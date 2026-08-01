@@ -21,54 +21,9 @@ import {
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./cameraStudio.css";
 
-const APP_NAME = "༄SW’s SPECTRAL IMAGE STUDIO𒀼";
 const STUDIO_UNLOCK_KEY = "ir-filter-camera-studio-unlocked";
-const YOUTUBE_CHANNEL_HANDLE = "@azel222";
-const YOUTUBE_CHANNEL_NAME = "Supernatural World";
-const YOUTUBE_CHANNEL_ID = "UCZd1C1Gw4Pjm4tiIJep4Oaw";
-const YOUTUBE_UPLOADS_PLAYLIST_ID = `UU${YOUTUBE_CHANNEL_ID.slice(2)}`;
-const YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@azel222";
-const YOUTUBE_SHARED_CHANNEL_URL = "https://youtube.com/@azel222?si=Uj_ZFMax1TYTZWbJ";
-const YOUTUBE_UPLOADS_PLAYLIST_URL = `https://www.youtube.com/playlist?list=${YOUTUBE_UPLOADS_PLAYLIST_ID}`;
-const YOUTUBE_UPLOADS_PLAYER_URL = `https://www.youtube.com/embed/videoseries?list=${YOUTUBE_UPLOADS_PLAYLIST_ID}&rel=0&modestbranding=1&playsinline=1`;
-const YOUTUBE_RECENT_UPLOADS = [
-  {
-    id: "5_T2LfeRDEY",
-    title: "TRIGGER - AMV Motionless in White - Werewolf Project Clip",
-    published: "2026-07-18",
-    type: "Video"
-  },
-  {
-    id: "cg9QiVkD5sg",
-    title: "TRIGGER - AMV Motionless in White - Werewolf Project Clip",
-    published: "2026-07-17",
-    type: "Video"
-  },
-  {
-    id: "Kyp0UzzClVs",
-    title: "AMV Motionless in White - Werewolf Project Demo",
-    published: "2026-07-17",
-    type: "Short"
-  },
-  {
-    id: "L_EMmOeQ4-k",
-    title: "Pissing off my father - comedy short",
-    published: "2026-07-15",
-    type: "Short"
-  },
-  {
-    id: "qZG5Pi0K8Rw",
-    title: "2026 Shapeshifting Research Project Collab Preview",
-    published: "2026-07-07",
-    type: "Video"
-  },
-  {
-    id: "Rj0JyCcBHqA",
-    title: "Cute Wolf Mimicry - Wolf Says Hello Back",
-    published: "2026-07-04",
-    type: "Short"
-  }
-];
+const YOUTUBE_CHANNEL_URL = "https://youtube.com/@azel222?si=ytU4AFS_aaEr-NNA";
+const YOUTUBE_EMBED_URL = "https://www.youtube.com/embed?listType=user_uploads&list=azel222";
 const CONTACT_EMAIL = "alola99990@gmail.com";
 const CAPTURE_LIBRARY_LIMIT = 3;
 const MAX_RECORDING_MS = 180000;
@@ -100,14 +55,6 @@ const RGBW_CHANNELS = [
   { key: "G", label: "Green", min: 0, max: 255, color: "#61df7d" },
   { key: "B", label: "Blue", min: 0, max: 255, color: "#4cc7ff" },
   { key: "W", label: "White", min: 0, max: 255, color: "#f5f8fb" }
-];
-
-const INVERSION_ADJUSTMENTS = [
-  ["classicInvert", "Classic RGB Invert", 0, 100, "%", 0],
-  ["lumaInvert", "Luma Negative", 0, 100, "%", 0],
-  ["channelInvert", "Channel Swap Invert", 0, 100, "%", 0],
-  ["spectralInvert", "Spectral Invert", 0, 100, "%", 0],
-  ["thermalInvert", "Thermal Black-Hot Invert", 0, 100, "%", 0]
 ];
 
 const CORE_ADJUSTMENTS = [
@@ -194,7 +141,6 @@ const DEFAULT_SETTINGS = {
   sepia: 0,
   grayscale: 0,
   invert: 0,
-  ...Object.fromEntries(INVERSION_ADJUSTMENTS.map(([key, , , , , initial = 0]) => [key, initial])),
   ...Object.fromEntries(EXTRA_ADJUSTMENTS.map(([key, , , , , initial = 0]) => [key, initial])),
   ...Object.fromEntries(
     RGBW_MIXERS.flatMap((group) =>
@@ -319,9 +265,6 @@ const CATEGORIES = ["All Presets", "Favorites", ...EFFECT_FAMILIES.map((family) 
 
 function CameraStudio() {
   const videoRef = useRef(null);
-  const previewCanvasRef = useRef(null);
-  const cameraFrameAnchorRef = useRef(null);
-  const previewFrameRef = useRef(0);
   const streamRef = useRef(null);
   const recorderRef = useRef(null);
   const recordingChunksRef = useRef([]);
@@ -331,6 +274,7 @@ function CameraStudio() {
   const recordingStartedAtRef = useRef(0);
   const captureShelfRef = useRef([]);
   const renderStateRef = useRef({
+    filterCss: "",
     selectedEffect: CAMERA_EFFECTS[0],
     manualSettings: CAMERA_EFFECTS[0].settings,
     cameraFacing: "user"
@@ -347,14 +291,11 @@ function CameraStudio() {
   const [recordingMimeType, setRecordingMimeType] = useState("");
   const [captureShelf, setCaptureShelf] = useState([]);
   const [youtubeWindowOpen, setYoutubeWindowOpen] = useState(false);
-  const [selectedYoutubeVideoId, setSelectedYoutubeVideoId] = useState(YOUTUBE_RECENT_UPLOADS[0]?.id || "");
   const [selectedCategory, setSelectedCategory] = useState("All Presets");
   const [search, setSearch] = useState("");
   const [selectedEffectId, setSelectedEffectId] = useState(CAMERA_EFFECTS[0].id);
   const [manualSettings, setManualSettings] = useState(CAMERA_EFFECTS[0].settings);
   const [snapshotUrl, setSnapshotUrl] = useState("");
-  const [cameraHudActive, setCameraHudActive] = useState(false);
-  const [cameraFrameHeight, setCameraFrameHeight] = useState(0);
 
   const selectedEffect = useMemo(
     () => CAMERA_EFFECTS.find((effect) => effect.id === selectedEffectId) || CAMERA_EFFECTS[0],
@@ -373,48 +314,20 @@ function CameraStudio() {
     });
   }, [search, selectedCategory]);
 
-  const activeEditSettings = manualSettings;
-
-  const youtubePlayerUrl = useMemo(() => {
-    if (!selectedYoutubeVideoId) return YOUTUBE_UPLOADS_PLAYER_URL;
-    return `https://www.youtube.com/embed/${selectedYoutubeVideoId}?rel=0&modestbranding=1&playsinline=1`;
-  }, [selectedYoutubeVideoId]);
-  const selectedYoutubeVideo = useMemo(
-    () => YOUTUBE_RECENT_UPLOADS.find((video) => video.id === selectedYoutubeVideoId) || YOUTUBE_RECENT_UPLOADS[0],
-    [selectedYoutubeVideoId]
+  const filterCss = useMemo(() => buildFilterCss(manualSettings), [manualSettings]);
+  const overlayStyle = useMemo(() => buildOverlayStyle(selectedEffect, manualSettings), [manualSettings, selectedEffect]);
+  const specialOverlayStyle = useMemo(() => buildSpecialOverlayStyle(manualSettings), [manualSettings]);
+  const videoStyle = useMemo(
+    () => ({
+      filter: filterCss,
+      imageRendering: manualSettings.pixelate > 48 ? "pixelated" : "auto"
+    }),
+    [filterCss, manualSettings.pixelate]
   );
 
   useEffect(() => {
-    document.title = APP_NAME;
-  }, []);
-
-  useEffect(() => {
-    const updateCameraHud = () => {
-      const anchor = cameraFrameAnchorRef.current;
-      if (!anchor) return;
-      const rect = anchor.getBoundingClientRect();
-      const anchorHeight = anchor.offsetHeight || rect.height || cameraFrameHeight;
-      if (anchorHeight && !cameraHudActive) setCameraFrameHeight(anchorHeight);
-      const activationDistance = Math.min(220, Math.max(96, anchorHeight * 0.28));
-      const shouldFloat = rect.top < -activationDistance;
-      setCameraHudActive(shouldFloat);
-    };
-    updateCameraHud();
-    window.addEventListener("scroll", updateCameraHud, { passive: true });
-    window.addEventListener("resize", updateCameraHud);
-    return () => {
-      window.removeEventListener("scroll", updateCameraHud);
-      window.removeEventListener("resize", updateCameraHud);
-    };
-  }, [cameraFrameHeight, cameraHudActive]);
-
-  useEffect(() => {
-    renderStateRef.current = {
-      selectedEffect,
-      manualSettings,
-      cameraFacing
-    };
-  }, [cameraFacing, manualSettings, selectedEffect]);
+    renderStateRef.current = { filterCss, selectedEffect, manualSettings, cameraFacing };
+  }, [cameraFacing, filterCss, manualSettings, selectedEffect]);
 
   const attachCameraStream = useCallback(async (stream, nextFacing = cameraFacing) => {
     streamRef.current = stream;
@@ -426,14 +339,6 @@ function CameraStudio() {
     setCameraActive(true);
     setCameraStatus("Camera active. The video is local to this device and is not uploaded.");
   }, [cameraFacing]);
-
-  const updateActiveSettings = useCallback((updater) => {
-    const apply = (current) => {
-      const next = typeof updater === "function" ? updater(current) : updater;
-      return { ...current, ...next };
-    };
-    setManualSettings((current) => apply(current));
-  }, []);
 
   const addCaptureToShelf = useCallback((capture) => {
     setCaptureShelf((current) => {
@@ -589,7 +494,8 @@ function CameraStudio() {
 
     const drawFrame = () => {
       const video = videoRef.current;
-      drawStudioFrame(context, resolution.width, resolution.height, video, renderStateRef.current);
+      const renderState = renderStateRef.current;
+      drawStudioFrame(context, resolution.width, resolution.height, video, renderState);
       recordingFrameRef.current = window.requestAnimationFrame(drawFrame);
     };
     drawFrame();
@@ -608,50 +514,12 @@ function CameraStudio() {
 
   useEffect(
     () => () => {
-      if (previewFrameRef.current) {
-        window.cancelAnimationFrame(previewFrameRef.current);
-        previewFrameRef.current = 0;
-      }
       stopRecording("Recording stopped because the studio closed.");
       stopCamera();
       captureShelfRef.current.forEach((item) => URL.revokeObjectURL(item.url));
     },
     [stopCamera, stopRecording]
   );
-
-  useEffect(() => {
-    if (!cameraActive) {
-      if (previewFrameRef.current) {
-        window.cancelAnimationFrame(previewFrameRef.current);
-        previewFrameRef.current = 0;
-      }
-      return undefined;
-    }
-    const drawPreview = () => {
-      const canvas = previewCanvasRef.current;
-      const video = videoRef.current;
-      if (canvas && video) {
-        const width = video.videoWidth || 1280;
-        const height = video.videoHeight || 720;
-        if (canvas.width !== width) canvas.width = width;
-        if (canvas.height !== height) canvas.height = height;
-        const videoReady = hasRenderableVideoFrame(video);
-        canvas.classList.toggle("is-waiting-frame", !videoReady);
-        if (videoReady) {
-          const context = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
-          drawStudioFrame(context, width, height, video, renderStateRef.current);
-        }
-      }
-      previewFrameRef.current = window.requestAnimationFrame(drawPreview);
-    };
-    drawPreview();
-    return () => {
-      if (previewFrameRef.current) {
-        window.cancelAnimationFrame(previewFrameRef.current);
-        previewFrameRef.current = 0;
-      }
-    };
-  }, [cameraActive]);
 
   async function unlockStudio(event) {
     event.preventDefault();
@@ -677,7 +545,7 @@ function CameraStudio() {
   }
 
   function updateSetting(key, value) {
-    updateActiveSettings((current) => ({ ...current, [key]: Number(value) }));
+    setManualSettings((current) => ({ ...current, [key]: Number(value) }));
   }
 
   function handleStopCamera() {
@@ -692,12 +560,6 @@ function CameraStudio() {
     setSnapshotUrl("");
   }
 
-  function returnToFullCameraFrame() {
-    setCameraHudActive(false);
-    cameraFrameAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    setCameraStatus("Returned to the full camera window for download, snapshot, and recording controls.");
-  }
-
   async function captureSnapshot() {
     const video = videoRef.current;
     if (!video || !cameraActive) {
@@ -710,7 +572,7 @@ function CameraStudio() {
     canvas.width = width;
     canvas.height = height;
     const context = canvas.getContext("2d");
-    drawStudioFrame(context, width, height, video, renderStateRef.current);
+    drawStudioFrame(context, width, height, video, { filterCss, selectedEffect, manualSettings, cameraFacing });
     canvas.toBlob((blob) => {
       if (!blob) return;
       const url = URL.createObjectURL(blob);
@@ -739,7 +601,7 @@ function CameraStudio() {
         <div className="camera-studio-title">
           <Camera size={22} />
           <div>
-            <h1>{APP_NAME}</h1>
+            <h1>ESP32 IR Filter Console • Camera Studio</h1>
             <span>Secure local photo booth with virtual filters</span>
           </div>
         </div>
@@ -833,19 +695,13 @@ function CameraStudio() {
           </div>
         </aside>
 
-        <section className={`camera-preview-panel studio-panel${cameraHudActive ? " has-camera-hud" : ""}`}>
-          <div
-            ref={cameraFrameAnchorRef}
-            className={`camera-frame-anchor${cameraHudActive ? " hud-active" : ""}`}
-            style={cameraHudActive && cameraFrameHeight ? { minHeight: `${cameraFrameHeight}px` } : undefined}
-          >
-          <div className={`camera-frame${cameraHudActive ? " camera-frame-hud" : ""}`}>
-            <video ref={videoRef} className={`source-camera-video${cameraFacing === "user" ? " is-mirrored" : ""}`} autoPlay playsInline muted />
-            <canvas
-              ref={previewCanvasRef}
-              className="processed-preview-canvas"
-              aria-label="Processed local camera preview"
-            />
+        <section className="camera-preview-panel studio-panel">
+          <div className="camera-frame">
+            <video ref={videoRef} className={cameraFacing === "user" ? "is-mirrored" : ""} autoPlay playsInline muted style={videoStyle} />
+            <div className="studio-color-overlay" style={overlayStyle} />
+            <div className="studio-special-overlay" style={specialOverlayStyle} />
+            <div className="studio-grain" style={{ opacity: manualSettings.grain / 160 }} />
+            <div className="studio-vignette" style={{ opacity: manualSettings.vignette / 100 }} />
             {!cameraActive && (
               <div className="camera-placeholder">
                 <LockKeyhole size={40} />
@@ -860,13 +716,6 @@ function CameraStudio() {
               <span>{cameraFacing === "user" ? "Front camera" : "Rear camera"}</span>
               <span>{selectedEffect.name}</span>
             </div>
-            {cameraHudActive && (
-              <button type="button" className="camera-hud-tap-target" onClick={returnToFullCameraFrame} aria-label="Return to full camera editor">
-                <span>Camera HUD</span>
-                <strong>Tap to return to full editor</strong>
-              </button>
-            )}
-          </div>
           </div>
 
           <div className="studio-action-row">
@@ -985,11 +834,11 @@ function CameraStudio() {
               <section className="rgbw-mixer" key={group.key}>
                 <div className="rgbw-mixer-header">
                   <h3>{group.label}</h3>
-                  <span style={{ background: rgbwCss(activeEditSettings, group.key, 1) }} />
+                  <span style={{ background: rgbwCss(manualSettings, group.key, 1) }} />
                 </div>
                 {RGBW_CHANNELS.map((channel) => {
                   const settingKey = `${group.key}${channel.key}`;
-                  const value = activeEditSettings[settingKey] ?? 0;
+                  const value = manualSettings[settingKey] ?? 0;
                   return (
                     <label key={settingKey} className={`rgbw-slider channel-${channel.key.toLowerCase()}`}>
                       <span>
@@ -1002,7 +851,6 @@ function CameraStudio() {
                         min={channel.min}
                         max={channel.max}
                         value={value}
-                        onInput={(event) => updateSetting(settingKey, event.currentTarget.value)}
                         onChange={(event) => updateSetting(settingKey, event.target.value)}
                         style={{
                           "--value": `${(value / channel.max) * 100}%`,
@@ -1022,37 +870,15 @@ function CameraStudio() {
                 <span>
                   <SlidersHorizontal size={15} />
                   {label}
-                  <output>{activeEditSettings[key]}{unit}</output>
+                  <output>{manualSettings[key]}{unit}</output>
                 </span>
                 <input
                   type="range"
                   min={min}
                   max={max}
-                  value={activeEditSettings[key]}
-                  onInput={(event) => updateSetting(key, event.currentTarget.value)}
+                  value={manualSettings[key]}
                   onChange={(event) => updateSetting(key, event.target.value)}
-                  style={{ "--value": `${((activeEditSettings[key] - min) / (max - min)) * 100}%` }}
-                />
-              </label>
-            ))}
-          </div>
-          <div className="adjustment-group-label">Color inversion tools ×5</div>
-          <div className="adjustment-list">
-            {INVERSION_ADJUSTMENTS.map(([key, label, min, max, unit]) => (
-              <label key={key} className="studio-adjustment inversion-adjustment">
-                <span>
-                  <SlidersHorizontal size={15} />
-                  {label}
-                  <output>{activeEditSettings[key]}{unit}</output>
-                </span>
-                <input
-                  type="range"
-                  min={min}
-                  max={max}
-                  value={activeEditSettings[key]}
-                  onInput={(event) => updateSetting(key, event.currentTarget.value)}
-                  onChange={(event) => updateSetting(key, event.target.value)}
-                  style={{ "--value": `${((activeEditSettings[key] - min) / (max - min)) * 100}%` }}
+                  style={{ "--value": `${((manualSettings[key] - min) / (max - min)) * 100}%` }}
                 />
               </label>
             ))}
@@ -1064,16 +890,15 @@ function CameraStudio() {
                 <span>
                   <SlidersHorizontal size={15} />
                   {label}
-                  <output>{activeEditSettings[key]}{unit}</output>
+                  <output>{manualSettings[key]}{unit}</output>
                 </span>
                 <input
                   type="range"
                   min={min}
                   max={max}
-                  value={activeEditSettings[key]}
-                  onInput={(event) => updateSetting(key, event.currentTarget.value)}
+                  value={manualSettings[key]}
                   onChange={(event) => updateSetting(key, event.target.value)}
-                  style={{ "--value": `${((activeEditSettings[key] - min) / (max - min)) * 100}%` }}
+                  style={{ "--value": `${((manualSettings[key] - min) / (max - min)) * 100}%` }}
                 />
               </label>
             ))}
@@ -1122,91 +947,24 @@ function CameraStudio() {
                 <X size={20} />
               </button>
             </div>
-
-            <section className="youtube-channel-card" aria-label="YouTube channel summary">
-              <div className="youtube-channel-avatar">
-                <Youtube size={32} />
-              </div>
-              <div>
-                <span>{YOUTUBE_CHANNEL_HANDLE}</span>
-                <strong>{YOUTUBE_CHANNEL_NAME}</strong>
-                <p>
-                  Embedded channel homepages are blocked by YouTube frame security, so this window uses the official uploads
-                  player and an in-app recent-upload browser.
-                </p>
-              </div>
-              <a href={YOUTUBE_CHANNEL_URL} target="_blank" rel="noreferrer">
-                <ExternalLink size={16} />
-                Open channel
-              </a>
-            </section>
-
-            {selectedYoutubeVideo && (
-              <section className="youtube-featured-upload" aria-label="Selected YouTube upload">
-                <img src={`https://i.ytimg.com/vi/${selectedYoutubeVideo.id}/hqdefault.jpg`} alt="" />
-                <div>
-                  <span>{selectedYoutubeVideo.type} loaded in player</span>
-                  <strong>{selectedYoutubeVideo.title}</strong>
-                  <small>Published {selectedYoutubeVideo.published}</small>
-                </div>
-                <a href={`https://www.youtube.com/watch?v=${selectedYoutubeVideo.id}`} target="_blank" rel="noreferrer">
-                  <ExternalLink size={16} />
-                  Open video
-                </a>
-              </section>
-            )}
-
             <div className="youtube-frame-shell">
               <iframe
-                title={selectedYoutubeVideoId ? "Supernatural World selected YouTube video" : "Supernatural World uploads playlist"}
-                src={youtubePlayerUrl}
+                title="Supernatural World YouTube channel home page"
+                src={YOUTUBE_CHANNEL_URL}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 referrerPolicy="strict-origin-when-cross-origin"
-                allowFullScreen
               />
               <div className="youtube-frame-fallback">
-                <strong>{selectedYoutubeVideoId ? "Selected upload player" : "Channel uploads player"}</strong>
-                <span>
-                  YouTube blocks the actual channel homepage inside frames, but videos and playlists can render through
-                  official embed URLs.
-                </span>
+                <strong>YouTube may block channel pages inside embedded frames.</strong>
+                <span>Use the button below if the homepage does not render in this GUI window.</span>
               </div>
             </div>
-
-            <div className="youtube-browser-toolbar" aria-label="YouTube browser controls">
-              <button
-                type="button"
-                className={!selectedYoutubeVideoId ? "active" : ""}
-                onClick={() => setSelectedYoutubeVideoId("")}
-              >
-                <Film size={16} />
-                Uploads playlist
-              </button>
-              <span>Channel ID: {YOUTUBE_CHANNEL_ID}</span>
-            </div>
-
-            <div className="youtube-upload-grid" aria-label="Recent YouTube uploads">
-              {YOUTUBE_RECENT_UPLOADS.map((video) => (
-                <button
-                  key={video.id}
-                  type="button"
-                  className={selectedYoutubeVideoId === video.id ? "active" : ""}
-                  onClick={() => setSelectedYoutubeVideoId(video.id)}
-                >
-                  <img src={`https://i.ytimg.com/vi/${video.id}/hqdefault.jpg`} alt="" loading="lazy" />
-                  <span>{video.type}</span>
-                  <strong>{video.title}</strong>
-                  <small>{video.published}</small>
-                </button>
-              ))}
-            </div>
-
             <div className="youtube-window-actions">
-              <a href={YOUTUBE_SHARED_CHANNEL_URL} target="_blank" rel="noreferrer">
+              <a href={YOUTUBE_CHANNEL_URL} target="_blank" rel="noreferrer">
                 <ExternalLink size={16} />
                 Open Channel Homepage
               </a>
-              <a href={YOUTUBE_UPLOADS_PLAYLIST_URL} target="_blank" rel="noreferrer">
+              <a href={YOUTUBE_EMBED_URL} target="_blank" rel="noreferrer">
                 <Film size={16} />
                 Open Uploads Player
               </a>
@@ -1224,83 +982,38 @@ function supportedMp4MimeType() {
 }
 
 function drawStudioFrame(context, width, height, video, renderState) {
-  if (!hasRenderableVideoFrame(video)) {
-    context.save();
-    context.globalAlpha = 1;
-    context.globalCompositeOperation = "source-over";
-    context.filter = "none";
-    context.fillStyle = "#030508";
-    context.fillRect(0, 0, width, height);
-    context.restore();
-    return false;
-  }
-  const {
-    selectedEffect,
-    manualSettings,
-    cameraFacing
-  } = renderState;
+  const { filterCss, selectedEffect, manualSettings, cameraFacing } = renderState;
   context.save();
+  context.filter = "none";
   context.globalAlpha = 1;
   context.globalCompositeOperation = "source-over";
-  context.filter = "none";
   context.fillStyle = "#030508";
   context.fillRect(0, 0, width, height);
-  const base = renderProcessedLayer(width, height, video, {
-    selectedEffect,
-    settings: manualSettings,
-    cameraFacing
-  });
-  context.drawImage(base, 0, 0);
-  context.restore();
-  return true;
-}
-
-function renderProcessedLayer(width, height, video, { selectedEffect, settings, cameraFacing }) {
-  const layer = document.createElement("canvas");
-  layer.width = width;
-  layer.height = height;
-  const layerContext = layer.getContext("2d", { alpha: false, willReadFrequently: hasPixelInversion(settings) });
-  layerContext.save();
-  layerContext.filter = "none";
-  layerContext.globalAlpha = 1;
-  layerContext.globalCompositeOperation = "source-over";
-  layerContext.fillStyle = "#030508";
-  layerContext.fillRect(0, 0, width, height);
-  if (hasRenderableVideoFrame(video)) {
-    const crop = coverCrop(video.videoWidth || width, video.videoHeight || height, width, height);
-    layerContext.filter = buildSpatialFilterCss(settings);
-    if (cameraFacing === "user") {
-      layerContext.translate(width, 0);
-      layerContext.scale(-1, 1);
+  if (video?.readyState >= 2) {
+    const sourceWidth = video.videoWidth || width;
+    const sourceHeight = video.videoHeight || height;
+    const sourceRatio = sourceWidth / sourceHeight;
+    const targetRatio = width / height;
+    let sx = 0;
+    let sy = 0;
+    let sw = sourceWidth;
+    let sh = sourceHeight;
+    if (sourceRatio > targetRatio) {
+      sw = sourceHeight * targetRatio;
+      sx = (sourceWidth - sw) / 2;
+    } else {
+      sh = sourceWidth / targetRatio;
+      sy = (sourceHeight - sh) / 2;
     }
-    layerContext.drawImage(video, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, width, height);
+    context.filter = filterCss;
+    if (cameraFacing === "user") {
+      context.translate(width, 0);
+      context.scale(-1, 1);
+    }
+    context.drawImage(video, sx, sy, sw, sh, 0, 0, width, height);
   }
-  layerContext.restore();
-  applyTonePixelAdjustments(layerContext, width, height, settings);
-  paintOverlay(layerContext, width, height, selectedEffect, settings);
-  applyInversionEffects(layerContext, width, height, settings);
-  return layer;
-}
-
-function hasRenderableVideoFrame(video) {
-  return Boolean(video && video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0);
-}
-
-function coverCrop(sourceWidth, sourceHeight, targetWidth, targetHeight) {
-  const sourceRatio = sourceWidth / sourceHeight;
-  const targetRatio = targetWidth / targetHeight;
-  let sx = 0;
-  let sy = 0;
-  let sw = sourceWidth;
-  let sh = sourceHeight;
-  if (sourceRatio > targetRatio) {
-    sw = sourceHeight * targetRatio;
-    sx = (sourceWidth - sw) / 2;
-  } else {
-    sh = sourceWidth / targetRatio;
-    sy = (sourceHeight - sh) / 2;
-  }
-  return { sx, sy, sw, sh };
+  context.restore();
+  paintOverlay(context, width, height, selectedEffect, manualSettings);
 }
 
 function buildFilterCss(settings) {
@@ -1333,192 +1046,6 @@ function buildFilterCss(settings) {
   ]
     .filter(Boolean)
     .join(" ");
-}
-
-function buildSpatialFilterCss(settings) {
-  const blur = clamp(
-    setting(settings, "blur") +
-      setting(settings, "softFocus") * 0.04 +
-      setting(settings, "radialBlur") * 0.02 +
-      setting(settings, "motionBlur") * 0.018,
-    0,
-    18
-  );
-  return blur ? `blur(${blur}px)` : "none";
-}
-
-function applyTonePixelAdjustments(context, width, height, settings) {
-  if (!needsTonePixelAdjustments(settings)) return;
-  let imageData;
-  try {
-    imageData = context.getImageData(0, 0, width, height);
-  } catch {
-    return;
-  }
-  const data = imageData.data;
-  const exposure = setting(settings, "exposure") / 80;
-  const brightnessScale = clamp(setting(settings, "brightness", 100) / 100 + exposure * 0.72 + setting(settings, "gamma") / 280, 0.05, 3.2);
-  const contrastScale = clamp(
-    setting(settings, "contrast", 100) / 100 +
-      setting(settings, "clarity") / 260 +
-      setting(settings, "dehaze") / 240 -
-      setting(settings, "fade") / 260,
-    0.05,
-    3.2
-  );
-  const saturationScale = clamp(
-    setting(settings, "saturation", 100) / 100 + setting(settings, "vibrance") / 145 + setting(settings, "colorizeStrength") / 260,
-    0,
-    3.5
-  );
-  const hueDegrees = setting(settings, "hue") + setting(settings, "colorizeHue") * (setting(settings, "colorizeStrength") / 100);
-  const temperature = setting(settings, "temperature");
-  const tint = setting(settings, "tint");
-  const shadows = setting(settings, "shadows");
-  const highlights = setting(settings, "highlights");
-  const whites = setting(settings, "whites");
-  const blacks = setting(settings, "blacks");
-  const midtoneLift = setting(settings, "midtoneLift");
-  const fade = setting(settings, "fade") / 100;
-  const matte = setting(settings, "matte") / 100;
-  const grayscale = clamp(setting(settings, "grayscale") / 100 + setting(settings, "threshold") / 500, 0, 1);
-  const sepia = clamp(setting(settings, "sepia") / 100 + Math.max(0, setting(settings, "whiteBalance")) / 600, 0, 1);
-  const invert = clamp(setting(settings, "invert") / 100, 0, 1);
-  const posterize = clamp(setting(settings, "posterize"), 0, 100);
-  const threshold = clamp(setting(settings, "threshold"), 0, 100);
-  const solarize = clamp(setting(settings, "solarize"), 0, 100) / 100;
-  const redScale = clamp(setting(settings, "redChannel", 100) / 100 + setting(settings, "magentaBalance") / 500 - setting(settings, "cyanBalance") / 360, 0, 2.8);
-  const greenScale = clamp(setting(settings, "greenChannel", 100) / 100 - setting(settings, "magentaBalance") / 360 + setting(settings, "yellowBalance") / 500, 0, 2.8);
-  const blueScale = clamp(setting(settings, "blueChannel", 100) / 100 + setting(settings, "cyanBalance") / 500 - setting(settings, "yellowBalance") / 360, 0, 2.8);
-  for (let index = 0; index < data.length; index += 4) {
-    let r = data[index];
-    let g = data[index + 1];
-    let b = data[index + 2];
-    const luma = r * 0.2126 + g * 0.7152 + b * 0.0722;
-    const shadowWeight = clamp((128 - luma) / 128, 0, 1);
-    const highlightWeight = clamp((luma - 128) / 127, 0, 1);
-    const midtoneWeight = 1 - Math.abs(luma - 128) / 128;
-    const toneOffset =
-      shadows * 0.92 * shadowWeight +
-      highlights * 0.88 * highlightWeight +
-      whites * 0.54 +
-      blacks * -0.62 * shadowWeight +
-      midtoneLift * 0.64 * midtoneWeight;
-    r = (r - 128) * contrastScale + 128;
-    g = (g - 128) * contrastScale + 128;
-    b = (b - 128) * contrastScale + 128;
-    r = r * brightnessScale + toneOffset + temperature * 0.88 + tint * 0.48;
-    g = g * brightnessScale + toneOffset - tint * 0.58;
-    b = b * brightnessScale + toneOffset - temperature * 0.86 + tint * 0.22;
-    r *= redScale;
-    g *= greenScale;
-    b *= blueScale;
-    if (hueDegrees) [r, g, b] = hueRotatePixel(r, g, b, hueDegrees);
-    const gray = r * 0.2126 + g * 0.7152 + b * 0.0722;
-    r = gray + (r - gray) * saturationScale;
-    g = gray + (g - gray) * saturationScale;
-    b = gray + (b - gray) * saturationScale;
-    if (sepia) {
-      const sr = r * 0.393 + g * 0.769 + b * 0.189;
-      const sg = r * 0.349 + g * 0.686 + b * 0.168;
-      const sb = r * 0.272 + g * 0.534 + b * 0.131;
-      r = mix(r, sr, sepia);
-      g = mix(g, sg, sepia);
-      b = mix(b, sb, sepia);
-    }
-    if (grayscale) {
-      r = mix(r, gray, grayscale);
-      g = mix(g, gray, grayscale);
-      b = mix(b, gray, grayscale);
-    }
-    if (fade || matte) {
-      const haze = 128 + fade * 34;
-      r = mix(r, haze, clamp(fade * 0.42 + matte * 0.22, 0, 0.72));
-      g = mix(g, haze, clamp(fade * 0.42 + matte * 0.22, 0, 0.72));
-      b = mix(b, haze, clamp(fade * 0.42 + matte * 0.22, 0, 0.72));
-    }
-    if (threshold) {
-      const limit = 255 * (0.5 + (threshold - 50) / 300);
-      const binary = gray >= limit ? 255 : 0;
-      r = mix(r, binary, threshold / 100);
-      g = mix(g, binary, threshold / 100);
-      b = mix(b, binary, threshold / 100);
-    }
-    if (posterize) {
-      r = posterizeChannel(r, posterize);
-      g = posterizeChannel(g, posterize);
-      b = posterizeChannel(b, posterize);
-    }
-    if (solarize) {
-      r = mix(r, r > 128 ? 255 - r : r, solarize);
-      g = mix(g, g > 128 ? 255 - g : g, solarize);
-      b = mix(b, b > 128 ? 255 - b : b, solarize);
-    }
-    if (invert) {
-      r = mix(r, 255 - r, invert);
-      g = mix(g, 255 - g, invert);
-      b = mix(b, 255 - b, invert);
-    }
-    data[index] = clamp(Math.round(r), 0, 255);
-    data[index + 1] = clamp(Math.round(g), 0, 255);
-    data[index + 2] = clamp(Math.round(b), 0, 255);
-  }
-  context.putImageData(imageData, 0, 0);
-}
-
-function needsTonePixelAdjustments(settings) {
-  return [
-    ["brightness", 100],
-    ["contrast", 100],
-    ["exposure", 0],
-    ["saturation", 100],
-    ["hue", 0],
-    ["temperature", 0],
-    ["tint", 0],
-    ["sepia", 0],
-    ["grayscale", 0],
-    ["invert", 0],
-    ["gamma", 0],
-    ["shadows", 0],
-    ["highlights", 0],
-    ["whites", 0],
-    ["blacks", 0],
-    ["clarity", 0],
-    ["dehaze", 0],
-    ["fade", 0],
-    ["vibrance", 0],
-    ["posterize", 0],
-    ["solarize", 0],
-    ["threshold", 0],
-    ["cyanBalance", 0],
-    ["magentaBalance", 0],
-    ["yellowBalance", 0],
-    ["redChannel", 100],
-    ["greenChannel", 100],
-    ["blueChannel", 100],
-    ["whiteBalance", 0],
-    ["midtoneLift", 0],
-    ["matte", 0],
-    ["colorizeHue", 0],
-    ["colorizeStrength", 0]
-  ].some(([key, baseline]) => setting(settings, key, baseline) !== baseline);
-}
-
-function hueRotatePixel(r, g, b, degrees) {
-  const radians = (degrees * Math.PI) / 180;
-  const cos = Math.cos(radians);
-  const sin = Math.sin(radians);
-  return [
-    r * (0.213 + cos * 0.787 - sin * 0.213) + g * (0.715 - cos * 0.715 - sin * 0.715) + b * (0.072 - cos * 0.072 + sin * 0.928),
-    r * (0.213 - cos * 0.213 + sin * 0.143) + g * (0.715 + cos * 0.285 + sin * 0.14) + b * (0.072 - cos * 0.072 - sin * 0.283),
-    r * (0.213 - cos * 0.213 - sin * 0.787) + g * (0.715 - cos * 0.715 + sin * 0.715) + b * (0.072 + cos * 0.928 + sin * 0.072)
-  ];
-}
-
-function posterizeChannel(value, amount) {
-  const levels = Math.round(clamp(64 - amount * 0.58, 2, 64));
-  const step = 255 / Math.max(1, levels - 1);
-  return Math.round(value / step) * step;
 }
 
 function buildOverlayStyle(effect, settings) {
@@ -1573,26 +1100,23 @@ function buildSpecialOverlayStyle(settings) {
 
 function paintOverlay(context, width, height, effect, settings) {
   context.save();
-  context.globalAlpha = clamp(0.025 + settings.duotone / 260 + setting(settings, "overlayStrength") / 520, 0, 0.46);
+  context.globalAlpha = clamp(0.08 + settings.duotone / 150, 0, 0.82);
   context.globalCompositeOperation = canvasCompositeMode(effect.blendMode);
   context.fillStyle = effect.overlayColor;
   context.fillRect(0, 0, width, height);
   if (settings.temperature !== 0) {
-    context.globalAlpha = Math.abs(settings.temperature) / 300;
+    context.globalAlpha = Math.abs(settings.temperature) / 220;
     context.fillStyle = settings.temperature > 0 ? "rgb(255,128,42)" : "rgb(54,138,255)";
     context.fillRect(0, 0, width, height);
   }
   context.globalCompositeOperation = "screen";
-  const gradientAlpha = clamp(setting(settings, "overlayStrength") / 260, 0, 0.38);
-  if (gradientAlpha > 0.004) {
-    context.globalAlpha = gradientAlpha;
-    const linear = context.createLinearGradient(0, 0, width, height);
-    linear.addColorStop(0, rgbwCss(settings, "main", 1));
-    linear.addColorStop(0.5, rgbwCss(settings, "secondary", 1));
-    linear.addColorStop(1, rgbwCss(settings, "third", 1));
-    context.fillStyle = linear;
-    context.fillRect(0, 0, width, height);
-  }
+  context.globalAlpha = clamp(setting(settings, "overlayStrength") / 170, 0.03, 0.62);
+  const linear = context.createLinearGradient(0, 0, width, height);
+  linear.addColorStop(0, rgbwCss(settings, "main", 1));
+  linear.addColorStop(0.5, rgbwCss(settings, "secondary", 1));
+  linear.addColorStop(1, rgbwCss(settings, "third", 1));
+  context.fillStyle = linear;
+  context.fillRect(0, 0, width, height);
   if (setting(settings, "bloom") || setting(settings, "halation") || setting(settings, "lensFlare")) {
     context.globalAlpha = clamp((setting(settings, "bloom") + setting(settings, "halation") + setting(settings, "lensFlare")) / 260, 0, 0.78);
     const flare = context.createRadialGradient(width * 0.5, height * 0.14, 0, width * 0.5, height * 0.14, width * 0.58);
@@ -1611,76 +1135,6 @@ function paintOverlay(context, width, height, effect, settings) {
     context.fillRect(0, 0, width, height);
   }
   context.restore();
-}
-
-function hasPixelInversion(settings) {
-  return INVERSION_ADJUSTMENTS.some(([key]) => setting(settings, key) > 0);
-}
-
-function applyInversionEffects(context, width, height, settings) {
-  const classic = clamp(setting(settings, "classicInvert") / 100, 0, 1);
-  const luma = clamp(setting(settings, "lumaInvert") / 100, 0, 1);
-  const channel = clamp(setting(settings, "channelInvert") / 100, 0, 1);
-  const spectral = clamp(setting(settings, "spectralInvert") / 100, 0, 1);
-  const thermal = clamp(setting(settings, "thermalInvert") / 100, 0, 1);
-  if (!classic && !luma && !channel && !spectral && !thermal) return;
-  let imageData;
-  try {
-    imageData = context.getImageData(0, 0, width, height);
-  } catch {
-    return;
-  }
-  const data = imageData.data;
-  for (let index = 0; index < data.length; index += 4) {
-    let r = data[index];
-    let g = data[index + 1];
-    let b = data[index + 2];
-    if (classic) {
-      r = mix(r, 255 - r, classic);
-      g = mix(g, 255 - g, classic);
-      b = mix(b, 255 - b, classic);
-    }
-    if (luma) {
-      const y = r * 0.2126 + g * 0.7152 + b * 0.0722;
-      const target = 255 - y;
-      r = mix(r, target, luma);
-      g = mix(g, target, luma);
-      b = mix(b, target, luma);
-    }
-    if (channel) {
-      const nr = 255 - g;
-      const ng = 255 - b;
-      const nb = 255 - r;
-      r = mix(r, nr, channel);
-      g = mix(g, ng, channel);
-      b = mix(b, nb, channel);
-    }
-    if (spectral) {
-      const nr = clamp(255 - b + g * 0.18, 0, 255);
-      const ng = clamp(255 - r + b * 0.18, 0, 255);
-      const nb = clamp(255 - g + r * 0.18, 0, 255);
-      r = mix(r, nr, spectral);
-      g = mix(g, ng, spectral);
-      b = mix(b, nb, spectral);
-    }
-    if (thermal) {
-      const heat = (r + g + b) / 3;
-      const nr = clamp(255 - heat * 0.18, 0, 255);
-      const ng = clamp(128 - heat * 0.42 + b * 0.2, 0, 255);
-      const nb = clamp(255 - heat, 0, 255);
-      r = mix(r, nr, thermal);
-      g = mix(g, ng, thermal);
-      b = mix(b, nb, thermal);
-    }
-    data[index] = r;
-    data[index + 1] = g;
-    data[index + 2] = b;
-  }
-  context.putImageData(imageData, 0, 0);
-}
-
-function mix(from, to, amount) {
-  return clamp(from + (to - from) * amount, 0, 255);
 }
 
 function setting(settings, key, fallback = 0) {
