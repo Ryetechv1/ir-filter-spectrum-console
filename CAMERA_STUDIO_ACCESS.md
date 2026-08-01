@@ -27,7 +27,15 @@ The Camera Studio is opened from the main console with the `Studio` button. It r
 - `Start MP4` records a processed 1080P or 2K canvas stream as `.mp4` where the browser supports MP4 MediaRecorder.
 - `Stop Recording` ends the current MP4 recording before the 3-minute cap.
 - Four RGBW mixer groups drive live gradient color layers: Main, Secondary, Third, and Highlights.
+- Five inversion controls add Classic RGB Invert, Luma Negative, Channel Swap Invert, Spectral Invert, and Thermal Black-Hot Invert.
 - The adjustment surface includes 12 core photo sliders plus 50 advanced effect sliders for exposure-style controls, color channels, bloom/halation, scanlines, IR/UVA/thermal washes, and other photobooth effects.
+
+## YouTube Channel Window
+
+- The `YouTube channel` button opens a local GUI window for the Supernatural World channel.
+- YouTube blocks the actual channel homepage from rendering inside third-party iframes, so the app uses the official embedded uploads playlist for the playable window.
+- The popup also includes an in-app recent-upload browser with thumbnail cards that switch the embedded player to the selected video.
+- API keys are not stored in the static GitHub Pages bundle. If automatic YouTube Data API refresh is needed later, put the key behind a server-side endpoint or a referrer-restricted backend worker.
 
 Current trusted hash:
 
