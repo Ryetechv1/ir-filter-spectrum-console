@@ -8,7 +8,8 @@ The Camera Studio is opened from the main console with the `Studio` button. It r
 
 ## Security Model
 
-- The browser asks for camera permission with `navigator.mediaDevices.getUserMedia()`.
+- The browser asks for camera permission only after unlock and a user click on `Start Camera`.
+- The camera request uses `navigator.mediaDevices.getUserMedia({ video: true })`.
 - The video feed stays inside the visitor's browser. It is not uploaded to GitHub Pages, the ESP32 device, or any server.
 - The access code is checked locally with SHA-256. The plaintext trusted code is not stored in this repository.
 - This is a static-site trust gate, not backend authentication. Anyone with repository/source access can inspect the gate logic, so high-security deployments should move the code check to a server or identity provider.

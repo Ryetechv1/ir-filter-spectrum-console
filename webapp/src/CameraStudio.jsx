@@ -1,7 +1,6 @@
 import {
   Camera,
   Download,
-  FlipHorizontal,
   KeyRound,
   LockKeyhole,
   RefreshCw,
@@ -178,9 +177,8 @@ function CameraStudio() {
   const [authorized, setAuthorized] = useState(() => window.sessionStorage.getItem(STUDIO_UNLOCK_KEY) === "true");
   const [accessCode, setAccessCode] = useState("");
   const [authError, setAuthError] = useState("");
-  const [cameraStatus, setCameraStatus] = useState("Enter the trusted access code, then allow camera permission.");
+  const [cameraStatus, setCameraStatus] = useState("Enter the trusted access code. After unlock, use Start Camera to request browser permission.");
   const [cameraActive, setCameraActive] = useState(false);
-  const [facingMode, setFacingMode] = useState("user");
   const [selectedCategory, setSelectedCategory] = useState("All Presets");
   const [search, setSearch] = useState("");
   const [selectedEffectId, setSelectedEffectId] = useState(CAMERA_EFFECTS[0].id);
@@ -216,38 +214,27 @@ function CameraStudio() {
     setCameraActive(false);
   }, []);
 
-  const startCamera = useCallback(
-    async (nextFacingMode = facingMode) => {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        setCameraStatus("Camera access is not supported in this browser.");
-        return;
+  const startCamera = useCallback(async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraStatus("Camera access is not supported in this browser.");
+      return;
+    }
+    stopCamera();
+    setCameraStatus("Requesting camera permission...");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
       }
-      stopCamera();
-      setCameraStatus("Requesting camera permission...");
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: nextFacingMode,
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
-          },
-          audio: false
-        });
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-        }
-        setFacingMode(nextFacingMode);
-        setCameraActive(true);
-        setCameraStatus("Camera active. The video is local to this device and is not uploaded.");
-      } catch (error) {
-        setCameraActive(false);
-        setCameraStatus(`Camera permission failed: ${error.message || error}`);
-      }
-    },
-    [facingMode, stopCamera]
-  );
+      setCameraActive(true);
+      setCameraStatus("Camera active. The video is local to this device and is not uploaded.");
+    } catch (error) {
+      setCameraActive(false);
+      setCameraStatus(`Camera permission failed: ${error.message || error}`);
+    }
+  }, [stopCamera]);
 
   useEffect(() => () => stopCamera(), [stopCamera]);
 
@@ -266,8 +253,7 @@ function CameraStudio() {
     }
     window.sessionStorage.setItem(STUDIO_UNLOCK_KEY, "true");
     setAuthorized(true);
-    setCameraStatus(`Access granted for ${trustedUser.name}. Requesting camera permission...`);
-    await startCamera();
+    setCameraStatus(`Access granted for ${trustedUser.name}. Press Start Camera to trigger the browser permission popup.`);
   }
 
   function selectEffect(effect) {
@@ -279,9 +265,9 @@ function CameraStudio() {
     setManualSettings((current) => ({ ...current, [key]: Number(value) }));
   }
 
-  async function flipCamera() {
-    const nextFacingMode = facingMode === "user" ? "environment" : "user";
-    await startCamera(nextFacingMode);
+  function handleStopCamera() {
+    stopCamera();
+    setCameraStatus("Camera stopped. Press Start Camera to request camera access again.");
   }
 
   function resetStudio() {
@@ -384,7 +370,7 @@ function CameraStudio() {
 
         <section className="camera-preview-panel studio-panel">
           <div className="camera-frame">
-            <video ref={videoRef} playsInline muted style={{ filter: filterCss }} />
+            <video ref={videoRef} autoPlay playsInline muted style={{ filter: filterCss }} />
             <div className="studio-color-overlay" style={overlayStyle} />
             <div className="studio-grain" style={{ opacity: manualSettings.grain / 160 }} />
             <div className="studio-vignette" style={{ opacity: manualSettings.vignette / 100 }} />
@@ -407,11 +393,11 @@ function CameraStudio() {
           <div className="studio-action-row">
             <button type="button" onClick={() => startCamera()}>
               <Camera size={18} />
-              {cameraActive ? "Restart Camera" : "Start Camera"}
+              Start Camera
             </button>
-            <button type="button" onClick={flipCamera} disabled={!authorized}>
-              <FlipHorizontal size={18} />
-              Flip Camera
+            <button type="button" onClick={handleStopCamera} disabled={!cameraActive}>
+              <X size={18} />
+              Stop Camera
             </button>
             <button type="button" className="studio-snapshot" onClick={captureSnapshot} disabled={!cameraActive}>
               <Download size={19} />
