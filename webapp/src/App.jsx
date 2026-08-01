@@ -34,6 +34,7 @@ import {
 import CameraStudio from "./CameraStudio.jsx";
 import { DEFAULT_PROTOTYPE_ID, PROTOTYPES, getPrototype } from "./prototypes.js";
 
+const APP_NAME = "༄SW’s SPECTRAL IMAGE STUDIO𒀼";
 const DEFAULT_ADDRESS = "http://192.168.4.1";
 const DEFAULT_HOLOGRAM_ADDRESS = "http://192.168.8.1";
 const AUTO_OFF_SECONDS = 300;
@@ -191,7 +192,7 @@ function openCameraStudioWindow() {
   url.searchParams.set("studio", "camera");
   const studioWindow = window.open(
     url.toString(),
-    "ir-filter-camera-studio",
+    "sw-spectral-image-studio",
     "popup,width=1440,height=960"
   );
   if (!studioWindow) {
@@ -418,6 +419,10 @@ function groupOffPatch(groupKey) {
 }
 
 function App() {
+  useEffect(() => {
+    document.title = APP_NAME;
+  }, []);
+
   if (isCameraStudioRoute()) {
     return <CameraStudio />;
   }
@@ -862,7 +867,7 @@ function App() {
             <Camera size={22} strokeWidth={2.2} />
           </div>
           <div>
-            <h1>Spectrum Camera Console</h1>
+            <h1>{APP_NAME}</h1>
           </div>
         </div>
 

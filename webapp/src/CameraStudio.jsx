@@ -29,6 +29,7 @@ import {
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./cameraStudio.css";
 
+const APP_NAME = "༄SW’s SPECTRAL IMAGE STUDIO𒀼";
 const STUDIO_UNLOCK_KEY = "ir-filter-camera-studio-unlocked";
 const YOUTUBE_CHANNEL_URL = "https://youtube.com/@azel222?si=ytU4AFS_aaEr-NNA";
 const YOUTUBE_EMBED_URL = "https://www.youtube.com/embed?listType=user_uploads&list=azel222";
@@ -293,6 +294,7 @@ const CATEGORIES = ["All Presets", "Favorites", ...EFFECT_FAMILIES.map((family) 
 function CameraStudio() {
   const videoRef = useRef(null);
   const previewCanvasRef = useRef(null);
+  const cameraFrameAnchorRef = useRef(null);
   const previewFrameRef = useRef(0);
   const streamRef = useRef(null);
   const recorderRef = useRef(null);
@@ -344,6 +346,8 @@ function CameraStudio() {
   const [roiRegions, setRoiRegions] = useState([]);
   const [activeRoiId, setActiveRoiId] = useState("");
   const [snapshotUrl, setSnapshotUrl] = useState("");
+  const [cameraHudActive, setCameraHudActive] = useState(false);
+  const [cameraFrameHeight, setCameraFrameHeight] = useState(0);
 
   const selectedEffect = useMemo(
     () => CAMERA_EFFECTS.find((effect) => effect.id === selectedEffectId) || CAMERA_EFFECTS[0],
@@ -373,6 +377,30 @@ function CameraStudio() {
   );
 
   const smartRegions = smartAnalysis.regions || [];
+
+  useEffect(() => {
+    document.title = APP_NAME;
+  }, []);
+
+  useEffect(() => {
+    const updateCameraHud = () => {
+      const anchor = cameraFrameAnchorRef.current;
+      if (!anchor) return;
+      const rect = anchor.getBoundingClientRect();
+      const anchorHeight = anchor.offsetHeight || rect.height || cameraFrameHeight;
+      if (anchorHeight && !cameraHudActive) setCameraFrameHeight(anchorHeight);
+      const activationDistance = Math.min(220, Math.max(96, anchorHeight * 0.28));
+      const shouldFloat = rect.top < -activationDistance;
+      setCameraHudActive(shouldFloat);
+    };
+    updateCameraHud();
+    window.addEventListener("scroll", updateCameraHud, { passive: true });
+    window.addEventListener("resize", updateCameraHud);
+    return () => {
+      window.removeEventListener("scroll", updateCameraHud);
+      window.removeEventListener("resize", updateCameraHud);
+    };
+  }, [cameraFrameHeight, cameraHudActive]);
 
   useEffect(() => {
     renderStateRef.current = {
@@ -816,6 +844,12 @@ function CameraStudio() {
     setSnapshotUrl("");
   }
 
+  function returnToFullCameraFrame() {
+    setCameraHudActive(false);
+    cameraFrameAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setCameraStatus("Returned to the full camera window for ROI editing, download, and capture controls.");
+  }
+
   function setAreaModeAndScope(mode) {
     setAreaMode(mode);
     if (mode === "click") {
@@ -957,7 +991,7 @@ function CameraStudio() {
         <div className="camera-studio-title">
           <Camera size={22} />
           <div>
-            <h1>ESP32 IR Filter Console • Camera Studio</h1>
+            <h1>{APP_NAME}</h1>
             <span>Secure local photo booth with virtual filters</span>
           </div>
         </div>
@@ -1051,8 +1085,13 @@ function CameraStudio() {
           </div>
         </aside>
 
-        <section className="camera-preview-panel studio-panel">
-          <div className="camera-frame">
+        <section className={`camera-preview-panel studio-panel${cameraHudActive ? " has-camera-hud" : ""}`}>
+          <div
+            ref={cameraFrameAnchorRef}
+            className={`camera-frame-anchor${cameraHudActive ? " hud-active" : ""}`}
+            style={cameraHudActive && cameraFrameHeight ? { minHeight: `${cameraFrameHeight}px` } : undefined}
+          >
+          <div className={`camera-frame${cameraHudActive ? " camera-frame-hud" : ""}`}>
             <video ref={videoRef} className={`source-camera-video${cameraFacing === "user" ? " is-mirrored" : ""}`} autoPlay playsInline muted />
             <canvas
               ref={previewCanvasRef}
@@ -1092,6 +1131,13 @@ function CameraStudio() {
               <span>{cameraFacing === "user" ? "Front camera" : "Rear camera"}</span>
               <span>{selectedEffect.name}</span>
             </div>
+            {cameraHudActive && (
+              <button type="button" className="camera-hud-tap-target" onClick={returnToFullCameraFrame} aria-label="Return to full camera editor">
+                <span>Camera HUD</span>
+                <strong>Tap to return to full editor</strong>
+              </button>
+            )}
+          </div>
           </div>
 
           <section className="selective-editor-panel" aria-labelledby="selectiveEditorTitle">

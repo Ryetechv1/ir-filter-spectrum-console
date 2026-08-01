@@ -41,7 +41,7 @@
   font-size: clamp(16px, 1.7vw, 24px);
   line-height: 1.12;
   letter-spacing: 0.04em;
-  text-transform: uppercase;
+  overflow-wrap: anywhere;
 }
 
 .camera-studio-title span {
@@ -313,6 +313,10 @@
   padding: 14px;
 }
 
+.camera-frame-anchor {
+  min-width: 0;
+}
+
 .camera-frame {
   position: relative;
   min-height: min(60vh, 620px);
@@ -322,6 +326,88 @@
   background:
     linear-gradient(135deg, rgba(64, 79, 96, 0.32), transparent),
     #030508;
+}
+
+.camera-frame-hud {
+  position: fixed;
+  top: 92px;
+  right: auto;
+  left: 50%;
+  z-index: 80;
+  width: min(380px, calc(100vw - 28px));
+  height: 214px;
+  min-height: 0;
+  border-color: rgba(140, 232, 255, 0.78);
+  transform: translateX(-50%);
+  box-shadow:
+    0 24px 70px rgba(0, 0, 0, 0.58),
+    0 0 0 1px rgba(63, 208, 255, 0.28),
+    0 0 44px rgba(63, 208, 255, 0.14);
+  animation: cameraHudIn 180ms ease-out;
+}
+
+.camera-frame-hud video,
+.camera-frame-hud .processed-preview-canvas {
+  height: 100%;
+  min-height: 0;
+}
+
+.camera-frame-hud .camera-corners {
+  inset: 16px;
+}
+
+.camera-frame-hud .camera-live-badge {
+  top: 16px;
+  left: 18px;
+  font-size: 11px;
+}
+
+.camera-frame-hud .camera-meta-row {
+  display: none;
+}
+
+.camera-hud-tap-target {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  align-content: end;
+  justify-items: start;
+  gap: 2px;
+  padding: 14px;
+  border: 0;
+  border-radius: inherit;
+  color: #f5f8fb;
+  background:
+    linear-gradient(180deg, transparent 42%, rgba(2, 5, 8, 0.18) 58%, rgba(2, 5, 8, 0.82) 100%),
+    radial-gradient(circle at 100% 0%, rgba(63, 208, 255, 0.18), transparent 38%);
+  text-align: left;
+  cursor: pointer;
+}
+
+.camera-hud-tap-target span {
+  color: #8ce8ff;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.camera-hud-tap-target strong {
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+@keyframes cameraHudIn {
+  from {
+    opacity: 0;
+    transform: translate3d(-50%, -10px, 0) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(-50%, 0, 0) scale(1);
+  }
 }
 
 .camera-frame video {
@@ -1375,6 +1461,22 @@
   .camera-frame video,
   .processed-preview-canvas {
     min-height: 420px;
+  }
+
+  .camera-frame-hud {
+    top: auto;
+    right: 10px;
+    bottom: 12px;
+    left: 10px;
+    width: auto;
+    height: 208px;
+    min-height: 0;
+    transform: none;
+  }
+
+  .camera-frame-hud video,
+  .camera-frame-hud .processed-preview-canvas {
+    min-height: 0;
   }
 
   .effect-preset-grid,
