@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="720" viewBox="0 0 1100 720">
+  <defs>
+    <style>
+      .bg{fill:#0b1220}.panel{fill:#111b2d;stroke:#4b6587;stroke-width:2}.title{fill:#e8f2ff;font:700 28px Arial}
+      .label{fill:#d8e6f7;font:600 18px Arial}.small{fill:#aebdd1;font:15px Arial}.pin{fill:#17253b;stroke:#7aa2d6;stroke-width:1.5}
+      .wire5{stroke:#f7d154;stroke-width:5;fill:none}.wireg{stroke:#92a0b5;stroke-width:5;fill:none}.wires{stroke:#58b7ff;stroke-width:4;fill:none}
+      .wired{stroke:#44e0a7;stroke-width:4;fill:none}.warn{fill:#ffd166;font:600 16px Arial}
+    </style>
+  </defs>
+  <rect class="bg" width="1100" height="720"/>
+  <text class="title" x="48" y="56">Prototype 1 - ESP32-CAM + Arduino Nano Link</text>
+  <text class="small" x="48" y="86">Purpose: validate Wi-Fi camera streaming, ESP32-CAM web server, and ESP32-to-Nano serial communication before adding LEDs.</text>
+
+  <rect class="panel" x="70" y="150" width="250" height="350" rx="12"/>
+  <text class="label" x="110" y="190">5 V Buck Regulator</text>
+  <rect class="pin" x="105" y="245" width="95" height="42" rx="6"/><text class="label" x="125" y="273">+5 V</text>
+  <rect class="pin" x="105" y="320" width="95" height="42" rx="6"/><text class="label" x="125" y="348">GND</text>
+  <text class="small" x="102" y="430">Input from 2S LiPo/BMS</text>
+
+  <rect class="panel" x="430" y="120" width="250" height="420" rx="12"/>
+  <text class="label" x="475" y="162">ESP32-CAM</text>
+  <circle cx="555" cy="235" r="48" fill="#05070a" stroke="#76a9e6" stroke-width="3"/>
+  <text class="small" x="512" y="300">OV2640 lens</text>
+  <rect class="pin" x="452" y="350" width="80" height="34" rx="5"/><text class="small" x="468" y="373">5V</text>
+  <rect class="pin" x="452" y="394" width="80" height="34" rx="5"/><text class="small" x="465" y="417">GND</text>
+  <rect class="pin" x="580" y="350" width="80" height="34" rx="5"/><text class="small" x="596" y="373">IO14</text>
+  <rect class="pin" x="580" y="394" width="80" height="34" rx="5"/><text class="small" x="596" y="417">IO13</text>
+
+  <rect class="panel" x="780" y="120" width="250" height="420" rx="12"/>
+  <text class="label" x="820" y="162">Arduino Nano</text>
+  <rect class="pin" x="805" y="230" width="82" height="34" rx="5"/><text class="small" x="823" y="253">5V</text>
+  <rect class="pin" x="805" y="274" width="82" height="34" rx="5"/><text class="small" x="818" y="297">GND</text>
+  <rect class="pin" x="922" y="230" width="82" height="34" rx="5"/><text class="small" x="943" y="253">D2</text>
+  <rect class="pin" x="922" y="274" width="82" height="34" rx="5"/><text class="small" x="943" y="297">D4</text>
+  <text class="small" x="813" y="390">D2 = Nano RX from ESP32</text>
+  <text class="small" x="813" y="418">D4 = Nano TX to ESP32</text>
+
+  <path class="wire5" d="M200 266 H452"/>
+  <path class="wire5" d="M200 266 C500 75 800 90 846 230"/>
+  <path class="wireg" d="M200 341 H452"/>
+  <path class="wireg" d="M200 341 C500 610 800 590 846 308"/>
+  <path class="wires" d="M660 367 C720 350 850 250 922 247"/>
+  <path class="wired" d="M922 291 C825 360 725 410 660 411"/>
+
+  <text class="warn" x="674" y="455">Nano D4 to ESP32 IO13 must use 1k/2k divider.</text>
+  <text class="small" x="48" y="650">Webapp selection: Prototype 1 disables IR, UVA, and RGBW controls. Firmware clamps all light outputs off.</text>
+</svg>

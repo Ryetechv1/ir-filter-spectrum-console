@@ -1,0 +1,8 @@
+Comment,Designator,Footprint,Quantity,Layer,Assembly Type,LCSC Part #,Notes
+47uF-100uF,C1,C_1206_3216Metric,1,Top,SMT,,Bulk capacitor across regulated 5V LED rail
+0.1uF,C2,C_0805_2012Metric,1,Top,SMT,,Local LED rail bypass capacitor
+950nm IR,D1,LED_D5.0mm_IRBlack,1,Top,THT,,"950 nm 5 mm IR LED, verify vendor polarity before assembly"
+375nm UVA,D2,LED_D5.0mm_Clear,1,Top,THT,,"375 nm 5 mm UVA LED, verify vendor polarity and use UV shielding"
+RGBW 1 RIGHT,D3,LED_D5.0mm-4_RGB_Wide_Pins,1,Top,THT,,SK6812 RGBW 5 mm LED 1 right of lens; verify exact vendor pinout
+RGBW 2 LEFT,D4,LED_D5.0mm-4_RGB_Wide_Pins,1,Top,THT,,SK6812 RGBW 5 mm LED 2 left of lens; verify exact vendor pinout
+14P FFC TO MAIN,J1,Molex_200528-0140_1x14-1MP_P1.00mm_Horizontal,1,Top,SMT,,"14-pin 1.0 mm FFC/FPC connector, Molex 200528-0140 or compatible"

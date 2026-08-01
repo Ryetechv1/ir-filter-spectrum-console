@@ -1,0 +1,27 @@
+Reference,Quantity,Value,Footprint,Notes
+J1 J2,2,ESP32-CAM socket,1x08 2.54mm female headers,AI-Thinker style row spacing assumed 22.86mm
+J3,1,USB-UART upload pads,1x04 2.54mm,GND 5V adapter-TX adapter-RX
+JP1,1,ESP32 boot jumper,1x02 2.54mm,Short IO0 to GND only while uploading
+J4 J5,2,Arduino Nano socket rotated,1x15 2.54mm female headers,Keep Nano per project request
+P1 P2,2,2S pack solder pads,4.0mm THT pads,Protected XT30 2S pack/BMS connection
+P3 P4,2,2S charger solder pads,3.0mm THT pads,Use 8.4V 2S charger only; do not use 12.6V 3S charger
+P5 P6,2,2S buck input solder pads,3.0mm THT pads,Switched/fused 2S rail to buck input
+P7 P8,2,5V buck output solder pads,3.0mm THT pads,Regulated 5V output back to PCB, 1A min, 2A recommended
+P9 P10,2,LED enable solder pads,2.0mm THT pads,Optional external load switch enable and ground
+D1,1,950nm IR LED,LED_D5.0mm_IRBlack,5mm, 50mA max continuous
+D2,1,375nm UVA LED,LED_D5.0mm_Clear,5mm, use shielding and UV-rated eye protection
+J6 J7,2,SK6812 RGBW solder pads,1x04 2.54mm,+5 DIN GND DOUT chain pads
+Q1 Q2,2,AO3400A or equivalent logic NMOS,SOT-23,Low-side IR/UVA switching
+R1,1,100 ohm 0.25W,R_0805_2012Metric,IR current limit from 5V, about 35mA with 1.5V Vf
+R4,1,68 ohm 0.25W,R_0805_2012Metric,UVA current limit from 5V, about 21mA at 3.6V Vf
+R2 R5,2,150 ohm,R_0805_2012Metric,MOSFET gate resistors
+R3 R6,2,100k,R_0805_2012Metric,MOSFET gate pulldowns
+R7,1,330 ohm,R_0805_2012Metric,SK6812 data resistor
+R8,1,1k,R_0805_2012Metric,Nano D4 to ESP RX divider high side
+R9,1,2k,R_0805_2012Metric,Nano D4 to ESP RX divider low side
+R10,1,470 ohm,R_0805_2012Metric,ESP GPIO14 to Nano D2 series resistor
+C1,1,470uF to 1000uF 6.3V+,CP_Radial_D6.3mm_P2.50mm,Across SK6812 +5/GND near LED pads
+C2,1,0.1uF,C_0805_2012Metric,Local bypass near SK6812 pads
+F1,1,Inline battery fuse,external,Install in pack positive lead before switch
+SW1,1,Main power switch,external,Place between fused 2S positive and buck input
+H1-H3,3,M3 mounting holes,MountingHole_3.2mm_M3,Keep clear in 3D shell

@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="980" viewBox="0 0 1500 980" role="img" aria-labelledby="title desc">
+  <title id="title">Five prototype wiring overview</title>
+  <desc id="desc">Prototype stages for ESP32-CAM, Arduino Nano, IR, UVA, two camera RGBW LEDs, six acrylic RGBW LEDs, and production PCB.</desc>
+  <defs>
+    <style>
+      .bg { fill: #071018; }
+      .card { fill: #101b24; stroke: #344b5d; stroke-width: 2; rx: 12; }
+      .active { stroke: #3fd0ff; }
+      .text { fill: #edf6fb; font: 700 24px Arial, sans-serif; }
+      .small { fill: #c4d1dc; font: 600 16px Arial, sans-serif; }
+      .tiny { fill: #97a9b7; font: 500 13px Arial, sans-serif; }
+      .wire { fill: none; stroke: #9eb0bd; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+      .data { stroke: #3fd0ff; }
+      .pwm { stroke: #ff6c7a; }
+      .power { stroke: #69df5c; }
+      .pcb { stroke: #f1ad38; }
+    </style>
+  </defs>
+  <rect class="bg" width="1500" height="980"/>
+  <text class="text" x="54" y="54">ESP32-CAM / Nano staged prototype path</text>
+
+  <rect class="card active" x="54" y="92" width="260" height="160"/>
+  <text class="text" x="82" y="135">Prototype 1</text>
+  <text class="small" x="82" y="170">Camera + Nano</text>
+  <text class="tiny" x="82" y="202">GPIO14 -> Nano D2</text>
+  <text class="tiny" x="82" y="224">Nano D4 -> divider -> GPIO13</text>
+
+  <rect class="card active" x="348" y="92" width="260" height="160"/>
+  <text class="text" x="376" y="135">Prototype 2</text>
+  <text class="small" x="376" y="170">Add IR + UVA</text>
+  <text class="tiny" x="376" y="202">Nano D5 -> IR NMOS</text>
+  <text class="tiny" x="376" y="224">Nano D6 -> UVA NMOS</text>
+
+  <rect class="card active" x="642" y="92" width="260" height="160"/>
+  <text class="text" x="670" y="135">Prototype 3</text>
+  <text class="small" x="670" y="170">Add RGBW 1 + 2</text>
+  <text class="tiny" x="670" y="202">Nano D7 -> 330R -> RGBW1</text>
+  <text class="tiny" x="670" y="224">RGBW1 DOUT -> RGBW2 DIN</text>
+
+  <rect class="card active" x="936" y="92" width="260" height="160"/>
+  <text class="text" x="964" y="135">Prototype 4</text>
+  <text class="small" x="964" y="170">Add acrylic pairs</text>
+  <text class="tiny" x="964" y="202">RGBW2 -> Acrylic 1/2/3</text>
+  <text class="tiny" x="964" y="224">8 SK6812 pixels total</text>
+
+  <rect class="card pcb" x="1230" y="92" width="220" height="160"/>
+  <text class="text" x="1258" y="135">Prototype 5</text>
+  <text class="small" x="1258" y="170">PCB production</text>
+  <text class="tiny" x="1258" y="202">Main v0.8 + head v0.8</text>
+  <text class="tiny" x="1258" y="224">JST-GH 14-pin harness</text>
+
+  <path class="wire data" d="M314 172 H348"/>
+  <path class="wire pwm" d="M608 172 H642"/>
+  <path class="wire data" d="M902 172 H936"/>
+  <path class="wire pcb" d="M1196 172 H1230"/>
+
+  <rect class="card" x="90" y="330" width="300" height="250"/>
+  <text class="text" x="122" y="374">Shared core</text>
+  <text class="small" x="122" y="414">ESP32-CAM</text>
+  <text class="tiny" x="122" y="444">5V, GND, camera stream</text>
+  <text class="tiny" x="122" y="468">Webapp /status and /led</text>
+  <text class="small" x="122" y="512">Arduino Nano</text>
+  <text class="tiny" x="122" y="542">D2 RX, D4 TX, D5/D6 PWM, D7 RGBW</text>
+
+  <rect class="card" x="470" y="330" width="300" height="250"/>
+  <text class="text" x="502" y="374">Mono LED branch</text>
+  <text class="small" x="502" y="414">Prototype 2+</text>
+  <text class="tiny" x="502" y="444">IR: +5V -> 100R -> LED -> NMOS</text>
+  <text class="tiny" x="502" y="468">UVA: +5V -> 68R -> LED -> NMOS</text>
+  <text class="tiny" x="502" y="492">150R gate resistors, 100k pulldowns</text>
+
+  <rect class="card" x="850" y="330" width="300" height="250"/>
+  <text class="text" x="882" y="374">RGBW chain</text>
+  <text class="small" x="882" y="414">Prototype 3+</text>
+  <text class="tiny" x="882" y="444">SK6812 5V and GND bus</text>
+  <text class="tiny" x="882" y="468">D7 -> RGBW1 -> RGBW2</text>
+  <text class="tiny" x="882" y="492">Prototype 4 adds six more pixels</text>
+
+  <rect class="card" x="1230" y="330" width="220" height="250"/>
+  <text class="text" x="1262" y="374">PCB path</text>
+  <text class="small" x="1262" y="414">Prototype 5</text>
+  <text class="tiny" x="1262" y="444">2-layer main board</text>
+  <text class="tiny" x="1262" y="468">2-layer head board</text>
+  <text class="tiny" x="1262" y="492">Gerber + BOM + CPL</text>
+
+  <path class="wire power" d="M240 580 V680 H1340 V580"/>
+  <text class="small" x="546" y="716">All stages share a fused 2S battery path, proper 2S 8.4V charger/BMS, and regulated 5V rail.</text>
+  <text class="tiny" x="54" y="910">Webapp prototype selection clamps unavailable outputs: P1 no LEDs, P2 IR/UVA only, P3 IR/UVA + two camera RGBW, P4/P5 all outputs.</text>
+</svg>

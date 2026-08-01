@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="760" viewBox="0 0 1100 760">
+  <defs>
+    <style>
+      .bg{fill:#0b1220}.panel{fill:#111b2d;stroke:#4b6587;stroke-width:2}.title{fill:#e8f2ff;font:700 28px Arial}
+      .label{fill:#d8e6f7;font:600 18px Arial}.small{fill:#aebdd1;font:15px Arial}.pin{fill:#17253b;stroke:#7aa2d6;stroke-width:1.5}
+      .wire5{stroke:#f7d154;stroke-width:5;fill:none}.wireg{stroke:#92a0b5;stroke-width:5;fill:none}.data{stroke:#44e0a7;stroke-width:4;fill:none}
+      .part{fill:#17253b;stroke:#8aaad6;stroke-width:1.5}.rgb{fill:url(#rgb)}.warn{fill:#ffd166;font:600 16px Arial}
+    </style>
+    <linearGradient id="rgb" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff405f"/><stop offset=".35" stop-color="#22d3ee"/><stop offset=".7" stop-color="#8bff68"/><stop offset="1" stop-color="#ffffff"/>
+    </linearGradient>
+  </defs>
+  <rect class="bg" width="1100" height="760"/>
+  <text class="title" x="48" y="56">Prototype 3 - Camera RGBW Pair</text>
+  <text class="small" x="48" y="86">Adds the first two SK6812 RGBW 5 mm LEDs beside the ESP32-CAM lens. IR/UVA wiring remains from Prototype 2.</text>
+
+  <rect class="panel" x="70" y="150" width="270" height="440" rx="12"/>
+  <text class="label" x="104" y="190">Prototype 2 Base</text>
+  <rect class="part" x="112" y="245" width="150" height="50" rx="8"/><text class="small" x="140" y="276">ESP32-CAM</text>
+  <rect class="part" x="112" y="325" width="150" height="50" rx="8"/><text class="small" x="153" y="356">Nano</text>
+  <rect class="part" x="112" y="405" width="150" height="50" rx="8"/><text class="small" x="138" y="436">IR + UVA</text>
+  <text class="small" x="100" y="520">Keep all common power, ground,</text>
+  <text class="small" x="100" y="545">serial, IR, and UVA wiring.</text>
+
+  <rect class="panel" x="455" y="120" width="440" height="520" rx="12"/>
+  <text class="label" x="530" y="160">Two SK6812 RGBW LEDs</text>
+  <rect class="part" x="540" y="225" width="86" height="86" rx="12"/><circle class="rgb" cx="583" cy="268" r="28"/><text class="small" x="548" y="337">RGBW 1</text>
+  <rect class="part" x="720" y="225" width="86" height="86" rx="12"/><circle class="rgb" cx="763" cy="268" r="28"/><text class="small" x="728" y="337">RGBW 2</text>
+  <path class="wire5" d="M470 410 H865"/>
+  <path class="wireg" d="M470 468 H865"/>
+  <path class="wire5" d="M583 311 V410"/>
+  <path class="wire5" d="M763 311 V410"/>
+  <path class="wireg" d="M583 354 V468"/>
+  <path class="wireg" d="M763 354 V468"/>
+  <path class="data" d="M190 350 C330 180 445 247 540 268"/>
+  <rect class="part" x="390" y="236" width="66" height="34" rx="6"/><text class="small" x="406" y="258">330R</text>
+  <path class="data" d="M626 268 H720"/>
+  <text class="small" x="480" y="520">Nano D7 -> 330 ohm -> RGBW 1 DIN</text>
+  <text class="small" x="480" y="548">RGBW 1 DOUT -> RGBW 2 DIN</text>
+  <text class="small" x="480" y="576">Add 47 uF to 100 uF across 5 V/GND near LEDs</text>
+
+  <text class="warn" x="48" y="705">Webapp selection: Prototype 3 enables IR, UVA, RGBW 1, and RGBW 2. Acrylic RGBW zones stay disabled.</text>
+</svg>

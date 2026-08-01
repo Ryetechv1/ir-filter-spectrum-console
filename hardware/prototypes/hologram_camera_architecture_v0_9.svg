@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="760" viewBox="0 0 1180 760">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#08131d"/>
+      <stop offset="0.55" stop-color="#0b0f16"/>
+      <stop offset="1" stop-color="#030508"/>
+    </linearGradient>
+    <linearGradient id="cyan" x1="0" x2="1">
+      <stop offset="0" stop-color="#25c8ff"/>
+      <stop offset="1" stop-color="#6ae4ff"/>
+    </linearGradient>
+    <linearGradient id="rgb" x1="0" x2="1">
+      <stop offset="0" stop-color="#ff4f5d"/>
+      <stop offset="0.5" stop-color="#69df5c"/>
+      <stop offset="1" stop-color="#388dff"/>
+    </linearGradient>
+    <marker id="arrow" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L12,4 L0,8 z" fill="#d7e8f3"/>
+    </marker>
+  </defs>
+
+  <rect width="1180" height="760" rx="18" fill="url(#bg)"/>
+  <text x="40" y="58" fill="#eff8ff" font-family="Inter,Segoe UI,Arial" font-size="30" font-weight="700">Spectrum Camera v0.9 Hologram Architecture</text>
+  <text x="40" y="88" fill="#9fb2c0" font-family="Inter,Segoe UI,Arial" font-size="15">Primary path: ESP32-S3 GC2145 camera + Arduino Nano LED driver + ESP32-C6 LCD acrylic projection. ESP32-CAM remains backup.</text>
+
+  <g font-family="Inter,Segoe UI,Arial">
+    <rect x="52" y="136" width="250" height="148" rx="10" fill="#101b25" stroke="#315067"/>
+    <text x="80" y="174" fill="#eaf6fb" font-size="22" font-weight="700">iPhone / Browser</text>
+    <text x="80" y="206" fill="#9fb2c0" font-size="14">Webapp at localhost/LAN</text>
+    <text x="80" y="232" fill="#9fb2c0" font-size="14">Camera address input</text>
+    <text x="80" y="258" fill="#9fb2c0" font-size="14">Display address input</text>
+
+    <rect x="396" y="118" width="312" height="188" rx="12" fill="#0f1c28" stroke="#41cef7" stroke-width="2"/>
+    <text x="424" y="156" fill="#eaf6fb" font-size="22" font-weight="700">ESP32-S3 Camera Board</text>
+    <text x="424" y="186" fill="#9fb2c0" font-size="14">N16R8 + GC2145 ribbon camera</text>
+    <text x="424" y="212" fill="#9fb2c0" font-size="14">HTTP /status, /led, /capture</text>
+    <text x="424" y="238" fill="#9fb2c0" font-size="14">MJPEG stream on port 81</text>
+    <text x="424" y="264" fill="#9fb2c0" font-size="14">UART: GPIO1 TX, GPIO2 RX</text>
+
+    <rect x="830" y="118" width="278" height="188" rx="12" fill="#101b25" stroke="#536d7e"/>
+    <text x="858" y="156" fill="#eaf6fb" font-size="22" font-weight="700">ESP32-C6 LCD</text>
+    <text x="858" y="186" fill="#9fb2c0" font-size="14">1.47 in ST7789, 172 x 320</text>
+    <text x="858" y="212" fill="#9fb2c0" font-size="14">HTTP /status and /hologram</text>
+    <text x="858" y="238" fill="#9fb2c0" font-size="14">Default AP: 192.168.8.1</text>
+    <text x="858" y="264" fill="#9fb2c0" font-size="14">Projects into acrylic/glass sheet</text>
+
+    <rect x="410" y="404" width="282" height="196" rx="12" fill="#111a21" stroke="#6ddf5c"/>
+    <text x="438" y="442" fill="#eaf6fb" font-size="22" font-weight="700">Arduino Nano Driver</text>
+    <text x="438" y="472" fill="#9fb2c0" font-size="14">D5 IR PWM via NMOS</text>
+    <text x="438" y="498" fill="#9fb2c0" font-size="14">D6 UVA PWM via NMOS</text>
+    <text x="438" y="524" fill="#9fb2c0" font-size="14">D7 SK6812 RGBW data</text>
+    <text x="438" y="550" fill="#9fb2c0" font-size="14">8 RGBW pixels / 5 control zones</text>
+
+    <rect x="806" y="414" width="302" height="176" rx="12" fill="#111821" stroke="url(#rgb)" stroke-width="2"/>
+    <text x="834" y="452" fill="#eaf6fb" font-size="22" font-weight="700">Optical Head Chamber</text>
+    <text x="834" y="482" fill="#9fb2c0" font-size="14">2 RGBW LEDs beside lens</text>
+    <text x="834" y="508" fill="#9fb2c0" font-size="14">IR + UVA below lens</text>
+    <text x="834" y="534" fill="#9fb2c0" font-size="14">3 acrylic square RGBW pairs</text>
+    <text x="834" y="560" fill="#9fb2c0" font-size="14">45 degree hologram acrylic/glass</text>
+
+    <rect x="68" y="438" width="228" height="122" rx="10" fill="#151820" stroke="#788896" stroke-dasharray="8 7"/>
+    <text x="94" y="476" fill="#eaf6fb" font-size="20" font-weight="700">Legacy Backup</text>
+    <text x="94" y="506" fill="#9fb2c0" font-size="14">ESP32-CAM OV2640 path</text>
+    <text x="94" y="532" fill="#9fb2c0" font-size="14">v0.8 DRC-clean PCB order set</text>
+  </g>
+
+  <g fill="none" stroke="#d7e8f3" stroke-width="3" marker-end="url(#arrow)">
+    <path d="M302 198 C342 182 356 174 396 174"/>
+    <path d="M302 242 C500 330 688 330 830 238"/>
+    <path d="M552 306 L552 404"/>
+    <path d="M692 500 L806 500"/>
+    <path d="M969 306 L969 414"/>
+  </g>
+
+  <g font-family="Inter,Segoe UI,Arial" font-size="13" fill="#cfe7f5">
+    <text x="330" y="160">camera HTTP/MJPEG</text>
+    <text x="540" y="350">UART LED protocol</text>
+    <text x="708" y="482">power + data harness</text>
+    <text x="980" y="360">projection image</text>
+    <text x="510" y="330">display HTTP /hologram</text>
+  </g>
+
+  <rect x="50" y="664" width="1080" height="52" rx="9" fill="#0b1219" stroke="#2f4554"/>
+  <text x="72" y="696" fill="#f0c76c" font-family="Inter,Segoe UI,Arial" font-size="15" font-weight="700">PCB note:</text>
+  <text x="160" y="696" fill="#c5d2db" font-family="Inter,Segoe UI,Arial" font-size="15">v0.9 is a mechanical/electrical planning revision until the exact S3 board, GC2145 module, and C6 LCD board are measured.</text>
+</svg>

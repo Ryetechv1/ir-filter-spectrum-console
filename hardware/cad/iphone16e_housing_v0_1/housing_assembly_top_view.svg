@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="443" height="704" viewBox="0 0 443 704">
+  <rect width="100%" height="100%" fill="#07111f"/>
+  <text x="28" y="24" fill="#e5f0ff" font-family="Arial" font-size="16" font-weight="700">iPhone case housing v0.1 top-view assembly reference</text>
+  <rect x="40.0" y="35.0" width="322.6" height="634.2" rx="18" fill="#152638" stroke="#8ab7d4" stroke-width="2"/>
+  <rect x="40.0" y="35.0" width="151.2" height="176.4" rx="9" fill="#07111f" stroke="#f5d06b" stroke-width="2"/>
+  <text x="52.6" y="135.8" fill="#f5d06b" font-family="Arial" font-size="10">phone camera keepout</text>
+  <rect x="54.3" y="66.5" width="294.0" height="571.2" fill="#0a6b73" fill-opacity="0.45" stroke="#42d9ff" stroke-width="2"/>
+  <text x="71.1" y="394.1" fill="#dff7ff" font-family="Arial" font-size="12">main PCB bay</text>
+  <rect x="128.2" y="505.4" width="270.9" height="79.4" rx="4" fill="#252f3a" stroke="#b9c7d6" stroke-width="2"/>
+  <text x="136.6" y="555.8" fill="#eaf2f8" font-family="Arial" font-size="10">2S LiPo pocket</text>
+  <rect x="115.6" y="51.8" width="243.6" height="478.8" rx="5" fill="#193143" fill-opacity="0.7" stroke="#71d8ff" stroke-width="2"/>
+  <rect x="140.8" y="77.0" width="205.8" height="147.0" fill="none" stroke="#ffffff" stroke-dasharray="5 3" stroke-width="1.5"/>
+  <text x="292.0" y="119.0" fill="#ffffff" font-family="Arial" font-size="9">slide-in acrylic</text>
+  <rect x="199.6" y="194.6" width="75.6" height="75.6" fill="none" stroke="#a5b4fc" stroke-dasharray="4 3" stroke-width="1.3"/>
+  <rect x="199.6" y="253.4" width="75.6" height="75.6" fill="none" stroke="#a5b4fc" stroke-dasharray="4 3" stroke-width="1.3"/>
+  <rect x="199.6" y="312.2" width="75.6" height="75.6" fill="none" stroke="#a5b4fc" stroke-dasharray="4 3" stroke-width="1.3"/>
+  <text x="283.6" y="274.4" fill="#c7d2fe" font-family="Arial" font-size="9">3 acrylic RGBW zones</text>
+</svg>

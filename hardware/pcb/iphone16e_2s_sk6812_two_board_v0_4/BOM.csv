@@ -1,0 +1,28 @@
+Reference,Quantity,Value,Footprint,Board,Notes
+J1 J2,2,ESP32-CAM socket,1x08 2.54mm female headers,main,AI-Thinker style row spacing assumed 22.86mm
+J3,1,USB-UART upload header,1x04 2.54mm,main,GND 5V adapter-TX adapter-RX
+JP1,1,ESP32 boot jumper,1x02 2.54mm,main,Short IO0 to GND only while uploading
+J4 J5,2,Arduino Nano socket rotated,1x15 2.54mm female headers,main,Keep Nano per project request
+J8 J1,2,14-pin 1.0mm FFC connectors,Molex 200528-0140 or compatible,both,One on main and one on LED head
+FFC1,1,14-conductor 1.0mm FFC ribbon cable,matching contact style,assembly,Length depends on printed shell routing
+P1 P2,2,2S pack solder pads,4.0mm THT pads,main,Protected XT30 2S pack/BMS connection
+P3 P4,2,2S charger solder pads,3.0mm THT pads,main,Use 8.4V 2S charger only; do not use 12.6V 3S charger
+P5 P6,2,2S buck input solder pads,3.0mm THT pads,main,Switched/fused 2S rail to buck input
+P7 P8,2,5V buck output solder pads,3.0mm THT pads,main,Regulated 5V system rail back to PCB; 1A min, 2A recommended
+D1,1,950nm IR LED,LED_D5.0mm_IRBlack,head,5mm, 50mA max continuous
+D2,1,375nm UVA LED,LED_D5.0mm_Clear,head,5mm, use shielding and UV-rated eye protection
+D3 D4,2,SK6812 RGBW 5mm LED,LED_D5.0mm-4_RGB_Wide_Pins,head,Verify exact vendor pinout before PCBA order
+Q1 Q2,2,AO3400A or equivalent logic NMOS,SOT-23,main,IR/UVA low-side switching
+R1,1,100 ohm 0.25W,R_0805_2012Metric,main,IR current limit from 5V, about 35mA with 1.5V Vf
+R4,1,68 ohm 0.25W,R_0805_2012Metric,main,UVA current limit from 5V, about 21mA at 3.6V Vf
+R2 R5,2,150 ohm,R_0805_2012Metric,main,MOSFET gate resistors
+R3 R6,2,100k,R_0805_2012Metric,main,MOSFET gate pulldowns
+R7,1,330 ohm,R_0805_2012Metric,main,SK6812 data resistor before the FFC cable
+R8,1,1k,R_0805_2012Metric,main,Nano D4 to ESP RX divider high side
+R9,1,2k,R_0805_2012Metric,main,Nano D4 to ESP RX divider low side
+R10,1,470 ohm,R_0805_2012Metric,main,ESP GPIO14 to Nano D2 series resistor
+C1,1,47uF to 100uF 6.3V or higher,C_1206_3216Metric,head,Low-profile bulk capacitor across regulated +5V LED rail
+C2,1,0.1uF,C_0805_2012Metric,head,Local bypass near LEDs
+F1,1,Inline battery fuse,external,assembly,Install in pack positive lead before switch
+SW1,1,Main power switch,external,assembly,Place between fused 2S positive and buck input
+H1-H3,3,M3 mounting holes,MountingHole_3.2mm_M3,main,Keep clear in 3D shell

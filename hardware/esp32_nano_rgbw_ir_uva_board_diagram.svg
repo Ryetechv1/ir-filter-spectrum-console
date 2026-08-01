@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900" role="img" aria-labelledby="title desc">
+  <title id="title">ESP32-CAM Arduino Nano 2S SK6812 IR UVA circuit diagram</title>
+  <desc id="desc">Module-level wiring diagram for ESP32-CAM, Arduino Nano, 2S LiPo battery, 2S charger BMS, 5V buck regulator, IR LED, UVA LED, and eight SK6812 RGBW LEDs arranged as five control zones.</desc>
+  <defs>
+    <style>
+      .bg { fill: #071018; }
+      .panel { fill: #101b24; stroke: #395064; stroke-width: 2; rx: 14; }
+      .power { fill: #17251e; stroke: #69df5c; }
+      .warn { fill: #2a1c11; stroke: #f1ad38; }
+      .logic { fill: #102234; stroke: #3fd0ff; }
+      .led { fill: #201727; stroke: #b64ee5; }
+      .text { fill: #eef6fb; font: 700 24px Arial, sans-serif; }
+      .small { fill: #c7d4de; font: 600 17px Arial, sans-serif; }
+      .tiny { fill: #93a8b8; font: 500 14px Arial, sans-serif; }
+      .wire { fill: none; stroke: #dbe8ef; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+      .wire5 { stroke: #69df5c; }
+      .wirebat { stroke: #f1ad38; }
+      .wiredata { stroke: #3fd0ff; }
+      .wireled { stroke: #ff6c7a; }
+      .gnd { stroke: #a9b7c3; }
+    </style>
+  </defs>
+  <rect class="bg" x="0" y="0" width="1400" height="900"/>
+
+  <rect class="panel power" x="70" y="70" width="240" height="130"/>
+  <text class="text" x="105" y="120">2S LiPo Pack</text>
+  <text class="small" x="98" y="152">OVONIC 7.4V 450mAh</text>
+  <text class="tiny" x="98" y="178">61.9 x 16.3 x 13.4 mm, XT30</text>
+
+  <rect class="panel warn" x="390" y="70" width="280" height="130"/>
+  <text class="text" x="432" y="118">2S Charger/BMS</text>
+  <text class="small" x="430" y="150">8.4V full-charge only</text>
+  <text class="tiny" x="430" y="176">Do not use 3S / 12.6V charger</text>
+
+  <rect class="panel power" x="760" y="70" width="250" height="130"/>
+  <text class="text" x="798" y="118">5V Buck Regulator</text>
+  <text class="small" x="805" y="150">2S input to 5V output</text>
+  <text class="tiny" x="805" y="176">1A minimum, 2A preferred</text>
+
+  <rect class="panel power" x="1090" y="70" width="240" height="130"/>
+  <text class="text" x="1133" y="118">5V System Rail</text>
+  <text class="small" x="1132" y="150">ESP32, Nano, LEDs</text>
+  <text class="tiny" x="1132" y="176">Fuse near battery positive</text>
+
+  <path class="wire wirebat" d="M310 135 H390"/>
+  <path class="wire wirebat" d="M670 135 H760"/>
+  <path class="wire wire5" d="M1010 135 H1090"/>
+
+  <rect class="panel logic" x="120" y="315" width="300" height="210"/>
+  <text class="text" x="183" y="365">ESP32-CAM</text>
+  <text class="small" x="164" y="400">Wi-Fi + web API + MJPEG</text>
+  <text class="tiny" x="152" y="434">GPIO14 TX -> Nano D2</text>
+  <text class="tiny" x="152" y="460">GPIO13 RX <- Nano D4 divider</text>
+  <text class="tiny" x="152" y="486">5V + GND from buck rail</text>
+
+  <rect class="panel logic" x="560" y="300" width="330" height="245"/>
+  <text class="text" x="626" y="350">Arduino Nano</text>
+  <text class="small" x="610" y="385">Lighting command decoder</text>
+  <text class="tiny" x="600" y="420">D5 IR PWM, D6 UVA PWM</text>
+  <text class="tiny" x="600" y="446">D7 SK6812 data, D8 LED enable</text>
+  <text class="tiny" x="600" y="472">D2/D4 SoftwareSerial link</text>
+  <text class="tiny" x="600" y="498">Adafruit NeoPixel library</text>
+
+  <path class="wire wiredata" d="M420 405 C485 405 495 405 560 405"/>
+  <path class="wire wiredata" d="M560 455 C500 455 485 455 420 455"/>
+  <path class="wire wire5" d="M1210 200 V260 H270 V315"/>
+  <path class="wire wire5" d="M1210 260 H725 V300"/>
+  <path class="wire gnd" d="M1170 200 V280 H245 V315"/>
+  <path class="wire gnd" d="M1170 280 H700 V300"/>
+
+  <rect class="panel led" x="1030" y="300" width="280" height="135"/>
+  <text class="text" x="1100" y="346">IR 950 nm</text>
+  <text class="small" x="1070" y="378">5mm LED, max 50mA</text>
+  <text class="tiny" x="1065" y="404">5V -> 100R -> LED -> NMOS -> GND</text>
+
+  <rect class="panel led" x="1030" y="470" width="280" height="135"/>
+  <text class="text" x="1094" y="516">UVA 375 nm</text>
+  <text class="small" x="1068" y="548">5mm LED, 25-30mA target</text>
+  <text class="tiny" x="1065" y="574">5V -> 68R -> LED -> NMOS -> GND</text>
+
+  <rect class="panel led" x="1030" y="640" width="280" height="145"/>
+  <text class="text" x="1082" y="686">SK6812 RGBW x8</text>
+  <text class="small" x="1068" y="718">5 zones / one data chain</text>
+  <text class="tiny" x="1065" y="744">D7 -> 330R -> RGBW1 DIN</text>
+  <text class="tiny" x="1065" y="768">RGBW1 -> RGBW2 -> Acrylic 1/2/3 pairs</text>
+
+  <path class="wire wireled" d="M890 420 H1030"/>
+  <text class="tiny" x="922" y="407">D5 PWM</text>
+  <path class="wire wireled" d="M890 530 H1030"/>
+  <text class="tiny" x="922" y="517">D6 PWM</text>
+  <path class="wire wiredata" d="M725 545 V710 H1030"/>
+  <text class="tiny" x="738" y="690">D7 data</text>
+  <path class="wire wire5" d="M1210 260 V300"/>
+  <path class="wire wire5" d="M1210 435 V470"/>
+  <path class="wire wire5" d="M1210 605 V640"/>
+
+  <rect class="panel" x="80" y="655" width="770" height="150"/>
+  <text class="text" x="118" y="700">Two-board PCB v0.8 Mechanical Notes</text>
+  <text class="small" x="118" y="735">Main PCB 70 x 136mm with top-left phone camera keepout.</text>
+  <text class="small" x="118" y="765">Head PCB 50 x 90mm: camera LEDs plus three acrylic RGBW pairs.</text>
+  <text class="small" x="118" y="795">JST-GH 14-pin locking harness replaces the old ribbon/FFC idea.</text>
+
+  <text class="tiny" x="80" y="860">UVA and IR require shielding and eye protection. The phone camera and ESP32-CAM lens must both stay clear of the printed shell.</text>
+</svg>

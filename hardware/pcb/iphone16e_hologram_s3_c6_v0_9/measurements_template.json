@@ -1,0 +1,165 @@
+{
+  "package": "iphone16e_hologram_s3_c6_v0_9",
+  "status": "measurement-capture-template",
+  "units": "mm",
+  "angle_units": "deg",
+  "coordinate_convention": {
+    "origin": "top-left corner when the board/component text is readable upright",
+    "x_axis": "left-to-right",
+    "y_axis": "top-to-bottom",
+    "z_axis": "thickness or height above the board/back surface"
+  },
+  "capture_meta": {
+    "captured_by": "",
+    "capture_date": "",
+    "caliper_model": "",
+    "source_photos_folder": "",
+    "notes": ""
+  },
+  "esp32_s3_camera_board": {
+    "board_width": null,
+    "board_height": null,
+    "pcb_thickness": null,
+    "max_component_height_top": null,
+    "max_component_height_bottom": null,
+    "usb_c": {
+      "center_x": null,
+      "center_y": null,
+      "shell_width": null,
+      "shell_depth_keepout": null,
+      "plug_clearance_required": null,
+      "service_access": ""
+    },
+    "antenna_keepout": {
+      "x": null,
+      "y": null,
+      "width": null,
+      "height": null
+    },
+    "mounting_holes": [
+      { "id": "S3-H1", "center_x": null, "center_y": null, "diameter": null },
+      { "id": "S3-H2", "center_x": null, "center_y": null, "diameter": null },
+      { "id": "S3-H3", "center_x": null, "center_y": null, "diameter": null },
+      { "id": "S3-H4", "center_x": null, "center_y": null, "diameter": null }
+    ],
+    "header_rows": [
+      { "id": "S3-J1", "first_pin_x": null, "first_pin_y": null, "pitch": null, "pin_count": null },
+      { "id": "S3-J2", "first_pin_x": null, "first_pin_y": null, "pitch": null, "pin_count": null }
+    ],
+    "camera_fpc_connector": {
+      "center_x": null,
+      "center_y": null,
+      "width": null,
+      "height": null,
+      "orientation": ""
+    },
+    "buttons": [
+      { "id": "reset", "x": null, "y": null, "width": null, "height": null },
+      { "id": "boot", "x": null, "y": null, "width": null, "height": null }
+    ],
+    "notes": ""
+  },
+  "gc2145_camera_module": {
+    "pcb_width": null,
+    "pcb_height": null,
+    "pcb_thickness": null,
+    "lens_optical_center_x": null,
+    "lens_optical_center_y": null,
+    "lens_barrel_diameter": null,
+    "lens_total_height_above_pcb": null,
+    "ribbon_tail_width": null,
+    "ribbon_free_length": null,
+    "ribbon_exit_side": "",
+    "lens_to_case_opening_clearance": null,
+    "notes": ""
+  },
+  "esp32_c6_lcd_board": {
+    "board_width": null,
+    "board_height": null,
+    "pcb_thickness": null,
+    "lcd_active_area": {
+      "x": null,
+      "y": null,
+      "width": null,
+      "height": null
+    },
+    "display_stack_height_above_pcb": null,
+    "max_component_height_top": null,
+    "max_component_height_bottom": null,
+    "usb_c": {
+      "center_x": null,
+      "center_y": null,
+      "shell_width": null,
+      "shell_depth_keepout": null,
+      "plug_clearance_required": null,
+      "service_access": ""
+    },
+    "buttons": [
+      { "id": "reset", "x": null, "y": null, "width": null, "height": null },
+      { "id": "boot", "x": null, "y": null, "width": null, "height": null }
+    ],
+    "mounting_holes": [
+      { "id": "C6-H1", "center_x": null, "center_y": null, "diameter": null },
+      { "id": "C6-H2", "center_x": null, "center_y": null, "diameter": null },
+      { "id": "C6-H3", "center_x": null, "center_y": null, "diameter": null },
+      { "id": "C6-H4", "center_x": null, "center_y": null, "diameter": null }
+    ],
+    "antenna_keepout": {
+      "x": null,
+      "y": null,
+      "width": null,
+      "height": null
+    },
+    "notes": ""
+  },
+  "projection_sheet": {
+    "material": "",
+    "width": null,
+    "height": null,
+    "thickness": null,
+    "target_angle": 45,
+    "actual_angle": null,
+    "slot_insertion_depth": null,
+    "visible_projection_area_width": null,
+    "visible_projection_area_height": null,
+    "lcd_active_area_to_sheet_distance": null,
+    "camera_lens_center_to_sheet_nearest_point": null,
+    "acrylic_led_edge_distances": [
+      { "zone": "acrylic_1", "left_led_distance": null, "right_led_distance": null },
+      { "zone": "acrylic_2", "left_led_distance": null, "right_led_distance": null },
+      { "zone": "acrylic_3", "left_led_distance": null, "right_led_distance": null }
+    ],
+    "notes": ""
+  },
+  "iphone_case": {
+    "case_model": "",
+    "case_outer_width_at_camera_area": null,
+    "case_outer_height_reference_near_camera_area": null,
+    "camera_opening": {
+      "width": null,
+      "height": null,
+      "top_left_x_from_case_origin": null,
+      "top_left_y_from_case_origin": null,
+      "corner_radius": null
+    },
+    "case_thickness_at_camera_opening_lip": null,
+    "case_back_thickness_where_sled_attaches": null,
+    "available_flat_mounting_area": {
+      "width": null,
+      "height": null
+    },
+    "phone_camera_lens_protrusion_clearance_needed": null,
+    "notes": ""
+  },
+  "assembly_clearances": {
+    "gc2145_lens_to_case_opening_edge_min": null,
+    "c6_lcd_board_to_phone_or_case_min": null,
+    "battery_to_s3_antenna_keepout_min": null,
+    "battery_to_c6_antenna_keepout_min": null,
+    "s3_usb_c_access_path": "",
+    "c6_usb_c_access_path": "",
+    "main_sled_total_added_thickness": null,
+    "hologram_chamber_total_height_above_phone_back": null,
+    "notes": ""
+  }
+}

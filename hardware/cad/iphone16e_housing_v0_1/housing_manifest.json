@@ -1,0 +1,222 @@
+{
+  "01_phone_back_sled.stl": {
+    "triangles": 1224,
+    "bounds_mm": {
+      "min": [
+        0,
+        0,
+        0
+      ],
+      "max": [
+        76.8,
+        151.0,
+        7.2
+      ],
+      "size": [
+        76.8,
+        151.0,
+        7.2
+      ]
+    }
+  },
+  "02_main_board_retainer.stl": {
+    "triangles": 2364,
+    "bounds_mm": {
+      "min": [
+        2.6,
+        3.0,
+        0
+      ],
+      "max": [
+        74.2,
+        144.3,
+        8.0
+      ],
+      "size": [
+        71.6,
+        141.3,
+        8.0
+      ]
+    }
+  },
+  "03_ovonic_2s_battery_cradle.stl": {
+    "triangles": 108,
+    "bounds_mm": {
+      "min": [
+        0,
+        0,
+        0
+      ],
+      "max": [
+        68.5,
+        22.9,
+        17.4
+      ],
+      "size": [
+        68.5,
+        22.9,
+        17.4
+      ]
+    }
+  },
+  "04_head_board_camera_effect_chamber.stl": {
+    "triangles": 2336,
+    "bounds_mm": {
+      "min": [
+        0,
+        0,
+        0
+      ],
+      "max": [
+        58.0,
+        114.0,
+        16.05
+      ],
+      "size": [
+        58.0,
+        114.0,
+        16.05
+      ]
+    }
+  },
+  "06_clear_acrylic_lens_panel_template.stl": {
+    "triangles": 12,
+    "bounds_mm": {
+      "min": [
+        0,
+        0,
+        0
+      ],
+      "max": [
+        49.0,
+        35.0,
+        1.0
+      ],
+      "size": [
+        49.0,
+        35.0,
+        1.0
+      ]
+    }
+  },
+  "07_left_reflective_insert.stl": {
+    "triangles": 12,
+    "bounds_mm": {
+      "min": [
+        0,
+        0,
+        0
+      ],
+      "max": [
+        1.0,
+        37.5,
+        10.8
+      ],
+      "size": [
+        1.0,
+        37.5,
+        10.8
+      ]
+    }
+  },
+  "07_right_reflective_insert.stl": {
+    "triangles": 12,
+    "bounds_mm": {
+      "min": [
+        0.0,
+        0,
+        0
+      ],
+      "max": [
+        1.0,
+        37.5,
+        10.8
+      ],
+      "size": [
+        1.0,
+        37.5,
+        10.8
+      ]
+    }
+  },
+  "08_acrylic_square_1_template.stl": {
+    "triangles": 12,
+    "bounds_mm": {
+      "min": [
+        0,
+        0,
+        0
+      ],
+      "max": [
+        18.0,
+        18.0,
+        1.0
+      ],
+      "size": [
+        18.0,
+        18.0,
+        1.0
+      ]
+    }
+  },
+  "09_acrylic_square_2_template.stl": {
+    "triangles": 12,
+    "bounds_mm": {
+      "min": [
+        0,
+        0,
+        0
+      ],
+      "max": [
+        18.0,
+        18.0,
+        1.0
+      ],
+      "size": [
+        18.0,
+        18.0,
+        1.0
+      ]
+    }
+  },
+  "10_acrylic_square_3_template.stl": {
+    "triangles": 12,
+    "bounds_mm": {
+      "min": [
+        0,
+        0,
+        0
+      ],
+      "max": [
+        18.0,
+        18.0,
+        1.0
+      ],
+      "size": [
+        18.0,
+        18.0,
+        1.0
+      ]
+    }
+  },
+  "00_housing_all_parts_preview.stl": {
+    "triangles": 6104,
+    "bounds_mm": {
+      "min": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "max": [
+        76.8,
+        151.0,
+        34.4
+      ],
+      "size": [
+        76.8,
+        151.0,
+        34.4
+      ]
+    }
+  }
+}

@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="820" viewBox="0 0 1200 820">
+  <defs>
+    <style>
+      .bg{fill:#0b1220}.panel{fill:#111b2d;stroke:#4b6587;stroke-width:2}.title{fill:#e8f2ff;font:700 28px Arial}
+      .label{fill:#d8e6f7;font:600 18px Arial}.small{fill:#aebdd1;font:15px Arial}.data{stroke:#44e0a7;stroke-width:4;fill:none}
+      .wire5{stroke:#f7d154;stroke-width:5;fill:none}.wireg{stroke:#92a0b5;stroke-width:5;fill:none}.part{fill:#17253b;stroke:#8aaad6;stroke-width:1.5}
+      .rgb{fill:url(#rgb)}.acrylic{fill:#84d9ff22;stroke:#84d9ff;stroke-width:2}.warn{fill:#ffd166;font:600 16px Arial}
+    </style>
+    <linearGradient id="rgb" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff405f"/><stop offset=".35" stop-color="#22d3ee"/><stop offset=".7" stop-color="#8bff68"/><stop offset="1" stop-color="#ffffff"/>
+    </linearGradient>
+  </defs>
+  <rect class="bg" width="1200" height="820"/>
+  <text class="title" x="48" y="56">Prototype 4 - Full Acrylic RGBW Stack</text>
+  <text class="small" x="48" y="86">Adds six more SK6812 RGBW LEDs: one left and one right LED for each of three stacked acrylic squares.</text>
+
+  <rect class="panel" x="55" y="135" width="280" height="520" rx="12"/>
+  <text class="label" x="92" y="175">Prototype 3 Base</text>
+  <rect class="part" x="95" y="235" width="165" height="52" rx="8"/><text class="small" x="126" y="267">ESP32-CAM</text>
+  <rect class="part" x="95" y="315" width="165" height="52" rx="8"/><text class="small" x="139" y="347">Nano</text>
+  <rect class="part" x="95" y="395" width="165" height="52" rx="8"/><text class="small" x="121" y="427">IR + UVA</text>
+  <rect class="part" x="95" y="475" width="165" height="52" rx="8"/><text class="small" x="111" y="507">RGBW 1 + 2</text>
+  <text class="small" x="84" y="585">Nano D7 data continues through</text>
+  <text class="small" x="84" y="610">one SK6812 chain.</text>
+
+  <rect class="panel" x="430" y="125" width="680" height="600" rx="12"/>
+  <text class="label" x="630" y="165">Three Edge-Lit Acrylic Squares</text>
+  <text class="small" x="592" y="194">Each square is one logical RGBW zone using mirrored left/right pixels.</text>
+
+  <rect class="acrylic" x="575" y="240" width="270" height="105" rx="8"/><text class="label" x="642" y="300">Acrylic 1</text>
+  <rect class="acrylic" x="575" y="390" width="270" height="105" rx="8"/><text class="label" x="642" y="450">Acrylic 2</text>
+  <rect class="acrylic" x="575" y="540" width="270" height="105" rx="8"/><text class="label" x="642" y="600">Acrylic 3</text>
+
+  <g>
+    <circle class="rgb" cx="535" cy="292" r="26"/><text class="small" x="492" y="336">pixel 2</text>
+    <circle class="rgb" cx="885" cy="292" r="26"/><text class="small" x="858" y="336">pixel 3</text>
+    <circle class="rgb" cx="535" cy="442" r="26"/><text class="small" x="492" y="486">pixel 4</text>
+    <circle class="rgb" cx="885" cy="442" r="26"/><text class="small" x="858" y="486">pixel 5</text>
+    <circle class="rgb" cx="535" cy="592" r="26"/><text class="small" x="492" y="636">pixel 6</text>
+    <circle class="rgb" cx="885" cy="592" r="26"/><text class="small" x="858" y="636">pixel 7</text>
+  </g>
+
+  <path class="wire5" d="M465 690 H1045"/>
+  <path class="wireg" d="M465 715 H1045"/>
+  <path class="wire5" d="M535 318 V690M885 318 V690M535 468 V690M885 468 V690M535 618 V690M885 618 V690"/>
+  <path class="wireg" d="M510 292 C475 500 500 620 535 715M910 292 C945 500 920 620 885 715"/>
+  <path class="data" d="M178 501 C350 165 445 292 535 292 H885"/>
+  <path class="data" d="M885 292 C965 335 965 395 885 442 H535"/>
+  <path class="data" d="M535 442 C455 485 455 545 535 592 H885"/>
+
+  <text class="small" x="455" y="748">Logical zones: RGBW 1 = pixel 0, RGBW 2 = pixel 1, Acrylic 1 = pixels 2/3, Acrylic 2 = pixels 4/5, Acrylic 3 = pixels 6/7.</text>
+  <text class="warn" x="48" y="790">Webapp selection: Prototype 4 enables every lighting control. Use a 5 V buck with enough current margin.</text>
+</svg>

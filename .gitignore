@@ -1,0 +1,35 @@
+# Dependencies and package-manager caches
+node_modules/
+webapp/node_modules/
+
+# Local build outputs
+webapp/dist/
+dist/
+
+# Public GitHub Pages output is intentionally tracked
+!docs/
+
+# Local dev logs
+*.log
+webapp/*.log
+
+# Local environment/secrets
+.env
+.env.*
+!.env.example
+
+# Generated caches
+.cache/
+.vite/
+__pycache__/
+*.py[cod]
+
+# Local backups and transfer bundles
+backups/
+*.zip
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
