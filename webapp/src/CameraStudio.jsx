@@ -16,6 +16,7 @@ import {
   Trash2,
   Video,
   Youtube,
+  Zap,
   X
 } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -291,6 +292,8 @@ function CameraStudio() {
   const [recordingMimeType, setRecordingMimeType] = useState("");
   const [captureShelf, setCaptureShelf] = useState([]);
   const [youtubeWindowOpen, setYoutubeWindowOpen] = useState(false);
+  const [torchActive, setTorchActive] = useState(false);
+  const [torchSupported, setTorchSupported] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("All Presets");
   const [search, setSearch] = useState("");
   const [selectedEffectId, setSelectedEffectId] = useState(CAMERA_EFFECTS[0].id);
@@ -329,16 +332,26 @@ function CameraStudio() {
     renderStateRef.current = { filterCss, selectedEffect, manualSettings, cameraFacing };
   }, [cameraFacing, filterCss, manualSettings, selectedEffect]);
 
+  const updateTorchCapability = useCallback((stream) => {
+    const videoTrack = stream?.getVideoTracks?.()[0];
+    const capabilities = videoTrack?.getCapabilities?.() || {};
+    const supported = Boolean(capabilities.torch);
+    setTorchSupported(supported);
+    setTorchActive(false);
+    return supported;
+  }, []);
+
   const attachCameraStream = useCallback(async (stream, nextFacing = cameraFacing) => {
     streamRef.current = stream;
     if (videoRef.current) {
       videoRef.current.srcObject = stream;
       await videoRef.current.play();
     }
+    updateTorchCapability(stream);
     setCameraFacing(nextFacing);
     setCameraActive(true);
     setCameraStatus("Camera active. The video is local to this device and is not uploaded.");
-  }, [cameraFacing]);
+  }, [cameraFacing, updateTorchCapability]);
 
   const addCaptureToShelf = useCallback((capture) => {
     setCaptureShelf((current) => {
@@ -368,6 +381,8 @@ function CameraStudio() {
       streamRef.current = null;
     }
     if (videoRef.current) videoRef.current.srcObject = null;
+    setTorchActive(false);
+    setTorchSupported(false);
     setCameraActive(false);
   }, []);
 
@@ -404,6 +419,38 @@ function CameraStudio() {
       setCameraStatus(`Camera flip failed: ${error.message || error}`);
     }
   }, [attachCameraStream, cameraFacing, stopCamera]);
+
+  const toggleTorch = useCallback(async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraStatus("Flashlight access is not supported in this browser.");
+      return;
+    }
+    try {
+      let stream = streamRef.current;
+      if (!stream || cameraFacing !== "environment") {
+        stopCamera();
+        setCameraStatus("Requesting rear camera for flashlight access...");
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } } });
+        await attachCameraStream(stream, "environment");
+      }
+      const videoTrack = stream.getVideoTracks()[0];
+      const capabilities = videoTrack?.getCapabilities?.() || {};
+      if (!capabilities.torch) {
+        setTorchSupported(false);
+        setTorchActive(false);
+        setCameraStatus("This device/browser does not expose rear-camera flashlight control for this stream.");
+        return;
+      }
+      const nextTorch = !torchActive;
+      await videoTrack.applyConstraints({ advanced: [{ torch: nextTorch }] });
+      setTorchSupported(true);
+      setTorchActive(nextTorch);
+      setCameraStatus(nextTorch ? "Rear camera flashlight is on. Stream remains local to this device." : "Rear camera flashlight is off.");
+    } catch (error) {
+      setTorchActive(false);
+      setCameraStatus(`Flashlight toggle failed: ${error.message || error}`);
+    }
+  }, [attachCameraStream, cameraFacing, stopCamera, torchActive]);
 
   const stopRecording = useCallback((message = "Recording stopped.") => {
     if (recordingTimerRef.current) {
@@ -731,6 +778,10 @@ function CameraStudio() {
               <FlipHorizontal size={18} />
               Flip Camera
             </button>
+            <button type="button" className={torchActive ? "studio-torch active" : "studio-torch"} onClick={toggleTorch}>
+              <Zap size={18} />
+              {torchActive ? "Flashlight On" : "Rear Flashlight"}
+            </button>
             <button type="button" className="studio-snapshot" onClick={captureSnapshot} disabled={!cameraActive}>
               <Download size={19} />
               Snapshot
@@ -777,6 +828,9 @@ function CameraStudio() {
           </section>
 
           <p className="studio-status">{cameraStatus}</p>
+          {cameraActive && cameraFacing === "environment" && !torchSupported && (
+            <p className="studio-status torch-note">Flashlight control appears unsupported for the current rear-camera stream.</p>
+          )}
           {snapshotUrl && (
             <a className="snapshot-review" href={snapshotUrl} target="_blank" rel="noreferrer">
               Open last local snapshot

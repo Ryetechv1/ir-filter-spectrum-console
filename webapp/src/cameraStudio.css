@@ -442,7 +442,7 @@
 
 .studio-action-row {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -457,6 +457,14 @@
   font-weight: 850;
 }
 
+.studio-torch.active {
+  color: #031017;
+  border-color: transparent;
+  background: linear-gradient(180deg, #fff4a6, #ffbf2e);
+  box-shadow: 0 0 22px rgba(255, 211, 76, 0.28);
+  font-weight: 850;
+}
+
 .studio-status,
 .snapshot-review {
   margin: 0;
@@ -466,6 +474,10 @@
 
 .snapshot-review {
   color: #8ce8ff;
+}
+
+.torch-note {
+  color: #ffd98b;
 }
 
 .recording-panel,

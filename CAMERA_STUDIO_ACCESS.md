@@ -22,6 +22,7 @@ The Camera Studio is opened from the main console with the `Studio` button. It r
 - `Start Camera` opens the browser camera permission prompt.
 - `Stop Camera` stops all active video tracks.
 - `Flip Camera` toggles between front and rear camera requests after a stream is active.
+- `Rear Flashlight` requests the rear camera and toggles the device torch when the active video track exposes `torch` support through browser media capabilities. Unsupported browsers/devices show a status message instead.
 - `Snapshot` downloads a local PNG with the current CSS/video effect stack painted into the image and adds it to the local capture shelf.
 - `Start MP4` records a processed 1080P or 2K canvas stream as `.mp4` where the browser supports MP4 MediaRecorder.
 - `Stop Recording` ends the current MP4 recording before the 3-minute cap.
