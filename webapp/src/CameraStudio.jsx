@@ -31,8 +31,52 @@ import "./cameraStudio.css";
 
 const APP_NAME = "༄SW’s SPECTRAL IMAGE STUDIO𒀼";
 const STUDIO_UNLOCK_KEY = "ir-filter-camera-studio-unlocked";
-const YOUTUBE_CHANNEL_URL = "https://youtube.com/@azel222?si=ytU4AFS_aaEr-NNA";
-const YOUTUBE_EMBED_URL = "https://www.youtube.com/embed?listType=user_uploads&list=azel222";
+const YOUTUBE_CHANNEL_HANDLE = "@azel222";
+const YOUTUBE_CHANNEL_NAME = "Supernatural World";
+const YOUTUBE_CHANNEL_ID = "UCZd1C1Gw4Pjm4tiIJep4Oaw";
+const YOUTUBE_UPLOADS_PLAYLIST_ID = `UU${YOUTUBE_CHANNEL_ID.slice(2)}`;
+const YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@azel222";
+const YOUTUBE_SHARED_CHANNEL_URL = "https://youtube.com/@azel222?si=Uj_ZFMax1TYTZWbJ";
+const YOUTUBE_UPLOADS_PLAYLIST_URL = `https://www.youtube.com/playlist?list=${YOUTUBE_UPLOADS_PLAYLIST_ID}`;
+const YOUTUBE_UPLOADS_PLAYER_URL = `https://www.youtube.com/embed/videoseries?list=${YOUTUBE_UPLOADS_PLAYLIST_ID}&rel=0&modestbranding=1&playsinline=1`;
+const YOUTUBE_RECENT_UPLOADS = [
+  {
+    id: "5_T2LfeRDEY",
+    title: "TRIGGER - AMV Motionless in White - Werewolf Project Clip",
+    published: "2026-07-18",
+    type: "Video"
+  },
+  {
+    id: "cg9QiVkD5sg",
+    title: "TRIGGER - AMV Motionless in White - Werewolf Project Clip",
+    published: "2026-07-17",
+    type: "Video"
+  },
+  {
+    id: "Kyp0UzzClVs",
+    title: "AMV Motionless in White - Werewolf Project Demo",
+    published: "2026-07-17",
+    type: "Short"
+  },
+  {
+    id: "L_EMmOeQ4-k",
+    title: "Pissing off my father - comedy short",
+    published: "2026-07-15",
+    type: "Short"
+  },
+  {
+    id: "qZG5Pi0K8Rw",
+    title: "2026 Shapeshifting Research Project Collab Preview",
+    published: "2026-07-07",
+    type: "Video"
+  },
+  {
+    id: "Rj0JyCcBHqA",
+    title: "Cute Wolf Mimicry - Wolf Says Hello Back",
+    published: "2026-07-04",
+    type: "Short"
+  }
+];
 const CONTACT_EMAIL = "alola99990@gmail.com";
 const CAPTURE_LIBRARY_LIMIT = 3;
 const MAX_RECORDING_MS = 180000;
@@ -330,6 +374,7 @@ function CameraStudio() {
   const [recordingMimeType, setRecordingMimeType] = useState("");
   const [captureShelf, setCaptureShelf] = useState([]);
   const [youtubeWindowOpen, setYoutubeWindowOpen] = useState(false);
+  const [selectedYoutubeVideoId, setSelectedYoutubeVideoId] = useState(YOUTUBE_RECENT_UPLOADS[0]?.id || "");
   const [selectedCategory, setSelectedCategory] = useState("All Presets");
   const [search, setSearch] = useState("");
   const [selectedEffectId, setSelectedEffectId] = useState(CAMERA_EFFECTS[0].id);
@@ -377,6 +422,14 @@ function CameraStudio() {
   );
 
   const smartRegions = smartAnalysis.regions || [];
+  const youtubePlayerUrl = useMemo(() => {
+    if (!selectedYoutubeVideoId) return YOUTUBE_UPLOADS_PLAYER_URL;
+    return `https://www.youtube.com/embed/${selectedYoutubeVideoId}?rel=0&modestbranding=1&playsinline=1`;
+  }, [selectedYoutubeVideoId]);
+  const selectedYoutubeVideo = useMemo(
+    () => YOUTUBE_RECENT_UPLOADS.find((video) => video.id === selectedYoutubeVideoId) || YOUTUBE_RECENT_UPLOADS[0],
+    [selectedYoutubeVideoId]
+  );
 
   useEffect(() => {
     document.title = APP_NAME;
@@ -1513,24 +1566,91 @@ function CameraStudio() {
                 <X size={20} />
               </button>
             </div>
+
+            <section className="youtube-channel-card" aria-label="YouTube channel summary">
+              <div className="youtube-channel-avatar">
+                <Youtube size={32} />
+              </div>
+              <div>
+                <span>{YOUTUBE_CHANNEL_HANDLE}</span>
+                <strong>{YOUTUBE_CHANNEL_NAME}</strong>
+                <p>
+                  Embedded channel homepages are blocked by YouTube frame security, so this window uses the official uploads
+                  player and an in-app recent-upload browser.
+                </p>
+              </div>
+              <a href={YOUTUBE_CHANNEL_URL} target="_blank" rel="noreferrer">
+                <ExternalLink size={16} />
+                Open channel
+              </a>
+            </section>
+
+            {selectedYoutubeVideo && (
+              <section className="youtube-featured-upload" aria-label="Selected YouTube upload">
+                <img src={`https://i.ytimg.com/vi/${selectedYoutubeVideo.id}/hqdefault.jpg`} alt="" />
+                <div>
+                  <span>{selectedYoutubeVideo.type} loaded in player</span>
+                  <strong>{selectedYoutubeVideo.title}</strong>
+                  <small>Published {selectedYoutubeVideo.published}</small>
+                </div>
+                <a href={`https://www.youtube.com/watch?v=${selectedYoutubeVideo.id}`} target="_blank" rel="noreferrer">
+                  <ExternalLink size={16} />
+                  Open video
+                </a>
+              </section>
+            )}
+
             <div className="youtube-frame-shell">
               <iframe
-                title="Supernatural World YouTube channel home page"
-                src={YOUTUBE_CHANNEL_URL}
+                title={selectedYoutubeVideoId ? "Supernatural World selected YouTube video" : "Supernatural World uploads playlist"}
+                src={youtubePlayerUrl}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 referrerPolicy="strict-origin-when-cross-origin"
+                allowFullScreen
               />
               <div className="youtube-frame-fallback">
-                <strong>YouTube may block channel pages inside embedded frames.</strong>
-                <span>Use the button below if the homepage does not render in this GUI window.</span>
+                <strong>{selectedYoutubeVideoId ? "Selected upload player" : "Channel uploads player"}</strong>
+                <span>
+                  YouTube blocks the actual channel homepage inside frames, but videos and playlists can render through
+                  official embed URLs.
+                </span>
               </div>
             </div>
+
+            <div className="youtube-browser-toolbar" aria-label="YouTube browser controls">
+              <button
+                type="button"
+                className={!selectedYoutubeVideoId ? "active" : ""}
+                onClick={() => setSelectedYoutubeVideoId("")}
+              >
+                <Film size={16} />
+                Uploads playlist
+              </button>
+              <span>Channel ID: {YOUTUBE_CHANNEL_ID}</span>
+            </div>
+
+            <div className="youtube-upload-grid" aria-label="Recent YouTube uploads">
+              {YOUTUBE_RECENT_UPLOADS.map((video) => (
+                <button
+                  key={video.id}
+                  type="button"
+                  className={selectedYoutubeVideoId === video.id ? "active" : ""}
+                  onClick={() => setSelectedYoutubeVideoId(video.id)}
+                >
+                  <img src={`https://i.ytimg.com/vi/${video.id}/hqdefault.jpg`} alt="" loading="lazy" />
+                  <span>{video.type}</span>
+                  <strong>{video.title}</strong>
+                  <small>{video.published}</small>
+                </button>
+              ))}
+            </div>
+
             <div className="youtube-window-actions">
-              <a href={YOUTUBE_CHANNEL_URL} target="_blank" rel="noreferrer">
+              <a href={YOUTUBE_SHARED_CHANNEL_URL} target="_blank" rel="noreferrer">
                 <ExternalLink size={16} />
                 Open Channel Homepage
               </a>
-              <a href={YOUTUBE_EMBED_URL} target="_blank" rel="noreferrer">
+              <a href={YOUTUBE_UPLOADS_PLAYLIST_URL} target="_blank" rel="noreferrer">
                 <Film size={16} />
                 Open Uploads Player
               </a>

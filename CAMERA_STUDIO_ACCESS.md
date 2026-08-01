@@ -29,6 +29,13 @@ The Camera Studio is opened from the main console with the `Studio` button. It r
 - Four RGBW mixer groups drive live gradient color layers: Main, Secondary, Third, and Highlights.
 - The adjustment surface includes 12 core photo sliders plus 50 advanced effect sliders for exposure-style controls, color channels, bloom/halation, scanlines, IR/UVA/thermal washes, and other photobooth effects.
 
+## YouTube Channel Window
+
+- The `YouTube channel` button opens a local GUI window for the Supernatural World channel.
+- YouTube blocks the actual channel homepage from rendering inside third-party iframes, so the app uses the official embedded uploads playlist for the playable window.
+- The popup also includes an in-app recent-upload browser with thumbnail cards that switch the embedded player to the selected video.
+- API keys are not stored in the static GitHub Pages bundle. If automatic YouTube Data API refresh is needed later, put the key behind a server-side endpoint or a referrer-restricted backend worker.
+
 ## Selective Editing
 
 - The studio renders the visible camera feed through a local canvas so foreground, background, and brush/click ranges can have separate adjustments.
