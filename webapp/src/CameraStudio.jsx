@@ -783,11 +783,15 @@ function CameraStudio() {
         const height = video.videoHeight || 720;
         if (canvas.width !== width) canvas.width = width;
         if (canvas.height !== height) canvas.height = height;
-        const context = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
-        drawStudioFrame(context, width, height, video, {
-          ...renderStateRef.current,
-          foregroundBox: foregroundBoxRef.current
-        });
+        const videoReady = hasRenderableVideoFrame(video);
+        canvas.classList.toggle("is-waiting-frame", !videoReady);
+        if (videoReady) {
+          const context = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
+          drawStudioFrame(context, width, height, video, {
+            ...renderStateRef.current,
+            foregroundBox: foregroundBoxRef.current
+          });
+        }
       }
       previewFrameRef.current = window.requestAnimationFrame(drawPreview);
     };
@@ -869,6 +873,12 @@ function CameraStudio() {
 
   function selectEffect(effect) {
     setSelectedEffectId(effect.id);
+    if (areaMode === "all") {
+      setManualSettings(effect.settings);
+      setForegroundSettings(effect.settings);
+      setBackgroundSettings(effect.settings);
+      return;
+    }
     updateActiveSettings(effect.settings);
   }
 
@@ -1263,7 +1273,14 @@ function CameraStudio() {
             </section>
             <label className="brush-size-control">
               <span>Brush size <output>{brushSize}</output></span>
-              <input type="range" min="8" max="140" value={brushSize} onChange={(event) => setBrushSize(Number(event.target.value))} />
+              <input
+                type="range"
+                min="8"
+                max="140"
+                value={brushSize}
+                onInput={(event) => setBrushSize(Number(event.currentTarget.value))}
+                onChange={(event) => setBrushSize(Number(event.target.value))}
+              />
             </label>
             <div className="roi-action-row">
               <button type="button" onClick={() => createNewRoi(areaMode === "click" ? "click" : "brush")} disabled={roiRegions.length >= ROI_LIMIT}>
@@ -1450,6 +1467,7 @@ function CameraStudio() {
                         min={channel.min}
                         max={channel.max}
                         value={value}
+                        onInput={(event) => updateSetting(settingKey, event.currentTarget.value)}
                         onChange={(event) => updateSetting(settingKey, event.target.value)}
                         style={{
                           "--value": `${(value / channel.max) * 100}%`,
@@ -1476,6 +1494,7 @@ function CameraStudio() {
                   min={min}
                   max={max}
                   value={activeEditSettings[key]}
+                  onInput={(event) => updateSetting(key, event.currentTarget.value)}
                   onChange={(event) => updateSetting(key, event.target.value)}
                   style={{ "--value": `${((activeEditSettings[key] - min) / (max - min)) * 100}%` }}
                 />
@@ -1496,6 +1515,7 @@ function CameraStudio() {
                   min={min}
                   max={max}
                   value={activeEditSettings[key]}
+                  onInput={(event) => updateSetting(key, event.currentTarget.value)}
                   onChange={(event) => updateSetting(key, event.target.value)}
                   style={{ "--value": `${((activeEditSettings[key] - min) / (max - min)) * 100}%` }}
                 />
@@ -1516,6 +1536,7 @@ function CameraStudio() {
                   min={min}
                   max={max}
                   value={activeEditSettings[key]}
+                  onInput={(event) => updateSetting(key, event.currentTarget.value)}
                   onChange={(event) => updateSetting(key, event.target.value)}
                   style={{ "--value": `${((activeEditSettings[key] - min) / (max - min)) * 100}%` }}
                 />
@@ -1977,8 +1998,8 @@ function roiPointVisualStyle(point) {
   return {
     left: `${point.x * 100}%`,
     top: `${point.y * 100}%`,
-    width: `${radiusX * 200 * 100}%`,
-    height: `${radiusY * 200 * 100}%`,
+    width: `${radiusX * 200}%`,
+    height: `${radiusY * 200}%`,
     transform: "translate(-50%, -50%)"
   };
 }
@@ -2005,6 +2026,16 @@ function roiSmartVisualStyle(region) {
 }
 
 function drawStudioFrame(context, width, height, video, renderState) {
+  if (!hasRenderableVideoFrame(video)) {
+    context.save();
+    context.globalAlpha = 1;
+    context.globalCompositeOperation = "source-over";
+    context.filter = "none";
+    context.fillStyle = "#030508";
+    context.fillRect(0, 0, width, height);
+    context.restore();
+    return false;
+  }
   const {
     selectedEffect,
     manualSettings,
@@ -2030,7 +2061,11 @@ function drawStudioFrame(context, width, height, video, renderState) {
   });
   context.drawImage(base, 0, 0);
 
-  if (backgroundEnabled) {
+  const effectSettings = selectedEffect?.settings || DEFAULT_SETTINGS;
+  const hasBackgroundOverrides = backgroundEnabled && settingsChangedFromBaseline(backgroundSettings, effectSettings);
+  const hasForegroundOverrides = foregroundEnabled && settingsChangedFromBaseline(foregroundSettings, effectSettings);
+
+  if (hasBackgroundOverrides) {
     const background = renderProcessedLayer(width, height, video, {
       selectedEffect,
       settings: backgroundSettings,
@@ -2042,7 +2077,7 @@ function drawStudioFrame(context, width, height, video, renderState) {
     context.restore();
   }
 
-  if (foregroundEnabled) {
+  if (hasForegroundOverrides) {
     const foreground = renderProcessedLayer(width, height, video, {
       selectedEffect,
       settings: foregroundSettings,
@@ -2069,6 +2104,7 @@ function drawStudioFrame(context, width, height, video, renderState) {
       context.restore();
     });
   context.restore();
+  return true;
 }
 
 function renderProcessedLayer(width, height, video, { selectedEffect, settings, cameraFacing }) {
@@ -2082,9 +2118,9 @@ function renderProcessedLayer(width, height, video, { selectedEffect, settings, 
   layerContext.globalCompositeOperation = "source-over";
   layerContext.fillStyle = "#030508";
   layerContext.fillRect(0, 0, width, height);
-  if (video?.readyState >= 2) {
+  if (hasRenderableVideoFrame(video)) {
     const crop = coverCrop(video.videoWidth || width, video.videoHeight || height, width, height);
-    layerContext.filter = buildFilterCss(settings);
+    layerContext.filter = buildSpatialFilterCss(settings);
     if (cameraFacing === "user") {
       layerContext.translate(width, 0);
       layerContext.scale(-1, 1);
@@ -2092,9 +2128,22 @@ function renderProcessedLayer(width, height, video, { selectedEffect, settings, 
     layerContext.drawImage(video, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, width, height);
   }
   layerContext.restore();
+  applyTonePixelAdjustments(layerContext, width, height, settings);
   paintOverlay(layerContext, width, height, selectedEffect, settings);
   applyInversionEffects(layerContext, width, height, settings);
   return layer;
+}
+
+function hasRenderableVideoFrame(video) {
+  return Boolean(video && video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0);
+}
+
+function settingsChangedFromBaseline(settings, baseline) {
+  const keys = new Set([...Object.keys(settings || {}), ...Object.keys(baseline || {})]);
+  for (const key of keys) {
+    if (setting(settings, key, baseline?.[key] ?? 0) !== setting(baseline, key, 0)) return true;
+  }
+  return false;
 }
 
 function coverCrop(sourceWidth, sourceHeight, targetWidth, targetHeight) {
@@ -2218,6 +2267,192 @@ function buildFilterCss(settings) {
     .join(" ");
 }
 
+function buildSpatialFilterCss(settings) {
+  const blur = clamp(
+    setting(settings, "blur") +
+      setting(settings, "softFocus") * 0.04 +
+      setting(settings, "radialBlur") * 0.02 +
+      setting(settings, "motionBlur") * 0.018,
+    0,
+    18
+  );
+  return blur ? `blur(${blur}px)` : "none";
+}
+
+function applyTonePixelAdjustments(context, width, height, settings) {
+  if (!needsTonePixelAdjustments(settings)) return;
+  let imageData;
+  try {
+    imageData = context.getImageData(0, 0, width, height);
+  } catch {
+    return;
+  }
+  const data = imageData.data;
+  const exposure = setting(settings, "exposure") / 80;
+  const brightnessScale = clamp(setting(settings, "brightness", 100) / 100 + exposure * 0.72 + setting(settings, "gamma") / 280, 0.05, 3.2);
+  const contrastScale = clamp(
+    setting(settings, "contrast", 100) / 100 +
+      setting(settings, "clarity") / 260 +
+      setting(settings, "dehaze") / 240 -
+      setting(settings, "fade") / 260,
+    0.05,
+    3.2
+  );
+  const saturationScale = clamp(
+    setting(settings, "saturation", 100) / 100 + setting(settings, "vibrance") / 145 + setting(settings, "colorizeStrength") / 260,
+    0,
+    3.5
+  );
+  const hueDegrees = setting(settings, "hue") + setting(settings, "colorizeHue") * (setting(settings, "colorizeStrength") / 100);
+  const temperature = setting(settings, "temperature");
+  const tint = setting(settings, "tint");
+  const shadows = setting(settings, "shadows");
+  const highlights = setting(settings, "highlights");
+  const whites = setting(settings, "whites");
+  const blacks = setting(settings, "blacks");
+  const midtoneLift = setting(settings, "midtoneLift");
+  const fade = setting(settings, "fade") / 100;
+  const matte = setting(settings, "matte") / 100;
+  const grayscale = clamp(setting(settings, "grayscale") / 100 + setting(settings, "threshold") / 500, 0, 1);
+  const sepia = clamp(setting(settings, "sepia") / 100 + Math.max(0, setting(settings, "whiteBalance")) / 600, 0, 1);
+  const invert = clamp(setting(settings, "invert") / 100, 0, 1);
+  const posterize = clamp(setting(settings, "posterize"), 0, 100);
+  const threshold = clamp(setting(settings, "threshold"), 0, 100);
+  const solarize = clamp(setting(settings, "solarize"), 0, 100) / 100;
+  const redScale = clamp(setting(settings, "redChannel", 100) / 100 + setting(settings, "magentaBalance") / 500 - setting(settings, "cyanBalance") / 360, 0, 2.8);
+  const greenScale = clamp(setting(settings, "greenChannel", 100) / 100 - setting(settings, "magentaBalance") / 360 + setting(settings, "yellowBalance") / 500, 0, 2.8);
+  const blueScale = clamp(setting(settings, "blueChannel", 100) / 100 + setting(settings, "cyanBalance") / 500 - setting(settings, "yellowBalance") / 360, 0, 2.8);
+  for (let index = 0; index < data.length; index += 4) {
+    let r = data[index];
+    let g = data[index + 1];
+    let b = data[index + 2];
+    const luma = r * 0.2126 + g * 0.7152 + b * 0.0722;
+    const shadowWeight = clamp((128 - luma) / 128, 0, 1);
+    const highlightWeight = clamp((luma - 128) / 127, 0, 1);
+    const midtoneWeight = 1 - Math.abs(luma - 128) / 128;
+    const toneOffset =
+      shadows * 0.92 * shadowWeight +
+      highlights * 0.88 * highlightWeight +
+      whites * 0.54 +
+      blacks * -0.62 * shadowWeight +
+      midtoneLift * 0.64 * midtoneWeight;
+    r = (r - 128) * contrastScale + 128;
+    g = (g - 128) * contrastScale + 128;
+    b = (b - 128) * contrastScale + 128;
+    r = r * brightnessScale + toneOffset + temperature * 0.88 + tint * 0.48;
+    g = g * brightnessScale + toneOffset - tint * 0.58;
+    b = b * brightnessScale + toneOffset - temperature * 0.86 + tint * 0.22;
+    r *= redScale;
+    g *= greenScale;
+    b *= blueScale;
+    if (hueDegrees) [r, g, b] = hueRotatePixel(r, g, b, hueDegrees);
+    const gray = r * 0.2126 + g * 0.7152 + b * 0.0722;
+    r = gray + (r - gray) * saturationScale;
+    g = gray + (g - gray) * saturationScale;
+    b = gray + (b - gray) * saturationScale;
+    if (sepia) {
+      const sr = r * 0.393 + g * 0.769 + b * 0.189;
+      const sg = r * 0.349 + g * 0.686 + b * 0.168;
+      const sb = r * 0.272 + g * 0.534 + b * 0.131;
+      r = mix(r, sr, sepia);
+      g = mix(g, sg, sepia);
+      b = mix(b, sb, sepia);
+    }
+    if (grayscale) {
+      r = mix(r, gray, grayscale);
+      g = mix(g, gray, grayscale);
+      b = mix(b, gray, grayscale);
+    }
+    if (fade || matte) {
+      const haze = 128 + fade * 34;
+      r = mix(r, haze, clamp(fade * 0.42 + matte * 0.22, 0, 0.72));
+      g = mix(g, haze, clamp(fade * 0.42 + matte * 0.22, 0, 0.72));
+      b = mix(b, haze, clamp(fade * 0.42 + matte * 0.22, 0, 0.72));
+    }
+    if (threshold) {
+      const limit = 255 * (0.5 + (threshold - 50) / 300);
+      const binary = gray >= limit ? 255 : 0;
+      r = mix(r, binary, threshold / 100);
+      g = mix(g, binary, threshold / 100);
+      b = mix(b, binary, threshold / 100);
+    }
+    if (posterize) {
+      r = posterizeChannel(r, posterize);
+      g = posterizeChannel(g, posterize);
+      b = posterizeChannel(b, posterize);
+    }
+    if (solarize) {
+      r = mix(r, r > 128 ? 255 - r : r, solarize);
+      g = mix(g, g > 128 ? 255 - g : g, solarize);
+      b = mix(b, b > 128 ? 255 - b : b, solarize);
+    }
+    if (invert) {
+      r = mix(r, 255 - r, invert);
+      g = mix(g, 255 - g, invert);
+      b = mix(b, 255 - b, invert);
+    }
+    data[index] = clamp(Math.round(r), 0, 255);
+    data[index + 1] = clamp(Math.round(g), 0, 255);
+    data[index + 2] = clamp(Math.round(b), 0, 255);
+  }
+  context.putImageData(imageData, 0, 0);
+}
+
+function needsTonePixelAdjustments(settings) {
+  return [
+    ["brightness", 100],
+    ["contrast", 100],
+    ["exposure", 0],
+    ["saturation", 100],
+    ["hue", 0],
+    ["temperature", 0],
+    ["tint", 0],
+    ["sepia", 0],
+    ["grayscale", 0],
+    ["invert", 0],
+    ["gamma", 0],
+    ["shadows", 0],
+    ["highlights", 0],
+    ["whites", 0],
+    ["blacks", 0],
+    ["clarity", 0],
+    ["dehaze", 0],
+    ["fade", 0],
+    ["vibrance", 0],
+    ["posterize", 0],
+    ["solarize", 0],
+    ["threshold", 0],
+    ["cyanBalance", 0],
+    ["magentaBalance", 0],
+    ["yellowBalance", 0],
+    ["redChannel", 100],
+    ["greenChannel", 100],
+    ["blueChannel", 100],
+    ["whiteBalance", 0],
+    ["midtoneLift", 0],
+    ["matte", 0],
+    ["colorizeHue", 0],
+    ["colorizeStrength", 0]
+  ].some(([key, baseline]) => setting(settings, key, baseline) !== baseline);
+}
+
+function hueRotatePixel(r, g, b, degrees) {
+  const radians = (degrees * Math.PI) / 180;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  return [
+    r * (0.213 + cos * 0.787 - sin * 0.213) + g * (0.715 - cos * 0.715 - sin * 0.715) + b * (0.072 - cos * 0.072 + sin * 0.928),
+    r * (0.213 - cos * 0.213 + sin * 0.143) + g * (0.715 + cos * 0.285 + sin * 0.14) + b * (0.072 - cos * 0.072 - sin * 0.283),
+    r * (0.213 - cos * 0.213 - sin * 0.787) + g * (0.715 - cos * 0.715 + sin * 0.715) + b * (0.072 + cos * 0.928 + sin * 0.072)
+  ];
+}
+
+function posterizeChannel(value, amount) {
+  const levels = Math.round(clamp(64 - amount * 0.58, 2, 64));
+  const step = 255 / Math.max(1, levels - 1);
+  return Math.round(value / step) * step;
+}
+
 function buildOverlayStyle(effect, settings) {
   const warm = settings.temperature > 0 ? `rgba(255,132,48,${settings.temperature / 260})` : `rgba(51,143,255,${Math.abs(settings.temperature) / 280})`;
   const tint = settings.tint > 0 ? `rgba(255,69,190,${settings.tint / 280})` : `rgba(67,255,122,${Math.abs(settings.tint) / 300})`;
@@ -2270,23 +2505,26 @@ function buildSpecialOverlayStyle(settings) {
 
 function paintOverlay(context, width, height, effect, settings) {
   context.save();
-  context.globalAlpha = clamp(0.08 + settings.duotone / 150, 0, 0.82);
+  context.globalAlpha = clamp(0.025 + settings.duotone / 260 + setting(settings, "overlayStrength") / 520, 0, 0.46);
   context.globalCompositeOperation = canvasCompositeMode(effect.blendMode);
   context.fillStyle = effect.overlayColor;
   context.fillRect(0, 0, width, height);
   if (settings.temperature !== 0) {
-    context.globalAlpha = Math.abs(settings.temperature) / 220;
+    context.globalAlpha = Math.abs(settings.temperature) / 300;
     context.fillStyle = settings.temperature > 0 ? "rgb(255,128,42)" : "rgb(54,138,255)";
     context.fillRect(0, 0, width, height);
   }
   context.globalCompositeOperation = "screen";
-  context.globalAlpha = clamp(setting(settings, "overlayStrength") / 170, 0.03, 0.62);
-  const linear = context.createLinearGradient(0, 0, width, height);
-  linear.addColorStop(0, rgbwCss(settings, "main", 1));
-  linear.addColorStop(0.5, rgbwCss(settings, "secondary", 1));
-  linear.addColorStop(1, rgbwCss(settings, "third", 1));
-  context.fillStyle = linear;
-  context.fillRect(0, 0, width, height);
+  const gradientAlpha = clamp(setting(settings, "overlayStrength") / 260, 0, 0.38);
+  if (gradientAlpha > 0.004) {
+    context.globalAlpha = gradientAlpha;
+    const linear = context.createLinearGradient(0, 0, width, height);
+    linear.addColorStop(0, rgbwCss(settings, "main", 1));
+    linear.addColorStop(0.5, rgbwCss(settings, "secondary", 1));
+    linear.addColorStop(1, rgbwCss(settings, "third", 1));
+    context.fillStyle = linear;
+    context.fillRect(0, 0, width, height);
+  }
   if (setting(settings, "bloom") || setting(settings, "halation") || setting(settings, "lensFlare")) {
     context.globalAlpha = clamp((setting(settings, "bloom") + setting(settings, "halation") + setting(settings, "lensFlare")) / 260, 0, 0.78);
     const flare = context.createRadialGradient(width * 0.5, height * 0.14, 0, width * 0.5, height * 0.14, width * 0.58);

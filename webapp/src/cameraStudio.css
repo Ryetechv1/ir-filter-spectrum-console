@@ -421,7 +421,10 @@
 .camera-frame video.source-camera-video {
   position: absolute;
   inset: 0;
-  opacity: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 1;
   pointer-events: none;
 }
 
@@ -437,6 +440,10 @@
   object-fit: cover;
   background: #030508;
   cursor: crosshair;
+}
+
+.processed-preview-canvas.is-waiting-frame {
+  opacity: 0;
 }
 
 .studio-color-overlay,
@@ -549,9 +556,12 @@
 .roi-region-visual span {
   position: absolute;
   transform: translate(-50%, -50%);
+  border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: 999px;
-  background: rgba(142, 66, 255, 0.45);
-  box-shadow: 0 0 24px rgba(142, 66, 255, 0.28);
+  background: rgba(142, 66, 255, 0.16);
+  box-shadow:
+    inset 0 0 18px rgba(255, 255, 255, 0.12),
+    0 0 18px rgba(142, 66, 255, 0.24);
 }
 
 .roi-region-visual .smart-mask-dot {
@@ -566,7 +576,8 @@
 }
 
 .roi-region-visual.active span {
-  background: rgba(165, 91, 255, 0.62);
+  border-color: rgba(255, 255, 255, 0.94);
+  background: rgba(165, 91, 255, 0.24);
 }
 
 .camera-placeholder {
