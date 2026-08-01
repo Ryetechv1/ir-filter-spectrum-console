@@ -1,27 +1,45 @@
 import {
   Camera,
   Download,
+  ExternalLink,
   FlipHorizontal,
+  Film,
   KeyRound,
   LockKeyhole,
+  Mail,
   RefreshCw,
   Search,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
-  UserRound,
+  Square,
+  Trash2,
+  Video,
+  Youtube,
   X
 } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./cameraStudio.css";
 
 const STUDIO_UNLOCK_KEY = "ir-filter-camera-studio-unlocked";
+const YOUTUBE_CHANNEL_URL = "https://youtube.com/@azel222?si=ytU4AFS_aaEr-NNA";
+const YOUTUBE_EMBED_URL = "https://www.youtube.com/embed?listType=user_uploads&list=azel222";
+const CONTACT_EMAIL = "alola99990@gmail.com";
+const CAPTURE_LIBRARY_LIMIT = 3;
+const MAX_RECORDING_MS = 180000;
+const RECORDING_RESOLUTIONS = {
+  "1080p": { label: "1080P", width: 1920, height: 1080 },
+  "2k": { label: "2K", width: 2560, height: 1440 }
+};
+const MP4_MIME_TYPES = [
+  "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
+  "video/mp4;codecs=h264",
+  "video/mp4"
+];
 const TRUSTED_ACCESS = [
   {
-    name: "Khiimori",
-    handle: "mayaniorgthe1st444",
-    profileUrl: "https://www.instagram.com/mayaniorgthe1st444?igsh=MXV6a2VobzBlNXJrbw==",
-    sha256: "41c2f45346727de86a361d793c1be4ac005f9d4b3d071dfd9433df206ba90874"
+    name: "Studio Access Holder",
+    sha256: "89bf6309ac1633d01b1fc6af1c3e79fcb55464450e6db4534fd01084375c4a65"
   }
 ];
 
@@ -248,12 +266,31 @@ const CATEGORIES = ["All Presets", "Favorites", ...EFFECT_FAMILIES.map((family) 
 function CameraStudio() {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
+  const recorderRef = useRef(null);
+  const recordingChunksRef = useRef([]);
+  const recordingCanvasRef = useRef(null);
+  const recordingFrameRef = useRef(0);
+  const recordingTimerRef = useRef(null);
+  const recordingStartedAtRef = useRef(0);
+  const captureShelfRef = useRef([]);
+  const renderStateRef = useRef({
+    filterCss: "",
+    selectedEffect: CAMERA_EFFECTS[0],
+    manualSettings: CAMERA_EFFECTS[0].settings,
+    cameraFacing: "user"
+  });
   const [authorized, setAuthorized] = useState(() => window.sessionStorage.getItem(STUDIO_UNLOCK_KEY) === "true");
   const [accessCode, setAccessCode] = useState("");
   const [authError, setAuthError] = useState("");
   const [cameraStatus, setCameraStatus] = useState("Enter the trusted access code. After unlock, use Start Camera to request browser permission.");
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraFacing, setCameraFacing] = useState("user");
+  const [recording, setRecording] = useState(false);
+  const [recordingResolution, setRecordingResolution] = useState("1080p");
+  const [recordingElapsed, setRecordingElapsed] = useState(0);
+  const [recordingMimeType, setRecordingMimeType] = useState("");
+  const [captureShelf, setCaptureShelf] = useState([]);
+  const [youtubeWindowOpen, setYoutubeWindowOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("All Presets");
   const [search, setSearch] = useState("");
   const [selectedEffectId, setSelectedEffectId] = useState(CAMERA_EFFECTS[0].id);
@@ -288,6 +325,10 @@ function CameraStudio() {
     [filterCss, manualSettings.pixelate]
   );
 
+  useEffect(() => {
+    renderStateRef.current = { filterCss, selectedEffect, manualSettings, cameraFacing };
+  }, [cameraFacing, filterCss, manualSettings, selectedEffect]);
+
   const attachCameraStream = useCallback(async (stream, nextFacing = cameraFacing) => {
     streamRef.current = stream;
     if (videoRef.current) {
@@ -298,6 +339,28 @@ function CameraStudio() {
     setCameraActive(true);
     setCameraStatus("Camera active. The video is local to this device and is not uploaded.");
   }, [cameraFacing]);
+
+  const addCaptureToShelf = useCallback((capture) => {
+    setCaptureShelf((current) => {
+      const next = [capture, ...current].slice(0, CAPTURE_LIBRARY_LIMIT);
+      const keptUrls = new Set(next.map((item) => item.url));
+      current.forEach((item) => {
+        if (!keptUrls.has(item.url)) URL.revokeObjectURL(item.url);
+      });
+      captureShelfRef.current = next;
+      return next;
+    });
+  }, []);
+
+  const removeCaptureFromShelf = useCallback((id) => {
+    setCaptureShelf((current) => {
+      const removed = current.find((item) => item.id === id);
+      if (removed) URL.revokeObjectURL(removed.url);
+      const next = current.filter((item) => item.id !== id);
+      captureShelfRef.current = next;
+      return next;
+    });
+  }, []);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -342,7 +405,121 @@ function CameraStudio() {
     }
   }, [attachCameraStream, cameraFacing, stopCamera]);
 
-  useEffect(() => () => stopCamera(), [stopCamera]);
+  const stopRecording = useCallback((message = "Recording stopped.") => {
+    if (recordingTimerRef.current) {
+      window.clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    if (recordingFrameRef.current) {
+      window.cancelAnimationFrame(recordingFrameRef.current);
+      recordingFrameRef.current = 0;
+    }
+    const recorder = recorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      setCameraStatus(message);
+      recorder.stop();
+      return;
+    }
+    setRecording(false);
+    setRecordingElapsed(0);
+    recorderRef.current = null;
+  }, []);
+
+  const startRecording = useCallback(() => {
+    if (!cameraActive || !videoRef.current) {
+      setCameraStatus("Start the camera before recording video.");
+      return;
+    }
+    if (recording) {
+      setCameraStatus("Recording is already active.");
+      return;
+    }
+    if (typeof MediaRecorder === "undefined") {
+      setCameraStatus("MP4 recording is not supported in this browser.");
+      return;
+    }
+    const mimeType = supportedMp4MimeType();
+    if (!mimeType) {
+      setCameraStatus("This browser does not expose MP4 MediaRecorder support. Try Safari, Edge, or a Chromium build with MP4 recording enabled.");
+      return;
+    }
+    const resolution = RECORDING_RESOLUTIONS[recordingResolution] || RECORDING_RESOLUTIONS["1080p"];
+    const canvas = document.createElement("canvas");
+    canvas.width = resolution.width;
+    canvas.height = resolution.height;
+    recordingCanvasRef.current = canvas;
+    const context = canvas.getContext("2d", { alpha: false });
+    const stream = canvas.captureStream(30);
+    const recorder = new MediaRecorder(stream, {
+      mimeType,
+      videoBitsPerSecond: recordingResolution === "2k" ? 14000000 : 8000000
+    });
+    recordingChunksRef.current = [];
+    recorderRef.current = recorder;
+    recorder.ondataavailable = (event) => {
+      if (event.data?.size) recordingChunksRef.current.push(event.data);
+    };
+    recorder.onstop = () => {
+      if (recordingFrameRef.current) {
+        window.cancelAnimationFrame(recordingFrameRef.current);
+        recordingFrameRef.current = 0;
+      }
+      if (recordingTimerRef.current) {
+        window.clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+      stream.getTracks().forEach((track) => track.stop());
+      const blob = new Blob(recordingChunksRef.current, { type: mimeType });
+      if (blob.size) {
+        const url = URL.createObjectURL(blob);
+        addCaptureToShelf({
+          id: `video-${Date.now()}`,
+          kind: "video",
+          url,
+          type: mimeType,
+          extension: "mp4",
+          label: `${resolution.label} MP4`,
+          size: blob.size,
+          createdAt: new Date().toISOString()
+        });
+      }
+      recorderRef.current = null;
+      recordingCanvasRef.current = null;
+      recordingChunksRef.current = [];
+      setRecording(false);
+      setRecordingElapsed(0);
+      setRecordingMimeType("");
+      setCameraStatus(blob.size ? "MP4 recording saved to the local capture shelf." : "Recording stopped without saved video data.");
+    };
+
+    const drawFrame = () => {
+      const video = videoRef.current;
+      const renderState = renderStateRef.current;
+      drawStudioFrame(context, resolution.width, resolution.height, video, renderState);
+      recordingFrameRef.current = window.requestAnimationFrame(drawFrame);
+    };
+    drawFrame();
+    recordingStartedAtRef.current = Date.now();
+    recorder.start(1000);
+    setRecording(true);
+    setRecordingElapsed(0);
+    setRecordingMimeType(mimeType);
+    setCameraStatus(`Recording ${resolution.label} MP4 locally. Maximum length is 3 minutes.`);
+    recordingTimerRef.current = window.setInterval(() => {
+      const elapsed = Date.now() - recordingStartedAtRef.current;
+      setRecordingElapsed(Math.min(elapsed, MAX_RECORDING_MS));
+      if (elapsed >= MAX_RECORDING_MS) stopRecording("Maximum 3-minute recording length reached.");
+    }, 500);
+  }, [addCaptureToShelf, cameraActive, recording, recordingResolution, stopRecording]);
+
+  useEffect(
+    () => () => {
+      stopRecording("Recording stopped because the studio closed.");
+      stopCamera();
+      captureShelfRef.current.forEach((item) => URL.revokeObjectURL(item.url));
+    },
+    [stopCamera, stopRecording]
+  );
 
   async function unlockStudio(event) {
     event.preventDefault();
@@ -359,7 +536,7 @@ function CameraStudio() {
     }
     window.sessionStorage.setItem(STUDIO_UNLOCK_KEY, "true");
     setAuthorized(true);
-    setCameraStatus(`Access granted for ${trustedUser.name}. Press Start Camera to trigger the browser permission popup.`);
+    setCameraStatus("Access granted. Press Start Camera to trigger the browser permission popup.");
   }
 
   function selectEffect(effect) {
@@ -372,6 +549,7 @@ function CameraStudio() {
   }
 
   function handleStopCamera() {
+    stopRecording("Recording stopped because the camera was stopped.");
     stopCamera();
     setCameraStatus("Camera stopped. Press Start Camera to request camera access again.");
   }
@@ -394,17 +572,24 @@ function CameraStudio() {
     canvas.width = width;
     canvas.height = height;
     const context = canvas.getContext("2d");
-    context.filter = filterCss;
-    context.drawImage(video, 0, 0, width, height);
-    paintOverlay(context, width, height, selectedEffect, manualSettings);
+    drawStudioFrame(context, width, height, video, { filterCss, selectedEffect, manualSettings, cameraFacing });
     canvas.toBlob((blob) => {
       if (!blob) return;
-      if (snapshotUrl) URL.revokeObjectURL(snapshotUrl);
       const url = URL.createObjectURL(blob);
       setSnapshotUrl(url);
+      addCaptureToShelf({
+        id: `photo-${Date.now()}`,
+        kind: "photo",
+        url,
+        type: "image/png",
+        extension: "png",
+        label: "Photo PNG",
+        size: blob.size,
+        createdAt: new Date().toISOString()
+      });
       const link = document.createElement("a");
       link.href = url;
-      link.download = `khiimori-camera-studio-${new Date().toISOString().replace(/[:.]/g, "-")}.png`;
+      link.download = `spectral-imaging-studio-${new Date().toISOString().replace(/[:.]/g, "-")}.png`;
       link.click();
       setCameraStatus("Snapshot downloaded locally.");
     }, "image/png");
@@ -425,14 +610,50 @@ function CameraStudio() {
           Local device only
           <span>No uploads. No external camera required.</span>
         </div>
-        <a className="trusted-user-pill" href={TRUSTED_ACCESS[0].profileUrl} target="_blank" rel="noreferrer">
-          <UserRound size={16} />
-          Trusted user: <strong>Khiimori</strong>
-        </a>
+        <button type="button" className="trusted-user-pill" onClick={() => setYoutubeWindowOpen(true)}>
+          <Youtube size={16} />
+          YouTube channel
+        </button>
         <button type="button" className="studio-close" onClick={closeStudioWindow} title="Close studio">
           <X size={22} />
         </button>
       </header>
+
+      <section className="studio-intro-box" aria-labelledby="studioWelcomeTitle">
+        <div className="studio-welcome-copy">
+          <h2 id="studioWelcomeTitle">Welcome to Supernatural World’s Free Spectral Imaging Studio!</h2>
+          <p>
+            Make sure to ➠SUBSCRIBE ▶︎ to my YOUTUBE CHANNEL<br />
+            ➥ SUPERNATURAL WORLD—@:<br />
+            ⇲<a href={YOUTUBE_CHANNEL_URL} target="_blank" rel="noreferrer">https://youtube.com/@azel222?si=ytU4AFS_aaEr-NNA</a> ↸
+          </p>
+        </div>
+        <div className="studio-disclosure-box">
+          <h3>Privacy, Camera Access, And Local Recording Disclosure</h3>
+          <p>
+            This studio asks for camera access only after you unlock the page and press Start Camera. Your camera stream stays on your own
+            device, inside your browser. The site does not upload, transmit, store, or remotely view your camera feed, photos, or recordings.
+            Captures and recordings are created locally as browser object URLs and remain visible only in this browser session unless you
+            download or share them yourself.
+          </p>
+          <p>
+            Camera permission is controlled by your browser and operating system. You can stop the stream with Stop Camera or revoke site
+            permission from your browser settings at any time. MP4 recording depends on your browser’s MediaRecorder support and automatically
+            stops at 3 minutes.
+          </p>
+        </div>
+        <div className="studio-guide-box">
+          <h3>What The Studio Offers</h3>
+          <ul>
+            <li>120 local visual presets for IR-style, UVA-style, thermal, cinematic, monochrome, duotone, retro, and color-lab looks.</li>
+            <li>Four RGBW gradient mixers for Main, Secondary, Third, and Highlights color layers.</li>
+            <li>12 core photo controls plus 50 advanced sliders for exposure, color channels, glow, scanlines, IR/UVA washes, and more.</li>
+            <li>Processed PNG snapshots and 1080P or 2K MP4 recordings with the studio effects applied.</li>
+            <li>A local shelf for the latest 3 photos/videos, with preview, download, and remove controls.</li>
+          </ul>
+          <a href={`mailto:${CONTACT_EMAIL}`}><Mail size={15} /> {CONTACT_EMAIL}</a>
+        </div>
+      </section>
 
       <section className="camera-studio-grid">
         <aside className="effect-browser studio-panel">
@@ -520,12 +741,87 @@ function CameraStudio() {
             </button>
           </div>
 
+          <section className="recording-panel" aria-labelledby="recordingPanelTitle">
+            <div className="recording-panel-heading">
+              <div>
+                <h2 id="recordingPanelTitle">MP4 Video Recording</h2>
+                <span>Processed canvas recording with studio effects applied. Max 3 minutes.</span>
+              </div>
+              <strong>{formatDuration(recordingElapsed)} / 3:00</strong>
+            </div>
+            <div className="resolution-selector" aria-label="Recording resolution">
+              {Object.entries(RECORDING_RESOLUTIONS).map(([key, resolution]) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={recordingResolution === key ? "active" : ""}
+                  onClick={() => setRecordingResolution(key)}
+                  disabled={recording}
+                >
+                  {resolution.label}
+                  <span>{resolution.width} × {resolution.height}</span>
+                </button>
+              ))}
+            </div>
+            <div className="recording-action-row">
+              <button type="button" className="studio-record-button" onClick={startRecording} disabled={!cameraActive || recording}>
+                <Video size={18} />
+                Start MP4
+              </button>
+              <button type="button" onClick={() => stopRecording("Recording stopped by user.")} disabled={!recording}>
+                <Square size={16} />
+                Stop Recording
+              </button>
+            </div>
+            <p>{recording ? `Recording locally as ${recordingMimeType || "video/mp4"}...` : "Start Camera first, then choose 1080P or 2K and record."}</p>
+          </section>
+
           <p className="studio-status">{cameraStatus}</p>
           {snapshotUrl && (
             <a className="snapshot-review" href={snapshotUrl} target="_blank" rel="noreferrer">
               Open last local snapshot
             </a>
           )}
+          <section className="capture-shelf" aria-labelledby="captureShelfTitle">
+            <div className="recording-panel-heading">
+              <div>
+                <h2 id="captureShelfTitle">Local Capture Storage</h2>
+                <span>Latest 3 photos/videos from this browser session.</span>
+              </div>
+              <strong>{captureShelf.length} / {CAPTURE_LIBRARY_LIMIT}</strong>
+            </div>
+            {captureShelf.length ? (
+              <div className="capture-shelf-grid">
+                {captureShelf.map((item) => (
+                  <article className="capture-card" key={item.id}>
+                    <div className="capture-preview">
+                      {item.kind === "photo" ? (
+                        <img src={item.url} alt={`${item.label} preview`} />
+                      ) : (
+                        <video src={item.url} controls muted playsInline />
+                      )}
+                    </div>
+                    <div className="capture-card-body">
+                      <strong>{item.label}</strong>
+                      <span>{formatFileSize(item.size)} • {formatCaptureTime(item.createdAt)}</span>
+                      <div className="capture-card-actions">
+                        <a href={item.url} download={captureDownloadName(item)}>
+                          <Download size={14} />
+                          Download
+                        </a>
+                        <button type="button" onClick={() => removeCaptureFromShelf(item.id)}>
+                          <Trash2 size={14} />
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <p className="empty-capture-note">No local captures yet. Take a snapshot or record MP4 video to fill this shelf.</p>
+            )}
+          </section>
         </section>
 
         <aside className="adjustments-panel studio-panel">
@@ -623,7 +919,7 @@ function CameraStudio() {
             <input
               value={accessCode}
               onChange={(event) => setAccessCode(event.target.value)}
-              placeholder="KHIIMORI-XXXX-XXXX-..."
+              placeholder="SP3CTR4L_X01-..."
               autoComplete="off"
               spellCheck="false"
               autoFocus
@@ -638,8 +934,86 @@ function CameraStudio() {
           </form>
         </div>
       )}
+
+      {youtubeWindowOpen && (
+        <div className="youtube-window-backdrop" role="dialog" aria-modal="true" aria-labelledby="youtubeWindowTitle">
+          <section className="youtube-window">
+            <div className="youtube-window-heading">
+              <div>
+                <Youtube size={24} />
+                <h2 id="youtubeWindowTitle">Supernatural World YouTube Channel</h2>
+              </div>
+              <button type="button" onClick={() => setYoutubeWindowOpen(false)} aria-label="Close YouTube channel window">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="youtube-frame-shell">
+              <iframe
+                title="Supernatural World YouTube channel home page"
+                src={YOUTUBE_CHANNEL_URL}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                referrerPolicy="strict-origin-when-cross-origin"
+              />
+              <div className="youtube-frame-fallback">
+                <strong>YouTube may block channel pages inside embedded frames.</strong>
+                <span>Use the button below if the homepage does not render in this GUI window.</span>
+              </div>
+            </div>
+            <div className="youtube-window-actions">
+              <a href={YOUTUBE_CHANNEL_URL} target="_blank" rel="noreferrer">
+                <ExternalLink size={16} />
+                Open Channel Homepage
+              </a>
+              <a href={YOUTUBE_EMBED_URL} target="_blank" rel="noreferrer">
+                <Film size={16} />
+                Open Uploads Player
+              </a>
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   );
+}
+
+function supportedMp4MimeType() {
+  if (typeof MediaRecorder === "undefined" || typeof MediaRecorder.isTypeSupported !== "function") return "";
+  return MP4_MIME_TYPES.find((type) => MediaRecorder.isTypeSupported(type)) || "";
+}
+
+function drawStudioFrame(context, width, height, video, renderState) {
+  const { filterCss, selectedEffect, manualSettings, cameraFacing } = renderState;
+  context.save();
+  context.filter = "none";
+  context.globalAlpha = 1;
+  context.globalCompositeOperation = "source-over";
+  context.fillStyle = "#030508";
+  context.fillRect(0, 0, width, height);
+  if (video?.readyState >= 2) {
+    const sourceWidth = video.videoWidth || width;
+    const sourceHeight = video.videoHeight || height;
+    const sourceRatio = sourceWidth / sourceHeight;
+    const targetRatio = width / height;
+    let sx = 0;
+    let sy = 0;
+    let sw = sourceWidth;
+    let sh = sourceHeight;
+    if (sourceRatio > targetRatio) {
+      sw = sourceHeight * targetRatio;
+      sx = (sourceWidth - sw) / 2;
+    } else {
+      sh = sourceWidth / targetRatio;
+      sy = (sourceHeight - sh) / 2;
+    }
+    context.filter = filterCss;
+    if (cameraFacing === "user") {
+      context.translate(width, 0);
+      context.scale(-1, 1);
+    }
+    context.drawImage(video, sx, sy, sw, sh, 0, 0, width, height);
+  }
+  context.restore();
+  paintOverlay(context, width, height, selectedEffect, manualSettings);
 }
 
 function buildFilterCss(settings) {
@@ -779,6 +1153,33 @@ function rgbwComponents(settings, groupKey) {
 function rgbwCss(settings, groupKey, alpha = 1) {
   const { r, g, b } = rgbwComponents(settings, groupKey);
   return `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${clamp(alpha, 0, 1)})`;
+}
+
+function formatDuration(ms) {
+  const totalSeconds = Math.floor((Number(ms) || 0) / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = String(totalSeconds % 60).padStart(2, "0");
+  return `${minutes}:${seconds}`;
+}
+
+function formatFileSize(bytes) {
+  const size = Number(bytes) || 0;
+  if (size >= 1024 * 1024) return `${(size / 1024 / 1024).toFixed(1)} MB`;
+  if (size >= 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${size} B`;
+}
+
+function formatCaptureTime(value) {
+  try {
+    return new Date(value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "local";
+  }
+}
+
+function captureDownloadName(item) {
+  const stamp = new Date(item.createdAt || Date.now()).toISOString().replace(/[:.]/g, "-");
+  return `spectral-imaging-studio-${stamp}.${item.extension || (item.kind === "video" ? "mp4" : "png")}`;
 }
 
 function canvasCompositeMode(mode) {
