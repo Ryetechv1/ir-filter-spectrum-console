@@ -22,7 +22,7 @@ The Camera Studio is opened from the main console with the `Studio` button. It r
 - `Start Camera` opens the browser camera permission prompt.
 - `Stop Camera` stops all active video tracks.
 - `Flip Camera` toggles between front and rear camera requests after a stream is active.
-- When the full camera frame scrolls away, it becomes a hovering HUD preview that stays visible while scrolling. Tapping the HUD scrolls back to the full camera frame for ROI editing, downloads, snapshots, and recording controls.
+- When the full camera frame scrolls away, it becomes a hovering HUD preview that stays visible while scrolling. Tapping the HUD scrolls back to the full camera frame for downloads, snapshots, and recording controls.
 - `Snapshot` downloads a local PNG with the current CSS/video effect stack painted into the image and adds it to the local capture shelf.
 - `Start MP4` records a processed 1080P or 2K canvas stream as `.mp4` where the browser supports MP4 MediaRecorder.
 - `Stop Recording` ends the current MP4 recording before the 3-minute cap.
@@ -35,18 +35,6 @@ The Camera Studio is opened from the main console with the `Studio` button. It r
 - YouTube blocks the actual channel homepage from rendering inside third-party iframes, so the app uses the official embedded uploads playlist for the playable window.
 - The popup also includes an in-app recent-upload browser with thumbnail cards that switch the embedded player to the selected video.
 - API keys are not stored in the static GitHub Pages bundle. If automatic YouTube Data API refresh is needed later, put the key behind a server-side endpoint or a referrer-restricted backend worker.
-
-## Selective Editing
-
-- The studio renders the visible camera feed through a local canvas so foreground, background, and brush/click ranges can have separate adjustments.
-- `All`, `Foreground`, `Background`, `Click`, and `Brush` follow the same area-selection model used by Canva's Adjust panel.
-- Foreground/background can be toggled independently. When the browser exposes `FaceDetector`, foreground detection uses it as a local beta helper; otherwise it falls back to a center-subject mask.
-- Smart recognition samples the local camera canvas in the browser to identify estimated near/mid/far depth planes plus bright, shadow, detail, warm, cool, and saturated scene fields. These smart areas become selectable Click ranges without uploading frames.
-- Click mode selects the best matching smart-recognized region under the pointer. If no smart region is under the pointer, it creates a small manual click-centered range instead.
-- Brush mode only paints the dragged path with the selected brush radius. Selecting Brush no longer creates or selects the entire preview automatically.
-- The user can create up to 15 separate ranges of interest. Each range has the same RGBW mixers, core controls, inversion controls, and advanced controls as the full frame.
-- Five color inversion controls are available for every scope: Classic RGB Invert, Luma Negative, Channel Swap Invert, Spectral Invert, and Thermal Black-Hot Invert.
-- Brush/click masks are local UI state only. They are not uploaded or sent to any server.
 
 Current trusted hash:
 

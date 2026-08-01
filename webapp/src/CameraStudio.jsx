@@ -1,28 +1,20 @@
 import {
-  Brush,
   Camera,
   Download,
-  Eye,
-  EyeOff,
   ExternalLink,
   FlipHorizontal,
   Film,
   KeyRound,
-  Layers,
   LockKeyhole,
   Mail,
-  MousePointerClick,
-  Plus,
   RefreshCw,
   Search,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
   Square,
-  Target,
   Trash2,
   Video,
-  WandSparkles,
   Youtube,
   X
 } from "lucide-react";
@@ -80,8 +72,6 @@ const YOUTUBE_RECENT_UPLOADS = [
 const CONTACT_EMAIL = "alola99990@gmail.com";
 const CAPTURE_LIBRARY_LIMIT = 3;
 const MAX_RECORDING_MS = 180000;
-const ROI_LIMIT = 15;
-const SMART_RECOGNITION_INTERVAL_MS = 900;
 const RECORDING_RESOLUTIONS = {
   "1080p": { label: "1080P", width: 1920, height: 1080 },
   "2k": { label: "2K", width: 2560, height: 1440 }
@@ -110,14 +100,6 @@ const RGBW_CHANNELS = [
   { key: "G", label: "Green", min: 0, max: 255, color: "#61df7d" },
   { key: "B", label: "Blue", min: 0, max: 255, color: "#4cc7ff" },
   { key: "W", label: "White", min: 0, max: 255, color: "#f5f8fb" }
-];
-
-const AREA_MODES = [
-  { key: "all", label: "All", description: "Edit the entire frame." },
-  { key: "foreground", label: "Foreground", description: "Edit the detected main subject." },
-  { key: "background", label: "Background", description: "Edit everything behind the subject." },
-  { key: "click", label: "Click", description: "Click the camera preview to add a range of interest." },
-  { key: "brush", label: "Brush", description: "Paint a range of interest directly on the preview." }
 ];
 
 const INVERSION_ADJUSTMENTS = [
@@ -348,18 +330,9 @@ function CameraStudio() {
   const recordingTimerRef = useRef(null);
   const recordingStartedAtRef = useRef(0);
   const captureShelfRef = useRef([]);
-  const brushPaintingRef = useRef(false);
-  const foregroundBoxRef = useRef(null);
   const renderStateRef = useRef({
     selectedEffect: CAMERA_EFFECTS[0],
     manualSettings: CAMERA_EFFECTS[0].settings,
-    foregroundSettings: CAMERA_EFFECTS[0].settings,
-    backgroundSettings: CAMERA_EFFECTS[0].settings,
-    roiRegions: [],
-    foregroundEnabled: true,
-    backgroundEnabled: true,
-    autoDetectForeground: true,
-    foregroundBox: null,
     cameraFacing: "user"
   });
   const [authorized, setAuthorized] = useState(() => window.sessionStorage.getItem(STUDIO_UNLOCK_KEY) === "true");
@@ -379,17 +352,6 @@ function CameraStudio() {
   const [search, setSearch] = useState("");
   const [selectedEffectId, setSelectedEffectId] = useState(CAMERA_EFFECTS[0].id);
   const [manualSettings, setManualSettings] = useState(CAMERA_EFFECTS[0].settings);
-  const [foregroundSettings, setForegroundSettings] = useState(CAMERA_EFFECTS[0].settings);
-  const [backgroundSettings, setBackgroundSettings] = useState(CAMERA_EFFECTS[0].settings);
-  const [areaMode, setAreaMode] = useState("all");
-  const [foregroundEnabled, setForegroundEnabled] = useState(true);
-  const [backgroundEnabled, setBackgroundEnabled] = useState(true);
-  const [autoDetectForeground, setAutoDetectForeground] = useState(true);
-  const [smartRecognitionEnabled, setSmartRecognitionEnabled] = useState(true);
-  const [smartAnalysis, setSmartAnalysis] = useState(() => fallbackSmartAnalysis(false));
-  const [brushSize, setBrushSize] = useState(40);
-  const [roiRegions, setRoiRegions] = useState([]);
-  const [activeRoiId, setActiveRoiId] = useState("");
   const [snapshotUrl, setSnapshotUrl] = useState("");
   const [cameraHudActive, setCameraHudActive] = useState(false);
   const [cameraFrameHeight, setCameraFrameHeight] = useState(0);
@@ -411,17 +373,8 @@ function CameraStudio() {
     });
   }, [search, selectedCategory]);
 
-  const activeRoi = useMemo(
-    () => roiRegions.find((region) => region.id === activeRoiId) || null,
-    [activeRoiId, roiRegions]
-  );
+  const activeEditSettings = manualSettings;
 
-  const activeEditSettings = useMemo(
-    () => activeSettingsForMode(areaMode, manualSettings, foregroundSettings, backgroundSettings, activeRoi),
-    [activeRoi, areaMode, backgroundSettings, foregroundSettings, manualSettings]
-  );
-
-  const smartRegions = smartAnalysis.regions || [];
   const youtubePlayerUrl = useMemo(() => {
     if (!selectedYoutubeVideoId) return YOUTUBE_UPLOADS_PLAYER_URL;
     return `https://www.youtube.com/embed/${selectedYoutubeVideoId}?rel=0&modestbranding=1&playsinline=1`;
@@ -459,26 +412,9 @@ function CameraStudio() {
     renderStateRef.current = {
       selectedEffect,
       manualSettings,
-      foregroundSettings,
-      backgroundSettings,
-      roiRegions,
-      foregroundEnabled,
-      backgroundEnabled,
-      autoDetectForeground,
-      foregroundBox: foregroundBoxRef.current,
       cameraFacing
     };
-  }, [
-    autoDetectForeground,
-    backgroundEnabled,
-    backgroundSettings,
-    cameraFacing,
-    foregroundEnabled,
-    foregroundSettings,
-    manualSettings,
-    roiRegions,
-    selectedEffect
-  ]);
+  }, [cameraFacing, manualSettings, selectedEffect]);
 
   const attachCameraStream = useCallback(async (stream, nextFacing = cameraFacing) => {
     streamRef.current = stream;
@@ -496,91 +432,8 @@ function CameraStudio() {
       const next = typeof updater === "function" ? updater(current) : updater;
       return { ...current, ...next };
     };
-    if (areaMode === "foreground") {
-      setForegroundSettings((current) => apply(current));
-      return;
-    }
-    if (areaMode === "background") {
-      setBackgroundSettings((current) => apply(current));
-      return;
-    }
-    if ((areaMode === "click" || areaMode === "brush") && activeRoiId) {
-      setRoiRegions((current) =>
-        current.map((region) =>
-          region.id === activeRoiId ? { ...region, settings: apply(region.settings), updatedAt: new Date().toISOString() } : region
-        )
-      );
-      return;
-    }
-    if (areaMode === "click" || areaMode === "brush") {
-      setCameraStatus("Select or paint a range of interest before changing range-only adjustments.");
-      return;
-    }
     setManualSettings((current) => apply(current));
-  }, [activeRoiId, areaMode]);
-
-  const ensureActiveRoi = useCallback((mode = areaMode) => {
-    let existing = null;
-    setRoiRegions((current) => {
-      if (activeRoiId) {
-        existing = current.find((region) => region.id === activeRoiId && region.mode === mode) || null;
-        if (existing) return current;
-      }
-      if (current.length >= ROI_LIMIT) {
-        existing = current[0] || null;
-        if (existing) setActiveRoiId(existing.id);
-        return current;
-      }
-      const region = createRoiRegion(current.length, mode);
-      existing = region;
-      setActiveRoiId(region.id);
-      return [region, ...current];
-    });
-    return existing;
-  }, [activeRoiId, areaMode]);
-
-  const createNewRoi = useCallback((mode = areaMode) => {
-    const nextMode = mode === "click" ? "click" : "brush";
-    setRoiRegions((current) => {
-      if (current.length >= ROI_LIMIT) {
-        setCameraStatus("15 ranges of interest are already active. Remove one before adding another.");
-        return current;
-      }
-      const region = createRoiRegion(current.length, nextMode);
-      setActiveRoiId(region.id);
-      setAreaMode(nextMode);
-      return [region, ...current];
-    });
-  }, [areaMode]);
-
-  const addRoiPoint = useCallback((point, mode = areaMode) => {
-    let regionId = activeRoiId;
-    setRoiRegions((current) => {
-      let next = current;
-      let region = regionId ? current.find((candidate) => candidate.id === regionId && candidate.mode === mode && !candidate.smartRegion) : null;
-      if (!region) {
-        if (current.length >= ROI_LIMIT) {
-          setCameraStatus("15 ranges of interest are already active. Remove one before adding another.");
-          return current;
-        }
-        region = createRoiRegion(current.length, mode);
-        regionId = region.id;
-        setActiveRoiId(region.id);
-        next = [region, ...current];
-      }
-      return next.map((candidate) =>
-        candidate.id === region.id
-          ? {
-              ...candidate,
-              mode,
-              enabled: true,
-              points: [...candidate.points, point].slice(-700),
-              updatedAt: new Date().toISOString()
-            }
-          : candidate
-      );
-    });
-  }, [activeRoiId, areaMode]);
+  }, []);
 
   const addCaptureToShelf = useCallback((capture) => {
     setCaptureShelf((current) => {
@@ -736,8 +589,7 @@ function CameraStudio() {
 
     const drawFrame = () => {
       const video = videoRef.current;
-      const renderState = { ...renderStateRef.current, foregroundBox: foregroundBoxRef.current };
-      drawStudioFrame(context, resolution.width, resolution.height, video, renderState);
+      drawStudioFrame(context, resolution.width, resolution.height, video, renderStateRef.current);
       recordingFrameRef.current = window.requestAnimationFrame(drawFrame);
     };
     drawFrame();
@@ -787,10 +639,7 @@ function CameraStudio() {
         canvas.classList.toggle("is-waiting-frame", !videoReady);
         if (videoReady) {
           const context = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
-          drawStudioFrame(context, width, height, video, {
-            ...renderStateRef.current,
-            foregroundBox: foregroundBoxRef.current
-          });
+          drawStudioFrame(context, width, height, video, renderStateRef.current);
         }
       }
       previewFrameRef.current = window.requestAnimationFrame(drawPreview);
@@ -803,55 +652,6 @@ function CameraStudio() {
       }
     };
   }, [cameraActive]);
-
-  useEffect(() => {
-    if (!cameraActive || !autoDetectForeground || typeof window.FaceDetector !== "function") {
-      foregroundBoxRef.current = null;
-      return undefined;
-    }
-    let cancelled = false;
-    const detector = new window.FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
-    const detect = async () => {
-      const video = videoRef.current;
-      if (!video || video.readyState < 2 || cancelled) return;
-      try {
-        const faces = await detector.detect(video);
-        const face = faces?.[0]?.boundingBox;
-        foregroundBoxRef.current = face
-          ? {
-              x: face.x,
-              y: face.y,
-              width: face.width,
-              height: face.height,
-              sourceWidth: video.videoWidth || 1,
-              sourceHeight: video.videoHeight || 1
-            }
-          : null;
-      } catch {
-        foregroundBoxRef.current = null;
-      }
-    };
-    const timer = window.setInterval(detect, 1000);
-    detect();
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [autoDetectForeground, cameraActive]);
-
-  useEffect(() => {
-    if (!cameraActive || !smartRecognitionEnabled) {
-      setSmartAnalysis(fallbackSmartAnalysis(cameraActive));
-      return undefined;
-    }
-    const analyze = () => {
-      const video = videoRef.current;
-      setSmartAnalysis(analyzeCameraFrame(video, foregroundBoxRef.current));
-    };
-    analyze();
-    const timer = window.setInterval(analyze, SMART_RECOGNITION_INTERVAL_MS);
-    return () => window.clearInterval(timer);
-  }, [cameraActive, smartRecognitionEnabled]);
 
   async function unlockStudio(event) {
     event.preventDefault();
@@ -873,13 +673,7 @@ function CameraStudio() {
 
   function selectEffect(effect) {
     setSelectedEffectId(effect.id);
-    if (areaMode === "all") {
-      setManualSettings(effect.settings);
-      setForegroundSettings(effect.settings);
-      setBackgroundSettings(effect.settings);
-      return;
-    }
-    updateActiveSettings(effect.settings);
+    setManualSettings(effect.settings);
   }
 
   function updateSetting(key, value) {
@@ -895,119 +689,13 @@ function CameraStudio() {
   function resetStudio() {
     setSelectedEffectId(CAMERA_EFFECTS[0].id);
     setManualSettings(CAMERA_EFFECTS[0].settings);
-    setForegroundSettings(CAMERA_EFFECTS[0].settings);
-    setBackgroundSettings(CAMERA_EFFECTS[0].settings);
-    setAreaMode("all");
-    setForegroundEnabled(true);
-    setBackgroundEnabled(true);
-    setAutoDetectForeground(true);
-    setBrushSize(40);
-    setRoiRegions([]);
-    setActiveRoiId("");
     setSnapshotUrl("");
   }
 
   function returnToFullCameraFrame() {
     setCameraHudActive(false);
     cameraFrameAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    setCameraStatus("Returned to the full camera window for ROI editing, download, and capture controls.");
-  }
-
-  function setAreaModeAndScope(mode) {
-    setAreaMode(mode);
-    if (mode === "click") {
-      setCameraStatus("Click mode ready. Tap the preview to select the best matching smart-recognized area.");
-    } else if (mode === "brush") {
-      setCameraStatus("Brush mode ready. Drag on the preview to paint a local range of interest.");
-    } else {
-      setCameraStatus(`${activeScopeLabel(mode)} adjustments are active.`);
-    }
-  }
-
-  function autoAdjustActiveScope() {
-    updateActiveSettings((current) => ({
-      ...current,
-      brightness: clamp(setting(current, "brightness", 100) + 8, 20, 220),
-      contrast: clamp(setting(current, "contrast", 100) + 12, 20, 220),
-      highlights: clamp(setting(current, "highlights") + 10, -100, 100),
-      shadows: clamp(setting(current, "shadows") + 6, -100, 100),
-      clarity: clamp(setting(current, "clarity") + 12, -100, 100),
-      dehaze: clamp(setting(current, "dehaze") + 8, -100, 100)
-    }));
-    setCameraStatus(`Auto-adjust applied to ${activeScopeLabel(areaMode)}.`);
-  }
-
-  function deleteActiveRoi() {
-    if (!activeRoiId) return;
-    setRoiRegions((current) => current.filter((region) => region.id !== activeRoiId));
-    setActiveRoiId("");
-    setAreaMode("all");
-    setCameraStatus("Range of interest removed.");
-  }
-
-  function toggleActiveRoi() {
-    if (!activeRoiId) return;
-    setRoiRegions((current) =>
-      current.map((region) => (region.id === activeRoiId ? { ...region, enabled: !region.enabled } : region))
-    );
-  }
-
-  function handlePreviewPointerDown(event) {
-    if (!cameraActive || (areaMode !== "click" && areaMode !== "brush")) return;
-    event.preventDefault();
-    const point = pointerToCanvasPoint(event, previewCanvasRef.current, brushSize);
-    if (!point) return;
-    if (areaMode === "click") {
-      createSmartRoiFromPoint(point);
-      return;
-    }
-    addRoiPoint(point, areaMode);
-    if (areaMode === "brush") {
-      brushPaintingRef.current = true;
-      event.currentTarget.setPointerCapture?.(event.pointerId);
-    }
-  }
-
-  function handlePreviewPointerMove(event) {
-    if (!brushPaintingRef.current || areaMode !== "brush") return;
-    event.preventDefault();
-    const point = pointerToCanvasPoint(event, previewCanvasRef.current, brushSize);
-    if (point) addRoiPoint(point, "brush");
-  }
-
-  function handlePreviewPointerUp(event) {
-    brushPaintingRef.current = false;
-    event.currentTarget.releasePointerCapture?.(event.pointerId);
-  }
-
-  function createSmartRoiFromPoint(point) {
-    const selectedSmartRegion = selectSmartRegionAtPoint(point, smartRegions);
-    const smartRegion = selectedSmartRegion || clickSpotSmartRegion(point);
-    setRoiRegions((current) => {
-      if (current.length >= ROI_LIMIT) {
-        setCameraStatus("15 ranges of interest are already active. Remove one before adding another.");
-        return current;
-      }
-      const region = createSmartRoiRegion(current.length, smartRegion);
-      setActiveRoiId(region.id);
-      setAreaMode("click");
-      setCameraStatus(`Click selected smart area: ${smartRegion.label}.`);
-      return [region, ...current];
-    });
-  }
-
-  function createSmartRoiFromRegion(region) {
-    setRoiRegions((current) => {
-      if (current.length >= ROI_LIMIT) {
-        setCameraStatus("15 ranges of interest are already active. Remove one before adding another.");
-        return current;
-      }
-      const roi = createSmartRoiRegion(current.length, region);
-      setActiveRoiId(roi.id);
-      setAreaMode("click");
-      setCameraStatus(`Smart recognition selected: ${region.label}.`);
-      return [roi, ...current];
-    });
+    setCameraStatus("Returned to the full camera window for download, snapshot, and recording controls.");
   }
 
   async function captureSnapshot() {
@@ -1022,10 +710,7 @@ function CameraStudio() {
     canvas.width = width;
     canvas.height = height;
     const context = canvas.getContext("2d");
-    drawStudioFrame(context, width, height, video, {
-      ...renderStateRef.current,
-      foregroundBox: foregroundBoxRef.current
-    });
+    drawStudioFrame(context, width, height, video, renderStateRef.current);
     canvas.toBlob((blob) => {
       if (!blob) return;
       const url = URL.createObjectURL(blob);
@@ -1160,26 +845,7 @@ function CameraStudio() {
               ref={previewCanvasRef}
               className="processed-preview-canvas"
               aria-label="Processed local camera preview"
-              onPointerDown={handlePreviewPointerDown}
-              onPointerMove={handlePreviewPointerMove}
-              onPointerUp={handlePreviewPointerUp}
-              onPointerCancel={handlePreviewPointerUp}
-              onPointerLeave={handlePreviewPointerUp}
             />
-            <div className="roi-visual-overlay" aria-hidden="true">
-              {(areaMode === "foreground" || areaMode === "background") && <div className={`subject-outline ${areaMode}`} />}
-              {roiRegions
-                .filter((region) => region.enabled)
-                .map((region) => (
-                  <div className={`roi-region-visual${region.id === activeRoiId ? " active" : ""}`} key={region.id}>
-                    {region.smartRegion ? (
-                      <span className="smart-mask-dot" style={roiSmartVisualStyle(region.smartRegion)} />
-                    ) : (
-                      region.points.map((point, index) => <span key={`${region.id}-${index}`} style={roiPointVisualStyle(point)} />)
-                    )}
-                  </div>
-                ))}
-            </div>
             {!cameraActive && (
               <div className="camera-placeholder">
                 <LockKeyhole size={40} />
@@ -1202,126 +868,6 @@ function CameraStudio() {
             )}
           </div>
           </div>
-
-          <section className="selective-editor-panel" aria-labelledby="selectiveEditorTitle">
-            <div className="selective-editor-heading">
-              <div>
-                <h2 id="selectiveEditorTitle">Selective Area Studio</h2>
-                <span>{activeScopeLabel(areaMode)} controls are active. Foreground/background and every range use the full filter stack.</span>
-              </div>
-              <strong>{roiRegions.length} / {ROI_LIMIT} ranges</strong>
-            </div>
-            <div className="area-mode-row" aria-label="Select edit area">
-              {AREA_MODES.map((mode) => (
-                <button
-                  type="button"
-                  key={mode.key}
-                  className={areaMode === mode.key ? "active" : ""}
-                  onClick={() => setAreaModeAndScope(mode.key)}
-                  title={mode.description}
-                >
-                  {mode.key === "click" && <MousePointerClick size={16} />}
-                  {mode.key === "brush" && <Brush size={16} />}
-                  {mode.key === "foreground" && <Target size={16} />}
-                  {mode.key === "background" && <Layers size={16} />}
-                  {mode.key === "all" && <Sparkles size={16} />}
-                  {mode.label}
-                </button>
-              ))}
-            </div>
-            <div className="selective-toggle-grid">
-              <label className="canva-switch">
-                <input type="checkbox" checked={autoDetectForeground} onChange={(event) => setAutoDetectForeground(event.target.checked)} />
-                <span>Auto-detect foreground</span>
-                <small>Beta</small>
-              </label>
-              <label className="canva-switch">
-                <input type="checkbox" checked={foregroundEnabled} onChange={(event) => setForegroundEnabled(event.target.checked)} />
-                <span>Foreground edits</span>
-                {foregroundEnabled ? <Eye size={15} /> : <EyeOff size={15} />}
-              </label>
-              <label className="canva-switch">
-                <input type="checkbox" checked={backgroundEnabled} onChange={(event) => setBackgroundEnabled(event.target.checked)} />
-                <span>Background edits</span>
-                {backgroundEnabled ? <Eye size={15} /> : <EyeOff size={15} />}
-              </label>
-            </div>
-            <section className="smart-recognition-panel" aria-labelledby="smartRecognitionTitle">
-              <div className="smart-recognition-heading">
-                <div>
-                  <h3 id="smartRecognitionTitle">Smart recognition</h3>
-                  <span>{smartAnalysis.status}</span>
-                </div>
-                <label className="mini-toggle">
-                  <input
-                    type="checkbox"
-                    checked={smartRecognitionEnabled}
-                    onChange={(event) => setSmartRecognitionEnabled(event.target.checked)}
-                  />
-                  On
-                </label>
-              </div>
-              <div className="smart-region-grid" aria-label="Recognized scene areas">
-                {smartRegions.map((region) => (
-                  <button key={region.id} type="button" onClick={() => createSmartRoiFromRegion(region)}>
-                    <span>{region.category}</span>
-                    <strong>{region.label}</strong>
-                    <small>{Math.round(region.confidence * 100)}% • {region.description}</small>
-                  </button>
-                ))}
-              </div>
-            </section>
-            <label className="brush-size-control">
-              <span>Brush size <output>{brushSize}</output></span>
-              <input
-                type="range"
-                min="8"
-                max="140"
-                value={brushSize}
-                onInput={(event) => setBrushSize(Number(event.currentTarget.value))}
-                onChange={(event) => setBrushSize(Number(event.target.value))}
-              />
-            </label>
-            <div className="roi-action-row">
-              <button type="button" onClick={() => createNewRoi(areaMode === "click" ? "click" : "brush")} disabled={roiRegions.length >= ROI_LIMIT}>
-                <Plus size={16} />
-                New range
-              </button>
-              <button type="button" onClick={autoAdjustActiveScope}>
-                <WandSparkles size={16} />
-                Auto-adjust
-              </button>
-              <button type="button" onClick={toggleActiveRoi} disabled={!activeRoiId}>
-                {activeRoi?.enabled === false ? <EyeOff size={16} /> : <Eye size={16} />}
-                Toggle range
-              </button>
-              <button type="button" onClick={deleteActiveRoi} disabled={!activeRoiId}>
-                <Trash2 size={16} />
-                Delete range
-              </button>
-            </div>
-            <div className="roi-region-list" aria-label="Ranges of interest">
-              {roiRegions.length ? (
-                roiRegions.map((region, index) => (
-                  <button
-                    key={region.id}
-                    type="button"
-                    className={region.id === activeRoiId ? "active" : ""}
-                    onClick={() => {
-                      setActiveRoiId(region.id);
-                      setAreaMode(region.mode === "click" ? "click" : "brush");
-                    }}
-                  >
-                    <span>{String(index + 1).padStart(2, "0")}</span>
-                    <strong>{region.name}</strong>
-                    <small>{region.smartRegion ? region.smartRegion.category : `${region.points.length} marks`} • {region.enabled ? "on" : "off"}</small>
-                  </button>
-                ))
-              ) : (
-                <p>Choose Click or Brush, then mark the preview. You can keep up to 15 separate editable ranges.</p>
-              )}
-            </div>
-          </section>
 
           <div className="studio-action-row">
             <button type="button" onClick={() => startCamera()}>
@@ -1433,17 +979,6 @@ function CameraStudio() {
           <div className="studio-panel-heading">
             <h2>Adjustments</h2>
             <button type="button" onClick={resetStudio}>Reset all</button>
-          </div>
-          <div className="active-scope-card">
-            <span>Editing scope</span>
-            <strong>{activeScopeLabel(areaMode)}</strong>
-            <small>
-              {areaMode === "click" || areaMode === "brush"
-                ? activeRoi
-                  ? `${activeRoi.name} has ${activeRoi.points.length} selected marks.`
-                  : "Create or select a range of interest."
-                : AREA_MODES.find((mode) => mode.key === areaMode)?.description}
-            </small>
           </div>
           <div className="rgbw-mixer-board" aria-label="RGBW color mixers">
             {RGBW_MIXERS.map((group) => (
@@ -1688,343 +1223,6 @@ function supportedMp4MimeType() {
   return MP4_MIME_TYPES.find((type) => MediaRecorder.isTypeSupported(type)) || "";
 }
 
-function activeSettingsForMode(mode, allSettings, foregroundSettings, backgroundSettings, activeRoi) {
-  if (mode === "foreground") return foregroundSettings;
-  if (mode === "background") return backgroundSettings;
-  if ((mode === "click" || mode === "brush") && activeRoi?.settings) return activeRoi.settings;
-  if (mode === "click" || mode === "brush") return DEFAULT_SETTINGS;
-  return allSettings;
-}
-
-function activeScopeLabel(mode) {
-  if (mode === "foreground") return "Foreground";
-  if (mode === "background") return "Background";
-  if (mode === "click") return "Click range";
-  if (mode === "brush") return "Brush range";
-  return "All";
-}
-
-function createRoiRegion(index, mode = "brush") {
-  const createdAt = new Date().toISOString();
-  return {
-    id: `roi-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-    name: `Range ${String(index + 1).padStart(2, "0")}`,
-    mode: mode === "click" ? "click" : "brush",
-    enabled: true,
-    points: [],
-    settings: { ...DEFAULT_SETTINGS },
-    createdAt,
-    updatedAt: createdAt
-  };
-}
-
-function createSmartRoiRegion(index, smartRegion) {
-  const region = createRoiRegion(index, "click");
-  return {
-    ...region,
-    name: smartRegion.label || `Smart area ${String(index + 1).padStart(2, "0")}`,
-    smartRegion,
-    points: [],
-    updatedAt: new Date().toISOString()
-  };
-}
-
-function pointerToCanvasPoint(event, canvas, brushSize) {
-  if (!canvas) return null;
-  const rect = canvas.getBoundingClientRect();
-  if (!rect.width || !rect.height) return null;
-  const x = clamp((event.clientX - rect.left) / rect.width, 0, 1);
-  const y = clamp((event.clientY - rect.top) / rect.height, 0, 1);
-  const radiusX = clamp((Number(brushSize) || 40) / 2 / rect.width, 0.004, 0.16);
-  const radiusY = clamp((Number(brushSize) || 40) / 2 / rect.height, 0.004, 0.16);
-  return { x, y, radius: Math.max(radiusX, radiusY), radiusX, radiusY };
-}
-
-function fallbackSmartAnalysis(active) {
-  return {
-    status: active ? "Using estimated scene fields until the next camera analysis pass." : "Start the camera to detect scene fields.",
-    regions: buildDefaultSmartRegions(),
-    updatedAt: new Date().toISOString()
-  };
-}
-
-function buildDefaultSmartRegions(foregroundBox = null) {
-  const subject = foregroundBoxToSmartRegion(foregroundBox) || {
-    id: "depth-near-subject",
-    category: "Depth",
-    label: "Near-field subject",
-    confidence: 0.72,
-    description: "Estimated center subject plane",
-    shape: "ellipse",
-    cx: 0.5,
-    cy: 0.48,
-    rx: 0.28,
-    ry: 0.43,
-    priority: 14
-  };
-  const farBackground = {
-    id: "depth-far-background",
-    category: "Depth",
-    label: "Far background",
-    confidence: 0.63,
-    description: "Outer area behind the near subject",
-    shape: "outside-ellipse",
-    cx: subject.cx,
-    cy: subject.cy,
-    rx: clamp(subject.rx * 1.12, 0.18, 0.48),
-    ry: clamp(subject.ry * 1.08, 0.24, 0.62),
-    priority: 8
-  };
-  return [
-    subject,
-    {
-      id: "depth-mid-field",
-      category: "Depth",
-      label: "Mid-field focus",
-      confidence: 0.58,
-      description: "Middle depth band around the subject",
-      shape: "ellipse",
-      cx: 0.5,
-      cy: 0.5,
-      rx: 0.43,
-      ry: 0.52,
-      priority: 6
-    },
-    farBackground,
-    {
-      id: "depth-upper-plane",
-      category: "Depth",
-      label: "Upper depth plane",
-      confidence: 0.52,
-      description: "Top third of the camera view",
-      shape: "rect",
-      x: 0,
-      y: 0,
-      w: 1,
-      h: 0.34,
-      priority: 4
-    },
-    {
-      id: "depth-lower-plane",
-      category: "Depth",
-      label: "Lower foreground plane",
-      confidence: 0.52,
-      description: "Lower third of the camera view",
-      shape: "rect",
-      x: 0,
-      y: 0.66,
-      w: 1,
-      h: 0.34,
-      priority: 4
-    }
-  ];
-}
-
-function analyzeCameraFrame(video, foregroundBox) {
-  if (!video || video.readyState < 2) return fallbackSmartAnalysis(Boolean(video));
-  const sampleWidth = 96;
-  const sampleHeight = 54;
-  const canvas = document.createElement("canvas");
-  canvas.width = sampleWidth;
-  canvas.height = sampleHeight;
-  const context = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
-  try {
-    context.drawImage(video, 0, 0, sampleWidth, sampleHeight);
-    const { data } = context.getImageData(0, 0, sampleWidth, sampleHeight);
-    const cells = [];
-    const cols = 4;
-    const rows = 3;
-    for (let row = 0; row < rows; row += 1) {
-      for (let col = 0; col < cols; col += 1) {
-        cells.push(sampleCellStats(data, sampleWidth, sampleHeight, col, row, cols, rows));
-      }
-    }
-
-    const by = (key) => [...cells].sort((a, b) => b[key] - a[key]);
-    const bright = by("luma")[0];
-    const dark = by("shadow")[0];
-    const detail = by("edge")[0];
-    const warm = by("warmth")[0];
-    const cool = by("coolness")[0];
-    const saturated = by("saturation")[0];
-    const regions = [
-      ...buildDefaultSmartRegions(foregroundBox),
-      buildCellSmartRegion("aspect-highlights", "Bright highlights", "Aspect", "Highest luminance field", bright, 0.7, 10),
-      buildCellSmartRegion("aspect-shadows", "Deep shadows", "Aspect", "Darkest low-light field", dark, 0.67, 10),
-      buildCellSmartRegion("aspect-detail", "High-detail edge field", "Aspect", "Strongest edge/texture field", detail, 0.64, 9),
-      buildCellSmartRegion("aspect-warm", "Warm color field", "Color", "Warmest red/yellow-biased field", warm, 0.6, 7),
-      buildCellSmartRegion("aspect-cool", "Cool color field", "Color", "Coolest blue/cyan-biased field", cool, 0.6, 7),
-      buildCellSmartRegion("aspect-saturated", "Saturated color field", "Color", "Most color-rich field", saturated, 0.62, 8)
-    ];
-    return {
-      status: `${regions.length} local depth/aspect fields detected.`,
-      regions: regions.filter(Boolean),
-      updatedAt: new Date().toISOString()
-    };
-  } catch {
-    return fallbackSmartAnalysis(true);
-  }
-}
-
-function sampleCellStats(data, width, height, col, row, cols, rows) {
-  const x0 = Math.floor((col / cols) * width);
-  const x1 = Math.floor(((col + 1) / cols) * width);
-  const y0 = Math.floor((row / rows) * height);
-  const y1 = Math.floor(((row + 1) / rows) * height);
-  let count = 0;
-  let luma = 0;
-  let saturation = 0;
-  let warmth = 0;
-  let coolness = 0;
-  let shadow = 0;
-  let edge = 0;
-  for (let y = y0; y < y1; y += 2) {
-    for (let x = x0; x < x1; x += 2) {
-      const index = (y * width + x) * 4;
-      const r = data[index];
-      const g = data[index + 1];
-      const b = data[index + 2];
-      const currentLuma = r * 0.2126 + g * 0.7152 + b * 0.0722;
-      const max = Math.max(r, g, b);
-      const min = Math.min(r, g, b);
-      const rightIndex = (y * width + Math.min(width - 1, x + 2)) * 4;
-      const downIndex = (Math.min(height - 1, y + 2) * width + x) * 4;
-      const rightLuma = data[rightIndex] * 0.2126 + data[rightIndex + 1] * 0.7152 + data[rightIndex + 2] * 0.0722;
-      const downLuma = data[downIndex] * 0.2126 + data[downIndex + 1] * 0.7152 + data[downIndex + 2] * 0.0722;
-      luma += currentLuma;
-      saturation += max ? (max - min) / max : 0;
-      warmth += (r + g * 0.35 - b * 0.8 + 255) / 510;
-      coolness += (b + g * 0.24 - r * 0.65 + 255) / 510;
-      shadow += 255 - currentLuma;
-      edge += Math.abs(currentLuma - rightLuma) + Math.abs(currentLuma - downLuma);
-      count += 1;
-    }
-  }
-  return {
-    col,
-    row,
-    cols,
-    rows,
-    luma: count ? luma / count : 0,
-    saturation: count ? saturation / count : 0,
-    warmth: count ? warmth / count : 0,
-    coolness: count ? coolness / count : 0,
-    shadow: count ? shadow / count : 0,
-    edge: count ? edge / count : 0
-  };
-}
-
-function buildCellSmartRegion(id, label, category, description, cell, baseConfidence, priority) {
-  if (!cell) return null;
-  const padX = 0.01;
-  const padY = 0.014;
-  return {
-    id,
-    category,
-    label,
-    confidence: clamp(baseConfidence + Math.min(0.18, (cell.edge || cell.saturation || 0) / 480), 0.46, 0.94),
-    description,
-    shape: "rect",
-    x: clamp(cell.col / cell.cols + padX, 0, 0.95),
-    y: clamp(cell.row / cell.rows + padY, 0, 0.95),
-    w: clamp(1 / cell.cols - padX * 2, 0.08, 1),
-    h: clamp(1 / cell.rows - padY * 2, 0.08, 1),
-    priority
-  };
-}
-
-function foregroundBoxToSmartRegion(foregroundBox) {
-  if (!foregroundBox?.width || !foregroundBox?.height || !foregroundBox?.sourceWidth || !foregroundBox?.sourceHeight) return null;
-  const cx = clamp((foregroundBox.x + foregroundBox.width / 2) / foregroundBox.sourceWidth, 0.12, 0.88);
-  const cy = clamp((foregroundBox.y + foregroundBox.height * 0.88) / foregroundBox.sourceHeight, 0.16, 0.88);
-  return {
-    id: "depth-detected-subject",
-    category: "Depth",
-    label: "Detected near-field subject",
-    confidence: 0.86,
-    description: "Face/subject-based foreground plane",
-    shape: "ellipse",
-    cx,
-    cy,
-    rx: clamp((foregroundBox.width / foregroundBox.sourceWidth) * 1.55, 0.18, 0.44),
-    ry: clamp((foregroundBox.height / foregroundBox.sourceHeight) * 2.35, 0.24, 0.62),
-    priority: 16
-  };
-}
-
-function selectSmartRegionAtPoint(point, regions = []) {
-  const candidates = regions
-    .filter((region) => smartRegionContainsPoint(region, point))
-    .sort((a, b) => b.priority + b.confidence * 3 - smartRegionArea(b) - (a.priority + a.confidence * 3 - smartRegionArea(a)));
-  return candidates[0] || null;
-}
-
-function clickSpotSmartRegion(point) {
-  return {
-    id: `click-spot-${Date.now()}`,
-    category: "Click",
-    label: "Clicked local spot",
-    confidence: 1,
-    description: "Manual click-centered selection",
-    shape: "ellipse",
-    cx: point.x,
-    cy: point.y,
-    rx: clamp(point.radiusX * 2.6, 0.04, 0.16),
-    ry: clamp(point.radiusY * 2.6, 0.04, 0.16),
-    priority: 18
-  };
-}
-
-function smartRegionContainsPoint(region, point) {
-  if (!region || !point) return false;
-  if (region.shape === "rect") {
-    return point.x >= region.x && point.x <= region.x + region.w && point.y >= region.y && point.y <= region.y + region.h;
-  }
-  const dx = (point.x - region.cx) / Math.max(region.rx, 0.001);
-  const dy = (point.y - region.cy) / Math.max(region.ry, 0.001);
-  const inside = dx * dx + dy * dy <= 1;
-  return region.shape === "outside-ellipse" ? !inside : inside;
-}
-
-function smartRegionArea(region) {
-  if (region.shape === "rect") return (region.w || 0) * (region.h || 0);
-  const ellipse = Math.PI * (region.rx || 0) * (region.ry || 0);
-  return region.shape === "outside-ellipse" ? Math.max(0.12, 1 - ellipse) : ellipse;
-}
-
-function roiPointVisualStyle(point) {
-  const radiusX = point.radiusX ?? point.radius ?? 0.04;
-  const radiusY = point.radiusY ?? point.radius ?? 0.04;
-  return {
-    left: `${point.x * 100}%`,
-    top: `${point.y * 100}%`,
-    width: `${radiusX * 200}%`,
-    height: `${radiusY * 200}%`,
-    transform: "translate(-50%, -50%)"
-  };
-}
-
-function roiSmartVisualStyle(region) {
-  if (region.shape === "rect") {
-    return {
-      left: `${region.x * 100}%`,
-      top: `${region.y * 100}%`,
-      width: `${region.w * 100}%`,
-      height: `${region.h * 100}%`,
-      borderRadius: "18px",
-      transform: "none"
-    };
-  }
-  return {
-    left: `${(region.cx - region.rx) * 100}%`,
-    top: `${(region.cy - region.ry) * 100}%`,
-    width: `${region.rx * 200 * 100}%`,
-    height: `${region.ry * 200 * 100}%`,
-    borderRadius: "999px",
-    transform: "none"
-  };
-}
-
 function drawStudioFrame(context, width, height, video, renderState) {
   if (!hasRenderableVideoFrame(video)) {
     context.save();
@@ -2039,13 +1237,6 @@ function drawStudioFrame(context, width, height, video, renderState) {
   const {
     selectedEffect,
     manualSettings,
-    foregroundSettings,
-    backgroundSettings,
-    roiRegions = [],
-    foregroundEnabled,
-    backgroundEnabled,
-    foregroundBox,
-    autoDetectForeground,
     cameraFacing
   } = renderState;
   context.save();
@@ -2060,49 +1251,6 @@ function drawStudioFrame(context, width, height, video, renderState) {
     cameraFacing
   });
   context.drawImage(base, 0, 0);
-
-  const effectSettings = selectedEffect?.settings || DEFAULT_SETTINGS;
-  const hasBackgroundOverrides = backgroundEnabled && settingsChangedFromBaseline(backgroundSettings, effectSettings);
-  const hasForegroundOverrides = foregroundEnabled && settingsChangedFromBaseline(foregroundSettings, effectSettings);
-
-  if (hasBackgroundOverrides) {
-    const background = renderProcessedLayer(width, height, video, {
-      selectedEffect,
-      settings: backgroundSettings,
-      cameraFacing
-    });
-    context.save();
-    clipBackgroundMask(context, width, height, foregroundBox, autoDetectForeground);
-    context.drawImage(background, 0, 0);
-    context.restore();
-  }
-
-  if (hasForegroundOverrides) {
-    const foreground = renderProcessedLayer(width, height, video, {
-      selectedEffect,
-      settings: foregroundSettings,
-      cameraFacing
-    });
-    context.save();
-    clipForegroundMask(context, width, height, foregroundBox, autoDetectForeground);
-    context.drawImage(foreground, 0, 0);
-    context.restore();
-  }
-
-  roiRegions
-    .filter((region) => region.enabled && (region.smartRegion || region.points?.length))
-    .forEach((region) => {
-      const layer = renderProcessedLayer(width, height, video, {
-        selectedEffect,
-        settings: region.settings,
-        cameraFacing
-      });
-      context.save();
-      if (clipRoiMask(context, width, height, region)) {
-        context.drawImage(layer, 0, 0);
-      }
-      context.restore();
-    });
   context.restore();
   return true;
 }
@@ -2138,14 +1286,6 @@ function hasRenderableVideoFrame(video) {
   return Boolean(video && video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0);
 }
 
-function settingsChangedFromBaseline(settings, baseline) {
-  const keys = new Set([...Object.keys(settings || {}), ...Object.keys(baseline || {})]);
-  for (const key of keys) {
-    if (setting(settings, key, baseline?.[key] ?? 0) !== setting(baseline, key, 0)) return true;
-  }
-  return false;
-}
-
 function coverCrop(sourceWidth, sourceHeight, targetWidth, targetHeight) {
   const sourceRatio = sourceWidth / sourceHeight;
   const targetRatio = targetWidth / targetHeight;
@@ -2161,78 +1301,6 @@ function coverCrop(sourceWidth, sourceHeight, targetWidth, targetHeight) {
     sy = (sourceHeight - sh) / 2;
   }
   return { sx, sy, sw, sh };
-}
-
-function clipForegroundMask(context, width, height, foregroundBox, autoDetectForeground) {
-  const mask = foregroundMaskRect(width, height, foregroundBox, autoDetectForeground);
-  context.beginPath();
-  context.ellipse(mask.cx, mask.cy, mask.rx, mask.ry, 0, 0, Math.PI * 2);
-  context.clip();
-}
-
-function clipBackgroundMask(context, width, height, foregroundBox, autoDetectForeground) {
-  const mask = foregroundMaskRect(width, height, foregroundBox, autoDetectForeground);
-  const path = new Path2D();
-  path.rect(0, 0, width, height);
-  path.ellipse(mask.cx, mask.cy, mask.rx, mask.ry, 0, 0, Math.PI * 2);
-  context.clip(path, "evenodd");
-}
-
-function foregroundMaskRect(width, height, foregroundBox, autoDetectForeground) {
-  if (autoDetectForeground && foregroundBox?.width && foregroundBox?.height) {
-    const crop = coverCrop(foregroundBox.sourceWidth, foregroundBox.sourceHeight, width, height);
-    const cx = ((foregroundBox.x + foregroundBox.width / 2 - crop.sx) / crop.sw) * width;
-    const cy = ((foregroundBox.y + foregroundBox.height / 2 - crop.sy) / crop.sh) * height;
-    return {
-      cx: clamp(cx, width * 0.18, width * 0.82),
-      cy: clamp(cy + foregroundBox.height * 0.35, height * 0.18, height * 0.82),
-      rx: clamp((foregroundBox.width / crop.sw) * width * 1.55, width * 0.18, width * 0.42),
-      ry: clamp((foregroundBox.height / crop.sh) * height * 2.35, height * 0.26, height * 0.62)
-    };
-  }
-  return {
-    cx: width * 0.5,
-    cy: height * 0.48,
-    rx: width * 0.28,
-    ry: height * 0.43
-  };
-}
-
-function clipRoiMask(context, width, height, region) {
-  if (region.smartRegion) return clipSmartRegionMask(context, width, height, region.smartRegion);
-  if (!region.points?.length) return false;
-  const path = new Path2D();
-  region.points.forEach((point) => {
-    const radiusX = clamp((point.radiusX ?? point.radius ?? 0.04) * width, 4, width * 0.22);
-    const radiusY = clamp((point.radiusY ?? point.radius ?? 0.04) * height, 4, height * 0.22);
-    path.moveTo(point.x * width + radiusX, point.y * height);
-    path.ellipse(point.x * width, point.y * height, radiusX, radiusY, 0, 0, Math.PI * 2);
-  });
-  context.clip(path);
-  return true;
-}
-
-function clipSmartRegionMask(context, width, height, region) {
-  if (!region) return false;
-  const path = new Path2D();
-  if (region.shape === "rect") {
-    path.rect(region.x * width, region.y * height, region.w * width, region.h * height);
-    context.clip(path);
-    return true;
-  }
-  const cx = region.cx * width;
-  const cy = region.cy * height;
-  const rx = clamp(region.rx * width, 6, width);
-  const ry = clamp(region.ry * height, 6, height);
-  if (region.shape === "outside-ellipse") {
-    path.rect(0, 0, width, height);
-    path.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-    context.clip(path, "evenodd");
-    return true;
-  }
-  path.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-  context.clip(path);
-  return true;
 }
 
 function buildFilterCss(settings) {
