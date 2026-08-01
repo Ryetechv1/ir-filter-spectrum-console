@@ -635,11 +635,97 @@
   padding-bottom: 14px;
 }
 
+.adjustment-dropdown-stack {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.adjustment-dropdown {
+  overflow: hidden;
+  border: 1px solid rgba(133, 160, 184, 0.2);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(255, 255, 255, 0.06), transparent 34%),
+    linear-gradient(180deg, rgba(20, 31, 42, 0.82), rgba(7, 12, 18, 0.84));
+}
+
+.adjustment-dropdown summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 58px;
+  padding: 12px 14px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.adjustment-dropdown summary::-webkit-details-marker {
+  display: none;
+}
+
+.adjustment-dropdown summary::before {
+  content: "+";
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+}
+
+.adjustment-dropdown summary span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.adjustment-dropdown summary strong {
+  color: #f5f8fb;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.adjustment-dropdown summary small {
+  color: #aeb9c5;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.adjustment-dropdown summary em {
+  display: inline-grid;
+  place-items: center;
+  min-width: 34px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid rgba(63, 208, 255, 0.24);
+  border-radius: 999px;
+  color: #8ce8ff;
+  background: rgba(63, 208, 255, 0.08);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.adjustment-dropdown[open] summary {
+  border-bottom: 1px solid rgba(133, 160, 184, 0.16);
+}
+
+.adjustment-dropdown[open] summary strong {
+  color: #ffffff;
+}
+
+.adjustment-dropdown[open] summary em {
+  color: #031017;
+  background: #8ce8ff;
+}
+
 .rgbw-mixer-board {
   display: grid;
   gap: 12px;
+  max-height: 560px;
+  overflow: auto;
   padding: 14px;
-  border-bottom: 1px solid rgba(133, 160, 184, 0.16);
 }
 
 .rgbw-mixer {
@@ -749,7 +835,10 @@
 .adjustment-list {
   display: grid;
   gap: 14px;
+  max-height: 520px;
+  overflow: auto;
   padding: 14px;
+  padding-right: 18px;
 }
 
 .advanced-adjustment-list {

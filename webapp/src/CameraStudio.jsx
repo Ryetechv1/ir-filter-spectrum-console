@@ -107,7 +107,12 @@ const INVERSION_ADJUSTMENTS = [
   ["lumaInvert", "Luma Negative", 0, 100, "%", 0],
   ["channelInvert", "Channel Swap Invert", 0, 100, "%", 0],
   ["spectralInvert", "Spectral Invert", 0, 100, "%", 0],
-  ["thermalInvert", "Thermal Black-Hot Invert", 0, 100, "%", 0]
+  ["thermalInvert", "Thermal Black-Hot Invert", 0, 100, "%", 0],
+  ["redInvert", "Red Channel Invert", 0, 100, "%", 0],
+  ["greenInvert", "Green Channel Invert", 0, 100, "%", 0],
+  ["blueInvert", "Blue Channel Invert", 0, 100, "%", 0],
+  ["shadowInvert", "Shadow Range Invert", 0, 100, "%", 0],
+  ["highlightInvert", "Highlight Range Invert", 0, 100, "%", 0]
 ];
 
 const CORE_ADJUSTMENTS = [
@@ -123,6 +128,12 @@ const CORE_ADJUSTMENTS = [
   ["grain", "Grain", 0, 80, "%"],
   ["duotone", "Duotone", 0, 100, "%"],
   ["glow", "Glow", 0, 60, "px"]
+];
+
+const FINISH_ADJUSTMENTS = [
+  ["sepia", "Sepia", 0, 100, "%", 0],
+  ["grayscale", "Grayscale", 0, 100, "%", 0],
+  ["invert", "Base Invert", 0, 100, "%", 0]
 ];
 
 const EXTRA_ADJUSTMENTS = [
@@ -178,6 +189,61 @@ const EXTRA_ADJUSTMENTS = [
   ["overlayStrength", "Overlay Strength", 0, 100, "%", 28]
 ];
 
+const ADDITIONAL_ADJUSTMENTS = [
+  ["microExposure", "Micro Exposure", -100, 100, "", 0],
+  ["hdrRange", "HDR Range", 0, 100, "%", 0],
+  ["specularControl", "Specular Control", -100, 100, "", 0],
+  ["blackPoint", "Black Point", -100, 100, "", 0],
+  ["whitePoint", "White Point", -100, 100, "", 0],
+  ["midtoneContrast", "Midtone Contrast", -100, 100, "", 0],
+  ["localContrast", "Local Contrast", -100, 100, "", 0],
+  ["highlightRecovery", "Highlight Recovery", 0, 100, "%", 0],
+  ["shadowDepth", "Shadow Depth", 0, 100, "%", 0],
+  ["ambientLift", "Ambient Lift", -100, 100, "", 0],
+  ["skinSmooth", "Skin Smooth", 0, 100, "%", 0],
+  ["texture", "Texture", -100, 100, "", 0],
+  ["structure", "Structure", -100, 100, "", 0],
+  ["detailBoost", "Detail Boost", 0, 100, "%", 0],
+  ["fineSharpen", "Fine Sharpen", 0, 100, "%", 0],
+  ["noiseColor", "Color Noise", 0, 100, "%", 0],
+  ["noiseMono", "Mono Noise", 0, 100, "%", 0],
+  ["dust", "Dust", 0, 100, "%", 0],
+  ["scratches", "Scratches", 0, 100, "%", 0],
+  ["clarityMask", "Clarity Mask", 0, 100, "%", 0],
+  ["redHueShift", "Red Hue Shift", -100, 100, "", 0],
+  ["greenHueShift", "Green Hue Shift", -100, 100, "", 0],
+  ["blueHueShift", "Blue Hue Shift", -100, 100, "", 0],
+  ["aquaShift", "Aqua Shift", -100, 100, "", 0],
+  ["purpleShift", "Purple Shift", -100, 100, "", 0],
+  ["orangeShift", "Orange Shift", -100, 100, "", 0],
+  ["skinToneWarmth", "Skin Tone Warmth", -100, 100, "", 0],
+  ["colorSeparation", "Color Separation", 0, 100, "%", 0],
+  ["colorLeak", "Color Leak", 0, 100, "%", 0],
+  ["colorHarmony", "Color Harmony", -100, 100, "", 0],
+  ["fisheye", "Fisheye Curve", 0, 100, "%", 0],
+  ["barrelWarp", "Barrel Warp", 0, 100, "%", 0],
+  ["glitchShift", "Glitch Shift", 0, 100, "%", 0],
+  ["mirrorGhost", "Mirror Ghost", 0, 100, "%", 0],
+  ["lightWrap", "Light Wrap", 0, 100, "%", 0],
+  ["edgeGlow", "Edge Glow", 0, 100, "%", 0],
+  ["centerGlow", "Center Glow", 0, 100, "%", 0],
+  ["bokehBloom", "Bokeh Bloom", 0, 100, "%", 0],
+  ["flareStreak", "Flare Streak", 0, 100, "%", 0],
+  ["chromaticGlow", "Chromatic Glow", 0, 100, "%", 0],
+  ["nearIrBoost", "Near-IR Boost", 0, 100, "%", 0],
+  ["uvaFluorescence", "UVA Fluorescence", 0, 100, "%", 0],
+  ["chlorophyllGlow", "Chlorophyll Glow", 0, 100, "%", 0],
+  ["mineralPop", "Mineral Pop", 0, 100, "%", 0],
+  ["auraBloom", "Aura Bloom", 0, 100, "%", 0],
+  ["xrayGhost", "X-Ray Ghost", 0, 100, "%", 0],
+  ["thermalContour", "Thermal Contour", 0, 100, "%", 0],
+  ["heatEdge", "Heat Edge", 0, 100, "%", 0],
+  ["nightScope", "Night Scope", 0, 100, "%", 0],
+  ["negativeDepth", "Negative Depth", 0, 100, "%", 0]
+];
+
+const ADVANCED_ADJUSTMENTS = [...EXTRA_ADJUSTMENTS, ...ADDITIONAL_ADJUSTMENTS];
+
 const DEFAULT_SETTINGS = {
   brightness: 100,
   contrast: 100,
@@ -195,13 +261,183 @@ const DEFAULT_SETTINGS = {
   grayscale: 0,
   invert: 0,
   ...Object.fromEntries(INVERSION_ADJUSTMENTS.map(([key, , , , , initial = 0]) => [key, initial])),
-  ...Object.fromEntries(EXTRA_ADJUSTMENTS.map(([key, , , , , initial = 0]) => [key, initial])),
+  ...Object.fromEntries(ADVANCED_ADJUSTMENTS.map(([key, , , , , initial = 0]) => [key, initial])),
   ...Object.fromEntries(
     RGBW_MIXERS.flatMap((group) =>
       RGBW_CHANNELS.map((channel) => [`${group.key}${channel.key}`, group.defaults[channel.key]])
     )
   )
 };
+
+const STACKED_SETTING_KEYS = new Set([
+  ...INVERSION_ADJUSTMENTS.map(([key]) => key),
+  ...RGBW_MIXERS.flatMap((group) => RGBW_CHANNELS.map((channel) => `${group.key}${channel.key}`))
+]);
+
+const ADJUSTMENT_GROUPS = [
+  {
+    id: "rgbw",
+    title: "RGBW Color Mixers",
+    description: "Main, Secondary, Third, and Highlights color layers. These now affect both overlays and base filter math.",
+    type: "rgbw",
+    open: true
+  },
+  {
+    id: "core",
+    title: "Core Photo Controls",
+    description: "Fast brightness, exposure, contrast, temperature, blur, glow, grain, and vignette controls.",
+    controls: CORE_ADJUSTMENTS,
+    open: true
+  },
+  {
+    id: "inversion",
+    title: "Color Inversion Matrix",
+    description: "Ten negative, channel, tonal-range, spectral, and thermal inversion tools that stack with every preset.",
+    controls: INVERSION_ADJUSTMENTS,
+    controlClassName: "inversion-adjustment",
+    open: true
+  },
+  {
+    id: "tone",
+    title: "Tone Curve & Exposure",
+    description: "Expanded exposure, HDR, black/white point, shadow, highlight, and midtone controls.",
+    controls: [
+      "gamma",
+      "shadows",
+      "highlights",
+      "whites",
+      "blacks",
+      "fade",
+      "midtoneLift",
+      "shadowCrush",
+      "microExposure",
+      "hdrRange",
+      "specularControl",
+      "blackPoint",
+      "whitePoint",
+      "midtoneContrast",
+      "localContrast",
+      "highlightRecovery",
+      "shadowDepth",
+      "ambientLift"
+    ]
+  },
+  {
+    id: "detail",
+    title: "Detail, Texture & Noise",
+    description: "Sharpening, structure, softness, pixel/noise tools, posterize, dust, scratches, and edge treatments.",
+    controls: [
+      "clarity",
+      "dehaze",
+      "sharpen",
+      "pixelate",
+      "posterize",
+      "noiseReduction",
+      "edgeEnhance",
+      "emboss",
+      "skinSmooth",
+      "texture",
+      "structure",
+      "detailBoost",
+      "fineSharpen",
+      "noiseColor",
+      "noiseMono",
+      "dust",
+      "scratches",
+      "clarityMask"
+    ]
+  },
+  {
+    id: "color",
+    title: "Color Channels & Balance",
+    description: "Vibrance, RGB channel levels, hue shifts, color harmony, and targeted color separation.",
+    controls: [
+      "vibrance",
+      "cyanBalance",
+      "magentaBalance",
+      "yellowBalance",
+      "redChannel",
+      "greenChannel",
+      "blueChannel",
+      "whiteBalance",
+      "colorizeHue",
+      "colorizeStrength",
+      "redHueShift",
+      "greenHueShift",
+      "blueHueShift",
+      "aquaShift",
+      "purpleShift",
+      "orangeShift",
+      "skinToneWarmth",
+      "colorSeparation",
+      "colorLeak",
+      "colorHarmony"
+    ]
+  },
+  {
+    id: "lens",
+    title: "Lens, Glow & Optical FX",
+    description: "Bloom, halo, soft focus, flare, radial/motion blur, prism, and camera-lens artifacts.",
+    controls: [
+      "bloom",
+      "halo",
+      "lensFlare",
+      "chromaticAberration",
+      "glowRadius",
+      "glowStrength",
+      "softFocus",
+      "tiltShift",
+      "radialBlur",
+      "motionBlur",
+      "prismSplit",
+      "fisheye",
+      "barrelWarp",
+      "glitchShift",
+      "mirrorGhost",
+      "lightWrap",
+      "edgeGlow",
+      "centerGlow",
+      "bokehBloom",
+      "flareStreak",
+      "chromaticGlow"
+    ]
+  },
+  {
+    id: "spectral",
+    title: "Spectral IR / UVA / Thermal",
+    description: "IR, UVA, chlorophyll, mineral, aura, night-scope, thermal, x-ray, and negative-depth effects.",
+    controls: [
+      "infraredWash",
+      "ultravioletWash",
+      "thermalBlend",
+      "splitTone",
+      "nearIrBoost",
+      "uvaFluorescence",
+      "chlorophyllGlow",
+      "mineralPop",
+      "auraBloom",
+      "xrayGhost",
+      "thermalContour",
+      "heatEdge",
+      "nightScope",
+      "negativeDepth"
+    ]
+  },
+  {
+    id: "analog",
+    title: "Analog, Print & Display",
+    description: "Matte, scanlines, CRT curve, halation, threshold, solarize, and print-style looks.",
+    controls: ["matte", "scanlines", "crtCurve", "halation", "threshold", "solarize", "duotone", "colorDodge"]
+  },
+  {
+    id: "creative",
+    title: "Creative Mix Finish",
+    description: "Overlay and compositing finishers that bind color mixers, inversion, and spectral filters together.",
+    controls: ["overlayStrength", "glow", "grain", "vignette", "sepia", "grayscale", "invert"]
+  }
+];
+
+const ADJUSTMENT_LOOKUP = new Map([...CORE_ADJUSTMENTS, ...FINISH_ADJUSTMENTS, ...INVERSION_ADJUSTMENTS, ...ADVANCED_ADJUSTMENTS].map((control) => [control[0], control]));
 
 const EFFECT_FAMILIES = [
   {
@@ -352,6 +588,7 @@ function CameraStudio() {
   const [search, setSearch] = useState("");
   const [selectedEffectId, setSelectedEffectId] = useState(CAMERA_EFFECTS[0].id);
   const [manualSettings, setManualSettings] = useState(CAMERA_EFFECTS[0].settings);
+  const [openAdjustmentGroups, setOpenAdjustmentGroups] = useState(() => new Set(ADJUSTMENT_GROUPS.filter((group) => group.open).map((group) => group.id)));
   const [snapshotUrl, setSnapshotUrl] = useState("");
 
   const selectedEffect = useMemo(
@@ -652,11 +889,23 @@ function CameraStudio() {
 
   function selectEffect(effect) {
     setSelectedEffectId(effect.id);
-    setManualSettings(effect.settings);
+    setManualSettings((current) => ({
+      ...effect.settings,
+      ...Object.fromEntries([...STACKED_SETTING_KEYS].map((key) => [key, current[key] ?? DEFAULT_SETTINGS[key] ?? 0]))
+    }));
   }
 
   function updateSetting(key, value) {
     setManualSettings((current) => ({ ...current, [key]: Number(value) }));
+  }
+
+  function setAdjustmentGroupOpen(groupId, open) {
+    setOpenAdjustmentGroups((current) => {
+      const next = new Set(current);
+      if (open) next.add(groupId);
+      else next.delete(groupId);
+      return next;
+    });
   }
 
   function handleStopCamera() {
@@ -704,6 +953,105 @@ function CameraStudio() {
       link.click();
       setCameraStatus("Snapshot downloaded locally.");
     }, "image/png");
+  }
+
+  function renderAdjustmentSlider(control, className = "") {
+    if (!control) return null;
+    const [key, label, min, max, unit] = control;
+    const value = manualSettings[key] ?? DEFAULT_SETTINGS[key] ?? 0;
+    return (
+      <label key={key} className={`studio-adjustment ${className}`.trim()}>
+        <span>
+          <SlidersHorizontal size={15} />
+          {label}
+          <output>{value}{unit}</output>
+        </span>
+        <input
+          type="range"
+          min={min}
+          max={max}
+          value={value}
+          onInput={(event) => updateSetting(key, event.currentTarget.value)}
+          onChange={(event) => updateSetting(key, event.target.value)}
+          style={{ "--value": `${((value - min) / (max - min)) * 100}%` }}
+        />
+      </label>
+    );
+  }
+
+  function renderRgbwMixerGroup() {
+    return (
+      <div className="rgbw-mixer-board" aria-label="RGBW color mixers">
+        {RGBW_MIXERS.map((group) => (
+          <section className="rgbw-mixer" key={group.key}>
+            <div className="rgbw-mixer-header">
+              <h3>{group.label}</h3>
+              <span style={{ background: rgbwCss(manualSettings, group.key, 1) }} />
+            </div>
+            {RGBW_CHANNELS.map((channel) => {
+              const settingKey = `${group.key}${channel.key}`;
+              const value = manualSettings[settingKey] ?? 0;
+              return (
+                <label key={settingKey} className={`rgbw-slider channel-${channel.key.toLowerCase()}`}>
+                  <span>
+                    <strong>{channel.key}</strong>
+                    {channel.label}
+                    <output>{value}</output>
+                  </span>
+                  <input
+                    type="range"
+                    min={channel.min}
+                    max={channel.max}
+                    value={value}
+                    onInput={(event) => updateSetting(settingKey, event.currentTarget.value)}
+                    onChange={(event) => updateSetting(settingKey, event.target.value)}
+                    style={{
+                      "--value": `${(value / channel.max) * 100}%`,
+                      "--channel-color": channel.color
+                    }}
+                  />
+                </label>
+              );
+            })}
+          </section>
+        ))}
+      </div>
+    );
+  }
+
+  function renderAdjustmentGroup(group) {
+    const count =
+      group.type === "rgbw"
+        ? RGBW_MIXERS.length * RGBW_CHANNELS.length
+        : group.controls.length;
+    return (
+      <details
+        key={group.id}
+        className="adjustment-dropdown"
+        open={openAdjustmentGroups.has(group.id)}
+        onToggle={(event) => setAdjustmentGroupOpen(group.id, event.currentTarget.open)}
+      >
+        <summary>
+          <span>
+            <strong>{group.title}</strong>
+            <small>{group.description}</small>
+          </span>
+          <em>{count}</em>
+        </summary>
+        {group.type === "rgbw" ? (
+          renderRgbwMixerGroup()
+        ) : (
+          <div className="adjustment-list">
+            {group.controls.map((controlKey) =>
+              renderAdjustmentSlider(
+                Array.isArray(controlKey) ? controlKey : ADJUSTMENT_LOOKUP.get(controlKey),
+                group.controlClassName
+              )
+            )}
+          </div>
+        )}
+      </details>
+    );
   }
 
   return (
@@ -757,8 +1105,8 @@ function CameraStudio() {
           <h3>What The Studio Offers</h3>
           <ul>
             <li>120 local visual presets for IR-style, UVA-style, thermal, cinematic, monochrome, duotone, retro, and color-lab looks.</li>
-            <li>Four RGBW gradient mixers for Main, Secondary, Third, and Highlights color layers.</li>
-            <li>12 core photo controls plus 50 advanced sliders for exposure, color channels, glow, scanlines, IR/UVA washes, and more.</li>
+            <li>Four RGBW gradient mixers for Main, Secondary, Third, and Highlights color layers that now drive overlays and filter math.</li>
+            <li>12 core photo controls, 10 color inversion tools, and 100 advanced sliders for exposure, color channels, glow, scanlines, IR/UVA washes, and more.</li>
             <li>Processed PNG snapshots and 1080P or 2K MP4 recordings with the studio effects applied.</li>
             <li>A local shelf for the latest 3 photos/videos, with preview, download, and remove controls.</li>
           </ul>
@@ -811,8 +1159,8 @@ function CameraStudio() {
             <video ref={videoRef} className={cameraFacing === "user" ? "is-mirrored" : ""} autoPlay playsInline muted style={videoStyle} />
             <div className="studio-color-overlay" style={overlayStyle} />
             <div className="studio-special-overlay" style={specialOverlayStyle} />
-            <div className="studio-grain" style={{ opacity: manualSettings.grain / 160 }} />
-            <div className="studio-vignette" style={{ opacity: manualSettings.vignette / 100 }} />
+            <div className="studio-grain" style={{ opacity: clamp((manualSettings.grain + setting(manualSettings, "filmGrainSize") + setting(manualSettings, "noiseMono") + setting(manualSettings, "dust")) / 260, 0, 0.72) }} />
+            <div className="studio-vignette" style={{ opacity: clamp((manualSettings.vignette + setting(manualSettings, "shadowDepth") * 0.24 + setting(manualSettings, "negativeDepth") * 0.18) / 100, 0, 0.96) }} />
             {!cameraActive && (
               <div className="camera-placeholder">
                 <LockKeyhole size={40} />
@@ -947,104 +1295,12 @@ function CameraStudio() {
             <h2>Adjustments</h2>
             <button type="button" onClick={resetStudio}>Reset all</button>
           </div>
-          <div className="rgbw-mixer-board" aria-label="RGBW color mixers">
-            {RGBW_MIXERS.map((group) => (
-              <section className="rgbw-mixer" key={group.key}>
-                <div className="rgbw-mixer-header">
-                  <h3>{group.label}</h3>
-                  <span style={{ background: rgbwCss(manualSettings, group.key, 1) }} />
-                </div>
-                {RGBW_CHANNELS.map((channel) => {
-                  const settingKey = `${group.key}${channel.key}`;
-                  const value = manualSettings[settingKey] ?? 0;
-                  return (
-                    <label key={settingKey} className={`rgbw-slider channel-${channel.key.toLowerCase()}`}>
-                      <span>
-                        <strong>{channel.key}</strong>
-                        {channel.label}
-                        <output>{value}</output>
-                      </span>
-                      <input
-                        type="range"
-                        min={channel.min}
-                        max={channel.max}
-                        value={value}
-                        onChange={(event) => updateSetting(settingKey, event.target.value)}
-                        style={{
-                          "--value": `${(value / channel.max) * 100}%`,
-                          "--channel-color": channel.color
-                        }}
-                      />
-                    </label>
-                  );
-                })}
-              </section>
-            ))}
-          </div>
-          <div className="adjustment-group-label">Core photo controls</div>
-          <div className="adjustment-list">
-            {CORE_ADJUSTMENTS.map(([key, label, min, max, unit]) => (
-              <label key={key} className="studio-adjustment">
-                <span>
-                  <SlidersHorizontal size={15} />
-                  {label}
-                  <output>{manualSettings[key]}{unit}</output>
-                </span>
-                <input
-                  type="range"
-                  min={min}
-                  max={max}
-                  value={manualSettings[key]}
-                  onChange={(event) => updateSetting(key, event.target.value)}
-                  style={{ "--value": `${((manualSettings[key] - min) / (max - min)) * 100}%` }}
-                />
-              </label>
-            ))}
-          </div>
-          <div className="adjustment-group-label">Color inversion tools ×5</div>
-          <div className="adjustment-list">
-            {INVERSION_ADJUSTMENTS.map(([key, label, min, max, unit]) => (
-              <label key={key} className="studio-adjustment inversion-adjustment">
-                <span>
-                  <SlidersHorizontal size={15} />
-                  {label}
-                  <output>{manualSettings[key]}{unit}</output>
-                </span>
-                <input
-                  type="range"
-                  min={min}
-                  max={max}
-                  value={manualSettings[key]}
-                  onInput={(event) => updateSetting(key, event.currentTarget.value)}
-                  onChange={(event) => updateSetting(key, event.target.value)}
-                  style={{ "--value": `${((manualSettings[key] - min) / (max - min)) * 100}%` }}
-                />
-              </label>
-            ))}
-          </div>
-          <div className="adjustment-group-label">Advanced effect controls +50</div>
-          <div className="adjustment-list advanced-adjustment-list">
-            {EXTRA_ADJUSTMENTS.map(([key, label, min, max, unit]) => (
-              <label key={key} className="studio-adjustment">
-                <span>
-                  <SlidersHorizontal size={15} />
-                  {label}
-                  <output>{manualSettings[key]}{unit}</output>
-                </span>
-                <input
-                  type="range"
-                  min={min}
-                  max={max}
-                  value={manualSettings[key]}
-                  onChange={(event) => updateSetting(key, event.target.value)}
-                  style={{ "--value": `${((manualSettings[key] - min) / (max - min)) * 100}%` }}
-                />
-              </label>
-            ))}
+          <div className="adjustment-dropdown-stack" aria-label="Grouped camera adjustments">
+            {ADJUSTMENT_GROUPS.map(renderAdjustmentGroup)}
           </div>
           <div className="studio-reference-note">
             <KeyRound size={17} />
-            <span>PineTools-style image operations and Canva-like filter intensity controls, rendered locally on live video.</span>
+            <span>MDN-style stacked filters, PineTools-style image operations, and Canva-like slider groups are rendered locally on live video.</span>
           </div>
         </aside>
       </section>
@@ -1225,6 +1481,7 @@ function drawStudioFrame(context, width, height, video, renderState) {
 
 function buildFilterCss(settings, options = {}) {
   const includeInversion = options.includeInversion !== false;
+  const rgbw = rgbwMixerInfluence(settings);
   const gammaLift = setting(settings, "gamma") * 0.2;
   const shadowLift = setting(settings, "shadows") * 0.16;
   const highlightLift = setting(settings, "highlights") * 0.18;
@@ -1237,41 +1494,153 @@ function buildFilterCss(settings, options = {}) {
   const channelInvert = includeInversion ? setting(settings, "channelInvert") : 0;
   const spectralInvert = includeInversion ? setting(settings, "spectralInvert") : 0;
   const thermalInvert = includeInversion ? setting(settings, "thermalInvert") : 0;
-  const brightness = clamp(settings.brightness + settings.exposure * 0.55 + gammaLift + shadowLift + highlightLift * 0.38 + channelAverage * 0.12, 5, 280);
-  const contrast = clamp(settings.contrast + Math.abs(settings.exposure) * 0.12 + clarityBoost + dehazeBoost - setting(settings, "fade") * 0.28, 5, 280);
+  const redInvert = includeInversion ? setting(settings, "redInvert") : 0;
+  const greenInvert = includeInversion ? setting(settings, "greenInvert") : 0;
+  const blueInvert = includeInversion ? setting(settings, "blueInvert") : 0;
+  const shadowInvert = includeInversion ? setting(settings, "shadowInvert") : 0;
+  const highlightInvert = includeInversion ? setting(settings, "highlightInvert") : 0;
+  const selectiveInvertAverage = (redInvert + greenInvert + blueInvert + shadowInvert + highlightInvert) / 5;
+  const exposureLift =
+    settings.exposure * 0.55 +
+    gammaLift +
+    shadowLift +
+    highlightLift * 0.38 +
+    channelAverage * 0.12 +
+    setting(settings, "microExposure") * 0.32 +
+    setting(settings, "ambientLift") * 0.2 +
+    setting(settings, "specularControl") * 0.12 +
+    setting(settings, "whites") * 0.12 -
+    setting(settings, "blacks") * 0.1 +
+    setting(settings, "whitePoint") * 0.18 -
+    setting(settings, "blackPoint") * 0.13 -
+    setting(settings, "highlightRecovery") * 0.1 +
+    rgbw.brightnessBoost;
+  const contrastLift =
+    Math.abs(settings.exposure) * 0.12 +
+    clarityBoost +
+    dehazeBoost -
+    setting(settings, "fade") * 0.28 +
+    setting(settings, "hdrRange") * 0.16 +
+    setting(settings, "midtoneContrast") * 0.2 +
+    setting(settings, "localContrast") * 0.18 +
+    setting(settings, "texture") * 0.08 +
+    setting(settings, "structure") * 0.1 +
+    setting(settings, "detailBoost") * 0.09 +
+    setting(settings, "fineSharpen") * 0.08 +
+    setting(settings, "clarityMask") * 0.12 +
+    setting(settings, "skinSmooth") * -0.12 +
+    rgbw.contrastBoost;
+  const brightness = clamp(settings.brightness + exposureLift, 5, 290);
+  const contrast = clamp(settings.contrast + contrastLift, 5, 300);
   const saturation = clamp(
     settings.saturation +
       vibranceBoost +
       setting(settings, "colorizeStrength") * 0.35 -
       setting(settings, "matte") * 0.15 +
       spectralInvert * 0.65 +
-      thermalInvert * 0.42,
+      thermalInvert * 0.42 +
+      setting(settings, "colorHarmony") * 0.12 +
+      setting(settings, "colorLeak") * 0.22 +
+      setting(settings, "noiseColor") * 0.06 +
+      setting(settings, "uvaFluorescence") * 0.24 +
+      setting(settings, "chlorophyllGlow") * 0.18 +
+      setting(settings, "mineralPop") * 0.18 +
+      setting(settings, "auraBloom") * 0.22 +
+      rgbw.saturationBoost,
     0,
-    320
+    360
   );
   const hue = clamp(
     settings.hue +
       setting(settings, "colorizeHue") * (setting(settings, "colorizeStrength") / 120) +
       channelInvert * 1.65 +
       spectralInvert * 2.15 -
-      thermalInvert * 0.72,
+      thermalInvert * 0.72 +
+      redInvert * 0.38 -
+      greenInvert * 0.24 +
+      blueInvert * 0.52 +
+      setting(settings, "redHueShift") * 0.42 +
+      setting(settings, "greenHueShift") * 0.34 +
+      setting(settings, "blueHueShift") * 0.46 +
+      setting(settings, "aquaShift") * 0.36 +
+      setting(settings, "purpleShift") * 0.44 +
+      setting(settings, "orangeShift") * 0.3 +
+      setting(settings, "skinToneWarmth") * 0.16 +
+      setting(settings, "colorSeparation") * 0.28 +
+      setting(settings, "nearIrBoost") * 0.28 -
+      setting(settings, "nightScope") * 0.22 +
+      rgbw.hueShift,
     -360,
     360
   );
-  const sepia = clamp(settings.sepia + setting(settings, "whiteBalance") * 0.12 + Math.max(0, setting(settings, "temperature")) * 0.12 + thermalInvert * 0.36, 0, 100);
-  const grayscale = clamp(settings.grayscale + setting(settings, "threshold") * 0.2 - setting(settings, "vibrance") * 0.08 + lumaInvert * 0.42, 0, 100);
-  const invert = clamp(settings.invert + setting(settings, "solarize") * 0.35 + classicInvert + lumaInvert * 0.62 + thermalInvert * 0.28, 0, 100);
-  const blur = clamp(settings.blur + setting(settings, "softFocus") * 0.04 + setting(settings, "radialBlur") * 0.02 + setting(settings, "motionBlur") * 0.018, 0, 18);
-  const glowRadius = clamp(settings.glow + setting(settings, "glowRadius") * 0.28 + setting(settings, "bloom") * 0.13 + setting(settings, "halation") * 0.18, 0, 90);
+  const sepia = clamp(
+    settings.sepia +
+      setting(settings, "whiteBalance") * 0.12 +
+      Math.max(0, setting(settings, "temperature")) * 0.12 +
+      thermalInvert * 0.36 +
+      setting(settings, "orangeShift") * 0.16 +
+      setting(settings, "thermalBlend") * 0.18,
+    0,
+    100
+  );
+  const grayscale = clamp(
+    settings.grayscale +
+      setting(settings, "threshold") * 0.2 -
+      setting(settings, "vibrance") * 0.08 +
+      lumaInvert * 0.42 +
+      setting(settings, "xrayGhost") * 0.22 +
+      setting(settings, "negativeDepth") * 0.16,
+    0,
+    100
+  );
+  const invert = clamp(
+    settings.invert +
+      setting(settings, "solarize") * 0.35 +
+      classicInvert +
+      lumaInvert * 0.62 +
+      thermalInvert * 0.28 +
+      selectiveInvertAverage * 0.32 +
+      setting(settings, "negativeDepth") * 0.26,
+    0,
+    100
+  );
+  const blur = clamp(
+    settings.blur +
+      setting(settings, "softFocus") * 0.04 +
+      setting(settings, "radialBlur") * 0.02 +
+      setting(settings, "motionBlur") * 0.018 +
+      setting(settings, "bokehBloom") * 0.018 +
+      setting(settings, "skinSmooth") * 0.018 -
+      setting(settings, "fineSharpen") * 0.018 -
+      setting(settings, "sharpen") * 0.012 -
+      setting(settings, "detailBoost") * 0.01 +
+      setting(settings, "fisheye") * 0.006 +
+      setting(settings, "barrelWarp") * 0.006,
+    0,
+    20
+  );
+  const glowRadius = clamp(
+    settings.glow +
+      setting(settings, "glowRadius") * 0.28 +
+      setting(settings, "bloom") * 0.13 +
+      setting(settings, "halation") * 0.18 +
+      setting(settings, "edgeGlow") * 0.16 +
+      setting(settings, "centerGlow") * 0.12 +
+      setting(settings, "chromaticGlow") * 0.14 +
+      setting(settings, "flareStreak") * 0.12 +
+      setting(settings, "lightWrap") * 0.1,
+    0,
+    100
+  );
   return [
-    `brightness(${brightness}%)`,
-    `contrast(${contrast}%)`,
-    `saturate(${saturation}%)`,
-    `hue-rotate(${hue}deg)`,
     `blur(${blur}px)`,
     `sepia(${sepia}%)`,
     `grayscale(${grayscale}%)`,
     `invert(${invert}%)`,
+    `hue-rotate(${hue}deg)`,
+    `saturate(${saturation}%)`,
+    `brightness(${brightness}%)`,
+    `contrast(${contrast}%)`,
     glowRadius ? `drop-shadow(0 0 ${glowRadius}px ${rgbwCss(settings, "highlights", 0.34)})` : ""
   ]
     .filter(Boolean)
@@ -1281,33 +1650,58 @@ function buildFilterCss(settings, options = {}) {
 function buildOverlayStyle(effect, settings) {
   const warm = settings.temperature > 0 ? `rgba(255,132,48,${settings.temperature / 260})` : `rgba(51,143,255,${Math.abs(settings.temperature) / 280})`;
   const tint = settings.tint > 0 ? `rgba(255,69,190,${settings.tint / 280})` : `rgba(67,255,122,${Math.abs(settings.tint) / 300})`;
-  const main = rgbwCss(settings, "main", clamp(0.08 + setting(settings, "overlayStrength") / 180, 0.04, 0.72));
-  const secondary = rgbwCss(settings, "secondary", clamp(0.04 + setting(settings, "duotone") / 180, 0, 0.66));
-  const third = rgbwCss(settings, "third", clamp(0.04 + setting(settings, "splitTone") / 280, 0, 0.52));
+  const rgbw = rgbwMixerInfluence(settings);
+  const main = rgbwCss(settings, "main", clamp(0.14 + setting(settings, "overlayStrength") / 160 + rgbw.mainIntensity * 0.22, 0.08, 0.88));
+  const secondary = rgbwCss(settings, "secondary", clamp(0.08 + setting(settings, "duotone") / 165 + rgbw.secondaryIntensity * 0.2, 0.04, 0.78));
+  const third = rgbwCss(settings, "third", clamp(0.07 + setting(settings, "splitTone") / 260 + rgbw.thirdIntensity * 0.18, 0.03, 0.66));
+  const highlight = rgbwCss(settings, "highlights", clamp(0.05 + rgbw.highlightsIntensity * 0.2 + setting(settings, "lightWrap") / 240, 0.02, 0.58));
   return {
-    background: `linear-gradient(120deg, ${effect.overlayColor}, ${warm}, ${main}), linear-gradient(300deg, ${tint}, ${secondary}, transparent 62%), radial-gradient(circle at 50% 12%, ${third}, transparent 46%)`,
+    background: `linear-gradient(120deg, ${effect.overlayColor}, ${warm}, ${main}), linear-gradient(300deg, ${tint}, ${secondary}, transparent 62%), radial-gradient(circle at 50% 12%, ${third}, transparent 46%), radial-gradient(circle at 52% 22%, ${highlight}, transparent 32%)`,
     mixBlendMode: effect.blendMode,
-    opacity: clamp(0.1 + settings.duotone / 150 + setting(settings, "overlayStrength") / 240, 0, 0.94)
+    opacity: clamp(0.14 + settings.duotone / 150 + setting(settings, "overlayStrength") / 210 + rgbw.totalIntensity * 0.18 + setting(settings, "colorLeak") / 260, 0, 0.96)
   };
 }
 
 function buildSpecialOverlayStyle(settings) {
-  const main = rgbwCss(settings, "main", clamp(setting(settings, "overlayStrength") / 100, 0, 0.9));
-  const secondary = rgbwCss(settings, "secondary", clamp(setting(settings, "colorDodge") / 120, 0, 0.82));
-  const third = rgbwCss(settings, "third", clamp(setting(settings, "prismSplit") / 150, 0, 0.72));
-  const highlights = rgbwCss(settings, "highlights", clamp((setting(settings, "bloom") + setting(settings, "halation") + setting(settings, "lensFlare")) / 260, 0, 0.88));
+  const rgbw = rgbwMixerInfluence(settings);
+  const main = rgbwCss(settings, "main", clamp(setting(settings, "overlayStrength") / 100 + rgbw.mainIntensity * 0.16, 0, 0.92));
+  const secondary = rgbwCss(settings, "secondary", clamp(setting(settings, "colorDodge") / 120 + rgbw.secondaryIntensity * 0.14, 0, 0.86));
+  const third = rgbwCss(settings, "third", clamp(setting(settings, "prismSplit") / 150 + rgbw.thirdIntensity * 0.14, 0, 0.78));
+  const highlights = rgbwCss(
+    settings,
+    "highlights",
+    clamp(
+      (setting(settings, "bloom") +
+        setting(settings, "halation") +
+        setting(settings, "lensFlare") +
+        setting(settings, "edgeGlow") +
+        setting(settings, "centerGlow") +
+        setting(settings, "chromaticGlow")) /
+        340 +
+        rgbw.highlightsIntensity * 0.12,
+      0,
+      0.92
+    )
+  );
   const infrared = `rgba(255, 48, 44, ${clamp(setting(settings, "infraredWash") / 150, 0, 0.68)})`;
-  const ultraviolet = `rgba(144, 82, 255, ${clamp(setting(settings, "ultravioletWash") / 145, 0, 0.72)})`;
-  const thermal = `rgba(255, 188, 30, ${clamp(setting(settings, "thermalBlend") / 140, 0, 0.7)})`;
+  const ultraviolet = `rgba(144, 82, 255, ${clamp((setting(settings, "ultravioletWash") + setting(settings, "uvaFluorescence")) / 145, 0, 0.78)})`;
+  const thermal = `rgba(255, 188, 30, ${clamp((setting(settings, "thermalBlend") + setting(settings, "thermalContour") + setting(settings, "heatEdge")) / 210, 0, 0.76)})`;
   const scanlineAlpha = clamp(setting(settings, "scanlines") / 160, 0, 0.62);
-  const grainAlpha = clamp(setting(settings, "filmGrainSize") / 180, 0, 0.56);
-  const split = clamp(setting(settings, "chromaticAberration") + setting(settings, "prismSplit"), 0, 200);
+  const grainAlpha = clamp((setting(settings, "filmGrainSize") + setting(settings, "noiseMono") + setting(settings, "dust") * 0.5) / 210, 0, 0.62);
+  const colorNoiseAlpha = clamp(setting(settings, "noiseColor") / 190, 0, 0.48);
+  const scratchAlpha = clamp(setting(settings, "scratches") / 190, 0, 0.5);
+  const split = clamp(setting(settings, "chromaticAberration") + setting(settings, "prismSplit") + setting(settings, "glitchShift") + setting(settings, "colorSeparation"), 0, 240);
   return {
     backgroundImage: `
       radial-gradient(circle at 18% 18%, ${highlights}, transparent ${clamp(28 + setting(settings, "bloom") * 0.22, 28, 54)}%),
       radial-gradient(circle at 84% 14%, rgba(255,255,255,${clamp(setting(settings, "lensFlare") / 110, 0, 0.66)}), transparent 24%),
       linear-gradient(${88 + setting(settings, "colorizeHue") * 0.2}deg, ${main}, ${secondary}, ${third}, transparent 72%),
       linear-gradient(90deg, ${infrared}, transparent 38%, ${ultraviolet}, transparent 70%, ${thermal}),
+      linear-gradient(${setting(settings, "flareStreak") * 1.8 + 24}deg, transparent 34%, ${rgbwCss(settings, "highlights", clamp(setting(settings, "flareStreak") / 140, 0, 0.62))} 48%, transparent 62%),
+      radial-gradient(circle at 50% 50%, ${rgbwCss(settings, "main", clamp(setting(settings, "centerGlow") / 160, 0, 0.58))}, transparent 36%),
+      repeating-linear-gradient(88deg, rgba(255,255,255,${scratchAlpha}) 0 1px, transparent 1px 46px),
+      repeating-radial-gradient(circle at 18% 24%, rgba(255,64,96,${colorNoiseAlpha}) 0 1px, transparent 1px 9px),
+      repeating-radial-gradient(circle at 82% 64%, rgba(64,196,255,${colorNoiseAlpha}) 0 1px, transparent 1px 11px),
       repeating-linear-gradient(0deg, rgba(255,255,255,${scanlineAlpha}) 0 1px, transparent 1px ${clamp(8 - setting(settings, "scanlines") / 20, 3, 8)}px),
       radial-gradient(circle at 50% 50%, transparent ${clamp(34 - setting(settings, "tiltShift") * 0.12, 18, 34)}%, rgba(0,0,0,${clamp(setting(settings, "shadowCrush") / 150, 0, 0.68)}) 100%),
       repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,${grainAlpha}) 0 1px, transparent 1px 5px)
@@ -1319,18 +1713,23 @@ function buildSpecialOverlayStyle(settings) {
         setting(settings, "bloom") / 240 +
         setting(settings, "infraredWash") / 320 +
         setting(settings, "ultravioletWash") / 320 +
-        setting(settings, "thermalBlend") / 320,
+        setting(settings, "thermalBlend") / 320 +
+        setting(settings, "colorLeak") / 360 +
+        setting(settings, "auraBloom") / 320 +
+        setting(settings, "mirrorGhost") / 360 +
+        rgbw.totalIntensity * 0.08,
       0,
       0.94
     ),
-    transform: `translateX(${(setting(settings, "redChannel", 100) - setting(settings, "blueChannel", 100)) * 0.018 + split * 0.018}px) scale(${1 + setting(settings, "crtCurve") * 0.0009})`,
-    filter: `blur(${clamp(setting(settings, "halo") * 0.03 + setting(settings, "softFocus") * 0.02, 0, 5)}px) contrast(${clamp(100 + setting(settings, "edgeEnhance") * 0.4 + setting(settings, "emboss") * 0.2, 100, 180)}%)`
+    transform: `translateX(${(setting(settings, "redChannel", 100) - setting(settings, "blueChannel", 100)) * 0.018 + split * 0.018}px) scale(${1 + setting(settings, "crtCurve") * 0.0009 + setting(settings, "fisheye") * 0.0008 - setting(settings, "barrelWarp") * 0.0005})`,
+    filter: `blur(${clamp(setting(settings, "halo") * 0.03 + setting(settings, "softFocus") * 0.02 + setting(settings, "bokehBloom") * 0.015, 0, 6)}px) contrast(${clamp(100 + setting(settings, "edgeEnhance") * 0.4 + setting(settings, "emboss") * 0.2 + setting(settings, "thermalContour") * 0.16, 100, 190)}%)`
   };
 }
 
 function paintOverlay(context, width, height, effect, settings) {
+  const rgbw = rgbwMixerInfluence(settings);
   context.save();
-  context.globalAlpha = clamp(0.08 + settings.duotone / 150, 0, 0.82);
+  context.globalAlpha = clamp(0.1 + settings.duotone / 150 + rgbw.totalIntensity * 0.12 + setting(settings, "colorLeak") / 320, 0, 0.88);
   context.globalCompositeOperation = canvasCompositeMode(effect.blendMode);
   context.fillStyle = effect.overlayColor;
   context.fillRect(0, 0, width, height);
@@ -1340,19 +1739,54 @@ function paintOverlay(context, width, height, effect, settings) {
     context.fillRect(0, 0, width, height);
   }
   context.globalCompositeOperation = "screen";
-  context.globalAlpha = clamp(setting(settings, "overlayStrength") / 170, 0.03, 0.62);
+  context.globalAlpha = clamp(setting(settings, "overlayStrength") / 160 + rgbw.mainIntensity * 0.08, 0.04, 0.72);
   const linear = context.createLinearGradient(0, 0, width, height);
   linear.addColorStop(0, rgbwCss(settings, "main", 1));
   linear.addColorStop(0.5, rgbwCss(settings, "secondary", 1));
   linear.addColorStop(1, rgbwCss(settings, "third", 1));
   context.fillStyle = linear;
   context.fillRect(0, 0, width, height);
-  if (setting(settings, "bloom") || setting(settings, "halation") || setting(settings, "lensFlare")) {
-    context.globalAlpha = clamp((setting(settings, "bloom") + setting(settings, "halation") + setting(settings, "lensFlare")) / 260, 0, 0.78);
+  if (setting(settings, "bloom") || setting(settings, "halation") || setting(settings, "lensFlare") || setting(settings, "edgeGlow") || setting(settings, "centerGlow") || setting(settings, "auraBloom")) {
+    context.globalAlpha = clamp(
+      (setting(settings, "bloom") +
+        setting(settings, "halation") +
+        setting(settings, "lensFlare") +
+        setting(settings, "edgeGlow") +
+        setting(settings, "centerGlow") +
+        setting(settings, "auraBloom")) /
+        330 +
+        rgbw.highlightsIntensity * 0.08,
+      0,
+      0.82
+    );
     const flare = context.createRadialGradient(width * 0.5, height * 0.14, 0, width * 0.5, height * 0.14, width * 0.58);
     flare.addColorStop(0, rgbwCss(settings, "highlights", 1));
     flare.addColorStop(1, "rgba(255,255,255,0)");
     context.fillStyle = flare;
+    context.fillRect(0, 0, width, height);
+  }
+  if (setting(settings, "lightWrap") || setting(settings, "flareStreak") || setting(settings, "mirrorGhost")) {
+    context.globalCompositeOperation = "screen";
+    context.globalAlpha = clamp((setting(settings, "lightWrap") + setting(settings, "flareStreak") + setting(settings, "mirrorGhost")) / 360, 0, 0.64);
+    const streak = context.createLinearGradient(0, height * 0.15, width, height * 0.85);
+    streak.addColorStop(0, "rgba(255,255,255,0)");
+    streak.addColorStop(0.48, rgbwCss(settings, "highlights", 1));
+    streak.addColorStop(1, "rgba(255,255,255,0)");
+    context.fillStyle = streak;
+    context.fillRect(0, 0, width, height);
+  }
+  if (setting(settings, "nightScope") || setting(settings, "nearIrBoost") || setting(settings, "uvaFluorescence") || setting(settings, "thermalContour")) {
+    context.globalCompositeOperation = "soft-light";
+    context.globalAlpha = clamp(
+      (setting(settings, "nightScope") + setting(settings, "nearIrBoost") + setting(settings, "uvaFluorescence") + setting(settings, "thermalContour")) / 420,
+      0,
+      0.58
+    );
+    const spectralGradient = context.createLinearGradient(0, 0, 0, height);
+    spectralGradient.addColorStop(0, `rgba(142, 82, 255, ${clamp(setting(settings, "uvaFluorescence") / 100, 0, 1)})`);
+    spectralGradient.addColorStop(0.52, `rgba(80, 255, 126, ${clamp(setting(settings, "nightScope") / 100, 0, 1)})`);
+    spectralGradient.addColorStop(1, `rgba(255, 58, 38, ${clamp(setting(settings, "thermalContour") / 100, 0, 1)})`);
+    context.fillStyle = spectralGradient;
     context.fillRect(0, 0, width, height);
   }
   if (settings.vignette > 0) {
@@ -1377,7 +1811,12 @@ function applyInversionEffects(context, width, height, settings) {
   const channel = clamp(setting(settings, "channelInvert") / 100, 0, 1);
   const spectral = clamp(setting(settings, "spectralInvert") / 100, 0, 1);
   const thermal = clamp(setting(settings, "thermalInvert") / 100, 0, 1);
-  if (!classic && !luma && !channel && !spectral && !thermal) return;
+  const redOnly = clamp(setting(settings, "redInvert") / 100, 0, 1);
+  const greenOnly = clamp(setting(settings, "greenInvert") / 100, 0, 1);
+  const blueOnly = clamp(setting(settings, "blueInvert") / 100, 0, 1);
+  const shadows = clamp(setting(settings, "shadowInvert") / 100, 0, 1);
+  const highlights = clamp(setting(settings, "highlightInvert") / 100, 0, 1);
+  if (!classic && !luma && !channel && !spectral && !thermal && !redOnly && !greenOnly && !blueOnly && !shadows && !highlights) return;
   let imageData;
   try {
     imageData = context.getImageData(0, 0, width, height);
@@ -1426,6 +1865,18 @@ function applyInversionEffects(context, width, height, settings) {
       g = mix(g, ng, thermal);
       b = mix(b, nb, thermal);
     }
+    if (redOnly) r = mix(r, 255 - r, redOnly);
+    if (greenOnly) g = mix(g, 255 - g, greenOnly);
+    if (blueOnly) b = mix(b, 255 - b, blueOnly);
+    if (shadows || highlights) {
+      const lumaMask = clamp((r * 0.2126 + g * 0.7152 + b * 0.0722) / 255, 0, 1);
+      const shadowAmount = shadows * (1 - lumaMask);
+      const highlightAmount = highlights * lumaMask;
+      const rangeAmount = clamp(shadowAmount + highlightAmount, 0, 1);
+      r = mix(r, 255 - r, rangeAmount);
+      g = mix(g, 255 - g, rangeAmount);
+      b = mix(b, 255 - b, rangeAmount);
+    }
     data[index] = r;
     data[index + 1] = g;
     data[index + 2] = b;
@@ -1453,6 +1904,39 @@ function rgbwComponents(settings, groupKey) {
 function rgbwCss(settings, groupKey, alpha = 1) {
   const { r, g, b } = rgbwComponents(settings, groupKey);
   return `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${clamp(alpha, 0, 1)})`;
+}
+
+function rgbwIntensity(settings, groupKey) {
+  const { r, g, b } = rgbwComponents(settings, groupKey);
+  return clamp((r + g + b) / (255 * 3), 0, 1);
+}
+
+function rgbwMixerInfluence(settings) {
+  const main = rgbwComponents(settings, "main");
+  const secondary = rgbwComponents(settings, "secondary");
+  const third = rgbwComponents(settings, "third");
+  const highlights = rgbwComponents(settings, "highlights");
+  const mainIntensity = rgbwIntensity(settings, "main");
+  const secondaryIntensity = rgbwIntensity(settings, "secondary");
+  const thirdIntensity = rgbwIntensity(settings, "third");
+  const highlightsIntensity = rgbwIntensity(settings, "highlights");
+  const totalIntensity = (mainIntensity + secondaryIntensity + thirdIntensity + highlightsIntensity) / 4;
+  const redBias = (main.r + secondary.r * 0.65 + third.r * 0.45 + highlights.r * 0.32) / 2.42;
+  const greenBias = (main.g + secondary.g * 0.65 + third.g * 0.45 + highlights.g * 0.32) / 2.42;
+  const blueBias = (main.b + secondary.b * 0.65 + third.b * 0.45 + highlights.b * 0.32) / 2.42;
+  const warmth = (redBias - blueBias) / 255;
+  const greenMagenta = (greenBias - (redBias + blueBias) / 2) / 255;
+  return {
+    mainIntensity,
+    secondaryIntensity,
+    thirdIntensity,
+    highlightsIntensity,
+    totalIntensity,
+    brightnessBoost: (totalIntensity - 0.5) * 22 + highlightsIntensity * 8,
+    contrastBoost: Math.abs(warmth) * 10 + Math.abs(greenMagenta) * 8,
+    saturationBoost: totalIntensity * 18 + Math.max(redBias, greenBias, blueBias) / 255 * 12,
+    hueShift: warmth * 34 - greenMagenta * 22
+  };
 }
 
 function formatDuration(ms) {
