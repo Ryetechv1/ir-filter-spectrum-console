@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "dev:local": "vite --host 127.0.0.1",
-    "build": "vite build",
+    "build": "vite build --base=/ir-filter-spectrum-console/",
     "preview": "vite preview --host 0.0.0.0",
     "preview:local": "vite preview --host 127.0.0.1"
   },
