@@ -1,20 +1,28 @@
 import {
+  Brush,
   Camera,
   Download,
+  Eye,
+  EyeOff,
   ExternalLink,
   FlipHorizontal,
   Film,
   KeyRound,
+  Layers,
   LockKeyhole,
   Mail,
+  MousePointerClick,
+  Plus,
   RefreshCw,
   Search,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
   Square,
+  Target,
   Trash2,
   Video,
+  WandSparkles,
   Youtube,
   X
 } from "lucide-react";
@@ -27,6 +35,7 @@ const YOUTUBE_EMBED_URL = "https://www.youtube.com/embed?listType=user_uploads&l
 const CONTACT_EMAIL = "alola99990@gmail.com";
 const CAPTURE_LIBRARY_LIMIT = 3;
 const MAX_RECORDING_MS = 180000;
+const ROI_LIMIT = 15;
 const RECORDING_RESOLUTIONS = {
   "1080p": { label: "1080P", width: 1920, height: 1080 },
   "2k": { label: "2K", width: 2560, height: 1440 }
@@ -55,6 +64,22 @@ const RGBW_CHANNELS = [
   { key: "G", label: "Green", min: 0, max: 255, color: "#61df7d" },
   { key: "B", label: "Blue", min: 0, max: 255, color: "#4cc7ff" },
   { key: "W", label: "White", min: 0, max: 255, color: "#f5f8fb" }
+];
+
+const AREA_MODES = [
+  { key: "all", label: "All", description: "Edit the entire frame." },
+  { key: "foreground", label: "Foreground", description: "Edit the detected main subject." },
+  { key: "background", label: "Background", description: "Edit everything behind the subject." },
+  { key: "click", label: "Click", description: "Click the camera preview to add a range of interest." },
+  { key: "brush", label: "Brush", description: "Paint a range of interest directly on the preview." }
+];
+
+const INVERSION_ADJUSTMENTS = [
+  ["classicInvert", "Classic RGB Invert", 0, 100, "%", 0],
+  ["lumaInvert", "Luma Negative", 0, 100, "%", 0],
+  ["channelInvert", "Channel Swap Invert", 0, 100, "%", 0],
+  ["spectralInvert", "Spectral Invert", 0, 100, "%", 0],
+  ["thermalInvert", "Thermal Black-Hot Invert", 0, 100, "%", 0]
 ];
 
 const CORE_ADJUSTMENTS = [
@@ -141,6 +166,7 @@ const DEFAULT_SETTINGS = {
   sepia: 0,
   grayscale: 0,
   invert: 0,
+  ...Object.fromEntries(INVERSION_ADJUSTMENTS.map(([key, , , , , initial = 0]) => [key, initial])),
   ...Object.fromEntries(EXTRA_ADJUSTMENTS.map(([key, , , , , initial = 0]) => [key, initial])),
   ...Object.fromEntries(
     RGBW_MIXERS.flatMap((group) =>
@@ -265,6 +291,8 @@ const CATEGORIES = ["All Presets", "Favorites", ...EFFECT_FAMILIES.map((family) 
 
 function CameraStudio() {
   const videoRef = useRef(null);
+  const previewCanvasRef = useRef(null);
+  const previewFrameRef = useRef(0);
   const streamRef = useRef(null);
   const recorderRef = useRef(null);
   const recordingChunksRef = useRef([]);
@@ -273,10 +301,18 @@ function CameraStudio() {
   const recordingTimerRef = useRef(null);
   const recordingStartedAtRef = useRef(0);
   const captureShelfRef = useRef([]);
+  const brushPaintingRef = useRef(false);
+  const foregroundBoxRef = useRef(null);
   const renderStateRef = useRef({
-    filterCss: "",
     selectedEffect: CAMERA_EFFECTS[0],
     manualSettings: CAMERA_EFFECTS[0].settings,
+    foregroundSettings: CAMERA_EFFECTS[0].settings,
+    backgroundSettings: CAMERA_EFFECTS[0].settings,
+    roiRegions: [],
+    foregroundEnabled: true,
+    backgroundEnabled: true,
+    autoDetectForeground: true,
+    foregroundBox: null,
     cameraFacing: "user"
   });
   const [authorized, setAuthorized] = useState(() => window.sessionStorage.getItem(STUDIO_UNLOCK_KEY) === "true");
@@ -295,6 +331,15 @@ function CameraStudio() {
   const [search, setSearch] = useState("");
   const [selectedEffectId, setSelectedEffectId] = useState(CAMERA_EFFECTS[0].id);
   const [manualSettings, setManualSettings] = useState(CAMERA_EFFECTS[0].settings);
+  const [foregroundSettings, setForegroundSettings] = useState(CAMERA_EFFECTS[0].settings);
+  const [backgroundSettings, setBackgroundSettings] = useState(CAMERA_EFFECTS[0].settings);
+  const [areaMode, setAreaMode] = useState("all");
+  const [foregroundEnabled, setForegroundEnabled] = useState(true);
+  const [backgroundEnabled, setBackgroundEnabled] = useState(true);
+  const [autoDetectForeground, setAutoDetectForeground] = useState(true);
+  const [brushSize, setBrushSize] = useState(40);
+  const [roiRegions, setRoiRegions] = useState([]);
+  const [activeRoiId, setActiveRoiId] = useState("");
   const [snapshotUrl, setSnapshotUrl] = useState("");
 
   const selectedEffect = useMemo(
@@ -314,20 +359,40 @@ function CameraStudio() {
     });
   }, [search, selectedCategory]);
 
-  const filterCss = useMemo(() => buildFilterCss(manualSettings), [manualSettings]);
-  const overlayStyle = useMemo(() => buildOverlayStyle(selectedEffect, manualSettings), [manualSettings, selectedEffect]);
-  const specialOverlayStyle = useMemo(() => buildSpecialOverlayStyle(manualSettings), [manualSettings]);
-  const videoStyle = useMemo(
-    () => ({
-      filter: filterCss,
-      imageRendering: manualSettings.pixelate > 48 ? "pixelated" : "auto"
-    }),
-    [filterCss, manualSettings.pixelate]
+  const activeRoi = useMemo(
+    () => roiRegions.find((region) => region.id === activeRoiId) || null,
+    [activeRoiId, roiRegions]
+  );
+
+  const activeEditSettings = useMemo(
+    () => activeSettingsForMode(areaMode, manualSettings, foregroundSettings, backgroundSettings, activeRoi),
+    [activeRoi, areaMode, backgroundSettings, foregroundSettings, manualSettings]
   );
 
   useEffect(() => {
-    renderStateRef.current = { filterCss, selectedEffect, manualSettings, cameraFacing };
-  }, [cameraFacing, filterCss, manualSettings, selectedEffect]);
+    renderStateRef.current = {
+      selectedEffect,
+      manualSettings,
+      foregroundSettings,
+      backgroundSettings,
+      roiRegions,
+      foregroundEnabled,
+      backgroundEnabled,
+      autoDetectForeground,
+      foregroundBox: foregroundBoxRef.current,
+      cameraFacing
+    };
+  }, [
+    autoDetectForeground,
+    backgroundEnabled,
+    backgroundSettings,
+    cameraFacing,
+    foregroundEnabled,
+    foregroundSettings,
+    manualSettings,
+    roiRegions,
+    selectedEffect
+  ]);
 
   const attachCameraStream = useCallback(async (stream, nextFacing = cameraFacing) => {
     streamRef.current = stream;
@@ -339,6 +404,93 @@ function CameraStudio() {
     setCameraActive(true);
     setCameraStatus("Camera active. The video is local to this device and is not uploaded.");
   }, [cameraFacing]);
+
+  const updateActiveSettings = useCallback((updater) => {
+    const apply = (current) => {
+      const next = typeof updater === "function" ? updater(current) : updater;
+      return { ...current, ...next };
+    };
+    if (areaMode === "foreground") {
+      setForegroundSettings((current) => apply(current));
+      return;
+    }
+    if (areaMode === "background") {
+      setBackgroundSettings((current) => apply(current));
+      return;
+    }
+    if ((areaMode === "click" || areaMode === "brush") && activeRoiId) {
+      setRoiRegions((current) =>
+        current.map((region) =>
+          region.id === activeRoiId ? { ...region, settings: apply(region.settings), updatedAt: new Date().toISOString() } : region
+        )
+      );
+      return;
+    }
+    setManualSettings((current) => apply(current));
+  }, [activeRoiId, areaMode]);
+
+  const ensureActiveRoi = useCallback((mode = areaMode) => {
+    let existing = null;
+    setRoiRegions((current) => {
+      if (activeRoiId) {
+        existing = current.find((region) => region.id === activeRoiId) || null;
+        if (existing) return current;
+      }
+      if (current.length >= ROI_LIMIT) {
+        existing = current[0] || null;
+        if (existing) setActiveRoiId(existing.id);
+        return current;
+      }
+      const region = createRoiRegion(current.length, mode);
+      existing = region;
+      setActiveRoiId(region.id);
+      return [region, ...current];
+    });
+    return existing;
+  }, [activeRoiId, areaMode]);
+
+  const createNewRoi = useCallback((mode = areaMode) => {
+    const nextMode = mode === "click" ? "click" : "brush";
+    setRoiRegions((current) => {
+      if (current.length >= ROI_LIMIT) {
+        setCameraStatus("15 ranges of interest are already active. Remove one before adding another.");
+        return current;
+      }
+      const region = createRoiRegion(current.length, nextMode);
+      setActiveRoiId(region.id);
+      setAreaMode(nextMode);
+      return [region, ...current];
+    });
+  }, [areaMode]);
+
+  const addRoiPoint = useCallback((point, mode = areaMode) => {
+    let regionId = activeRoiId;
+    setRoiRegions((current) => {
+      let next = current;
+      let region = regionId ? current.find((candidate) => candidate.id === regionId) : null;
+      if (!region) {
+        if (current.length >= ROI_LIMIT) {
+          setCameraStatus("15 ranges of interest are already active. Remove one before adding another.");
+          return current;
+        }
+        region = createRoiRegion(current.length, mode);
+        regionId = region.id;
+        setActiveRoiId(region.id);
+        next = [region, ...current];
+      }
+      return next.map((candidate) =>
+        candidate.id === region.id
+          ? {
+              ...candidate,
+              mode,
+              enabled: true,
+              points: [...candidate.points, point].slice(-700),
+              updatedAt: new Date().toISOString()
+            }
+          : candidate
+      );
+    });
+  }, [activeRoiId, areaMode]);
 
   const addCaptureToShelf = useCallback((capture) => {
     setCaptureShelf((current) => {
@@ -494,7 +646,7 @@ function CameraStudio() {
 
     const drawFrame = () => {
       const video = videoRef.current;
-      const renderState = renderStateRef.current;
+      const renderState = { ...renderStateRef.current, foregroundBox: foregroundBoxRef.current };
       drawStudioFrame(context, resolution.width, resolution.height, video, renderState);
       recordingFrameRef.current = window.requestAnimationFrame(drawFrame);
     };
@@ -514,12 +666,84 @@ function CameraStudio() {
 
   useEffect(
     () => () => {
+      if (previewFrameRef.current) {
+        window.cancelAnimationFrame(previewFrameRef.current);
+        previewFrameRef.current = 0;
+      }
       stopRecording("Recording stopped because the studio closed.");
       stopCamera();
       captureShelfRef.current.forEach((item) => URL.revokeObjectURL(item.url));
     },
     [stopCamera, stopRecording]
   );
+
+  useEffect(() => {
+    if (!cameraActive) {
+      if (previewFrameRef.current) {
+        window.cancelAnimationFrame(previewFrameRef.current);
+        previewFrameRef.current = 0;
+      }
+      return undefined;
+    }
+    const drawPreview = () => {
+      const canvas = previewCanvasRef.current;
+      const video = videoRef.current;
+      if (canvas && video) {
+        const width = video.videoWidth || 1280;
+        const height = video.videoHeight || 720;
+        if (canvas.width !== width) canvas.width = width;
+        if (canvas.height !== height) canvas.height = height;
+        const context = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
+        drawStudioFrame(context, width, height, video, {
+          ...renderStateRef.current,
+          foregroundBox: foregroundBoxRef.current
+        });
+      }
+      previewFrameRef.current = window.requestAnimationFrame(drawPreview);
+    };
+    drawPreview();
+    return () => {
+      if (previewFrameRef.current) {
+        window.cancelAnimationFrame(previewFrameRef.current);
+        previewFrameRef.current = 0;
+      }
+    };
+  }, [cameraActive]);
+
+  useEffect(() => {
+    if (!cameraActive || !autoDetectForeground || typeof window.FaceDetector !== "function") {
+      foregroundBoxRef.current = null;
+      return undefined;
+    }
+    let cancelled = false;
+    const detector = new window.FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
+    const detect = async () => {
+      const video = videoRef.current;
+      if (!video || video.readyState < 2 || cancelled) return;
+      try {
+        const faces = await detector.detect(video);
+        const face = faces?.[0]?.boundingBox;
+        foregroundBoxRef.current = face
+          ? {
+              x: face.x,
+              y: face.y,
+              width: face.width,
+              height: face.height,
+              sourceWidth: video.videoWidth || 1,
+              sourceHeight: video.videoHeight || 1
+            }
+          : null;
+      } catch {
+        foregroundBoxRef.current = null;
+      }
+    };
+    const timer = window.setInterval(detect, 1000);
+    detect();
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [autoDetectForeground, cameraActive]);
 
   async function unlockStudio(event) {
     event.preventDefault();
@@ -541,11 +765,11 @@ function CameraStudio() {
 
   function selectEffect(effect) {
     setSelectedEffectId(effect.id);
-    setManualSettings(effect.settings);
+    updateActiveSettings(effect.settings);
   }
 
   function updateSetting(key, value) {
-    setManualSettings((current) => ({ ...current, [key]: Number(value) }));
+    updateActiveSettings((current) => ({ ...current, [key]: Number(value) }));
   }
 
   function handleStopCamera() {
@@ -557,7 +781,73 @@ function CameraStudio() {
   function resetStudio() {
     setSelectedEffectId(CAMERA_EFFECTS[0].id);
     setManualSettings(CAMERA_EFFECTS[0].settings);
+    setForegroundSettings(CAMERA_EFFECTS[0].settings);
+    setBackgroundSettings(CAMERA_EFFECTS[0].settings);
+    setAreaMode("all");
+    setForegroundEnabled(true);
+    setBackgroundEnabled(true);
+    setAutoDetectForeground(true);
+    setBrushSize(40);
+    setRoiRegions([]);
+    setActiveRoiId("");
     setSnapshotUrl("");
+  }
+
+  function setAreaModeAndScope(mode) {
+    setAreaMode(mode);
+    if (mode === "click" || mode === "brush") ensureActiveRoi(mode);
+  }
+
+  function autoAdjustActiveScope() {
+    updateActiveSettings((current) => ({
+      ...current,
+      brightness: clamp(setting(current, "brightness", 100) + 8, 20, 220),
+      contrast: clamp(setting(current, "contrast", 100) + 12, 20, 220),
+      highlights: clamp(setting(current, "highlights") + 10, -100, 100),
+      shadows: clamp(setting(current, "shadows") + 6, -100, 100),
+      clarity: clamp(setting(current, "clarity") + 12, -100, 100),
+      dehaze: clamp(setting(current, "dehaze") + 8, -100, 100)
+    }));
+    setCameraStatus(`Auto-adjust applied to ${activeScopeLabel(areaMode)}.`);
+  }
+
+  function deleteActiveRoi() {
+    if (!activeRoiId) return;
+    setRoiRegions((current) => current.filter((region) => region.id !== activeRoiId));
+    setActiveRoiId("");
+    setAreaMode("all");
+    setCameraStatus("Range of interest removed.");
+  }
+
+  function toggleActiveRoi() {
+    if (!activeRoiId) return;
+    setRoiRegions((current) =>
+      current.map((region) => (region.id === activeRoiId ? { ...region, enabled: !region.enabled } : region))
+    );
+  }
+
+  function handlePreviewPointerDown(event) {
+    if (!cameraActive || (areaMode !== "click" && areaMode !== "brush")) return;
+    event.preventDefault();
+    const point = pointerToCanvasPoint(event, previewCanvasRef.current, brushSize);
+    if (!point) return;
+    addRoiPoint(point, areaMode);
+    if (areaMode === "brush") {
+      brushPaintingRef.current = true;
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+    }
+  }
+
+  function handlePreviewPointerMove(event) {
+    if (!brushPaintingRef.current || areaMode !== "brush") return;
+    event.preventDefault();
+    const point = pointerToCanvasPoint(event, previewCanvasRef.current, brushSize);
+    if (point) addRoiPoint(point, "brush");
+  }
+
+  function handlePreviewPointerUp(event) {
+    brushPaintingRef.current = false;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
   }
 
   async function captureSnapshot() {
@@ -572,7 +862,10 @@ function CameraStudio() {
     canvas.width = width;
     canvas.height = height;
     const context = canvas.getContext("2d");
-    drawStudioFrame(context, width, height, video, { filterCss, selectedEffect, manualSettings, cameraFacing });
+    drawStudioFrame(context, width, height, video, {
+      ...renderStateRef.current,
+      foregroundBox: foregroundBoxRef.current
+    });
     canvas.toBlob((blob) => {
       if (!blob) return;
       const url = URL.createObjectURL(blob);
@@ -697,11 +990,37 @@ function CameraStudio() {
 
         <section className="camera-preview-panel studio-panel">
           <div className="camera-frame">
-            <video ref={videoRef} className={cameraFacing === "user" ? "is-mirrored" : ""} autoPlay playsInline muted style={videoStyle} />
-            <div className="studio-color-overlay" style={overlayStyle} />
-            <div className="studio-special-overlay" style={specialOverlayStyle} />
-            <div className="studio-grain" style={{ opacity: manualSettings.grain / 160 }} />
-            <div className="studio-vignette" style={{ opacity: manualSettings.vignette / 100 }} />
+            <video ref={videoRef} className={`source-camera-video${cameraFacing === "user" ? " is-mirrored" : ""}`} autoPlay playsInline muted />
+            <canvas
+              ref={previewCanvasRef}
+              className="processed-preview-canvas"
+              aria-label="Processed local camera preview"
+              onPointerDown={handlePreviewPointerDown}
+              onPointerMove={handlePreviewPointerMove}
+              onPointerUp={handlePreviewPointerUp}
+              onPointerCancel={handlePreviewPointerUp}
+              onPointerLeave={handlePreviewPointerUp}
+            />
+            <div className="roi-visual-overlay" aria-hidden="true">
+              {(areaMode === "foreground" || areaMode === "background") && <div className={`subject-outline ${areaMode}`} />}
+              {roiRegions
+                .filter((region) => region.enabled)
+                .map((region) => (
+                  <div className={`roi-region-visual${region.id === activeRoiId ? " active" : ""}`} key={region.id}>
+                    {region.points.map((point, index) => (
+                      <span
+                        key={`${region.id}-${index}`}
+                        style={{
+                          left: `${point.x * 100}%`,
+                          top: `${point.y * 100}%`,
+                          width: `${point.radius * 200 * 100}%`,
+                          height: `${point.radius * 200 * 100}%`
+                        }}
+                      />
+                    ))}
+                  </div>
+                ))}
+            </div>
             {!cameraActive && (
               <div className="camera-placeholder">
                 <LockKeyhole size={40} />
@@ -717,6 +1036,94 @@ function CameraStudio() {
               <span>{selectedEffect.name}</span>
             </div>
           </div>
+
+          <section className="selective-editor-panel" aria-labelledby="selectiveEditorTitle">
+            <div className="selective-editor-heading">
+              <div>
+                <h2 id="selectiveEditorTitle">Selective Area Studio</h2>
+                <span>{activeScopeLabel(areaMode)} controls are active. Foreground/background and every range use the full filter stack.</span>
+              </div>
+              <strong>{roiRegions.length} / {ROI_LIMIT} ranges</strong>
+            </div>
+            <div className="area-mode-row" aria-label="Select edit area">
+              {AREA_MODES.map((mode) => (
+                <button
+                  type="button"
+                  key={mode.key}
+                  className={areaMode === mode.key ? "active" : ""}
+                  onClick={() => setAreaModeAndScope(mode.key)}
+                  title={mode.description}
+                >
+                  {mode.key === "click" && <MousePointerClick size={16} />}
+                  {mode.key === "brush" && <Brush size={16} />}
+                  {mode.key === "foreground" && <Target size={16} />}
+                  {mode.key === "background" && <Layers size={16} />}
+                  {mode.key === "all" && <Sparkles size={16} />}
+                  {mode.label}
+                </button>
+              ))}
+            </div>
+            <div className="selective-toggle-grid">
+              <label className="canva-switch">
+                <input type="checkbox" checked={autoDetectForeground} onChange={(event) => setAutoDetectForeground(event.target.checked)} />
+                <span>Auto-detect foreground</span>
+                <small>Beta</small>
+              </label>
+              <label className="canva-switch">
+                <input type="checkbox" checked={foregroundEnabled} onChange={(event) => setForegroundEnabled(event.target.checked)} />
+                <span>Foreground edits</span>
+                {foregroundEnabled ? <Eye size={15} /> : <EyeOff size={15} />}
+              </label>
+              <label className="canva-switch">
+                <input type="checkbox" checked={backgroundEnabled} onChange={(event) => setBackgroundEnabled(event.target.checked)} />
+                <span>Background edits</span>
+                {backgroundEnabled ? <Eye size={15} /> : <EyeOff size={15} />}
+              </label>
+            </div>
+            <label className="brush-size-control">
+              <span>Brush size <output>{brushSize}</output></span>
+              <input type="range" min="8" max="140" value={brushSize} onChange={(event) => setBrushSize(Number(event.target.value))} />
+            </label>
+            <div className="roi-action-row">
+              <button type="button" onClick={() => createNewRoi(areaMode === "click" ? "click" : "brush")} disabled={roiRegions.length >= ROI_LIMIT}>
+                <Plus size={16} />
+                New range
+              </button>
+              <button type="button" onClick={autoAdjustActiveScope}>
+                <WandSparkles size={16} />
+                Auto-adjust
+              </button>
+              <button type="button" onClick={toggleActiveRoi} disabled={!activeRoiId}>
+                {activeRoi?.enabled === false ? <EyeOff size={16} /> : <Eye size={16} />}
+                Toggle range
+              </button>
+              <button type="button" onClick={deleteActiveRoi} disabled={!activeRoiId}>
+                <Trash2 size={16} />
+                Delete range
+              </button>
+            </div>
+            <div className="roi-region-list" aria-label="Ranges of interest">
+              {roiRegions.length ? (
+                roiRegions.map((region, index) => (
+                  <button
+                    key={region.id}
+                    type="button"
+                    className={region.id === activeRoiId ? "active" : ""}
+                    onClick={() => {
+                      setActiveRoiId(region.id);
+                      setAreaMode(region.mode === "click" ? "click" : "brush");
+                    }}
+                  >
+                    <span>{String(index + 1).padStart(2, "0")}</span>
+                    <strong>{region.name}</strong>
+                    <small>{region.points.length} marks • {region.enabled ? "on" : "off"}</small>
+                  </button>
+                ))
+              ) : (
+                <p>Choose Click or Brush, then mark the preview. You can keep up to 15 separate editable ranges.</p>
+              )}
+            </div>
+          </section>
 
           <div className="studio-action-row">
             <button type="button" onClick={() => startCamera()}>
@@ -829,16 +1236,27 @@ function CameraStudio() {
             <h2>Adjustments</h2>
             <button type="button" onClick={resetStudio}>Reset all</button>
           </div>
+          <div className="active-scope-card">
+            <span>Editing scope</span>
+            <strong>{activeScopeLabel(areaMode)}</strong>
+            <small>
+              {areaMode === "click" || areaMode === "brush"
+                ? activeRoi
+                  ? `${activeRoi.name} has ${activeRoi.points.length} selected marks.`
+                  : "Create or select a range of interest."
+                : AREA_MODES.find((mode) => mode.key === areaMode)?.description}
+            </small>
+          </div>
           <div className="rgbw-mixer-board" aria-label="RGBW color mixers">
             {RGBW_MIXERS.map((group) => (
               <section className="rgbw-mixer" key={group.key}>
                 <div className="rgbw-mixer-header">
                   <h3>{group.label}</h3>
-                  <span style={{ background: rgbwCss(manualSettings, group.key, 1) }} />
+                  <span style={{ background: rgbwCss(activeEditSettings, group.key, 1) }} />
                 </div>
                 {RGBW_CHANNELS.map((channel) => {
                   const settingKey = `${group.key}${channel.key}`;
-                  const value = manualSettings[settingKey] ?? 0;
+                  const value = activeEditSettings[settingKey] ?? 0;
                   return (
                     <label key={settingKey} className={`rgbw-slider channel-${channel.key.toLowerCase()}`}>
                       <span>
@@ -870,15 +1288,35 @@ function CameraStudio() {
                 <span>
                   <SlidersHorizontal size={15} />
                   {label}
-                  <output>{manualSettings[key]}{unit}</output>
+                  <output>{activeEditSettings[key]}{unit}</output>
                 </span>
                 <input
                   type="range"
                   min={min}
                   max={max}
-                  value={manualSettings[key]}
+                  value={activeEditSettings[key]}
                   onChange={(event) => updateSetting(key, event.target.value)}
-                  style={{ "--value": `${((manualSettings[key] - min) / (max - min)) * 100}%` }}
+                  style={{ "--value": `${((activeEditSettings[key] - min) / (max - min)) * 100}%` }}
+                />
+              </label>
+            ))}
+          </div>
+          <div className="adjustment-group-label">Color inversion tools ×5</div>
+          <div className="adjustment-list">
+            {INVERSION_ADJUSTMENTS.map(([key, label, min, max, unit]) => (
+              <label key={key} className="studio-adjustment inversion-adjustment">
+                <span>
+                  <SlidersHorizontal size={15} />
+                  {label}
+                  <output>{activeEditSettings[key]}{unit}</output>
+                </span>
+                <input
+                  type="range"
+                  min={min}
+                  max={max}
+                  value={activeEditSettings[key]}
+                  onChange={(event) => updateSetting(key, event.target.value)}
+                  style={{ "--value": `${((activeEditSettings[key] - min) / (max - min)) * 100}%` }}
                 />
               </label>
             ))}
@@ -890,15 +1328,15 @@ function CameraStudio() {
                 <span>
                   <SlidersHorizontal size={15} />
                   {label}
-                  <output>{manualSettings[key]}{unit}</output>
+                  <output>{activeEditSettings[key]}{unit}</output>
                 </span>
                 <input
                   type="range"
                   min={min}
                   max={max}
-                  value={manualSettings[key]}
+                  value={activeEditSettings[key]}
                   onChange={(event) => updateSetting(key, event.target.value)}
-                  style={{ "--value": `${((manualSettings[key] - min) / (max - min)) * 100}%` }}
+                  style={{ "--value": `${((activeEditSettings[key] - min) / (max - min)) * 100}%` }}
                 />
               </label>
             ))}
@@ -981,39 +1419,200 @@ function supportedMp4MimeType() {
   return MP4_MIME_TYPES.find((type) => MediaRecorder.isTypeSupported(type)) || "";
 }
 
+function activeSettingsForMode(mode, allSettings, foregroundSettings, backgroundSettings, activeRoi) {
+  if (mode === "foreground") return foregroundSettings;
+  if (mode === "background") return backgroundSettings;
+  if ((mode === "click" || mode === "brush") && activeRoi?.settings) return activeRoi.settings;
+  return allSettings;
+}
+
+function activeScopeLabel(mode) {
+  if (mode === "foreground") return "Foreground";
+  if (mode === "background") return "Background";
+  if (mode === "click") return "Click range";
+  if (mode === "brush") return "Brush range";
+  return "All";
+}
+
+function createRoiRegion(index, mode = "brush") {
+  const createdAt = new Date().toISOString();
+  return {
+    id: `roi-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    name: `Range ${String(index + 1).padStart(2, "0")}`,
+    mode: mode === "click" ? "click" : "brush",
+    enabled: true,
+    points: [],
+    settings: { ...DEFAULT_SETTINGS },
+    createdAt,
+    updatedAt: createdAt
+  };
+}
+
+function pointerToCanvasPoint(event, canvas, brushSize) {
+  if (!canvas) return null;
+  const rect = canvas.getBoundingClientRect();
+  if (!rect.width || !rect.height) return null;
+  const x = clamp((event.clientX - rect.left) / rect.width, 0, 1);
+  const y = clamp((event.clientY - rect.top) / rect.height, 0, 1);
+  const radius = clamp((Number(brushSize) || 40) / 2 / rect.width, 0.006, 0.18);
+  return { x, y, radius };
+}
+
 function drawStudioFrame(context, width, height, video, renderState) {
-  const { filterCss, selectedEffect, manualSettings, cameraFacing } = renderState;
+  const {
+    selectedEffect,
+    manualSettings,
+    foregroundSettings,
+    backgroundSettings,
+    roiRegions = [],
+    foregroundEnabled,
+    backgroundEnabled,
+    foregroundBox,
+    autoDetectForeground,
+    cameraFacing
+  } = renderState;
   context.save();
-  context.filter = "none";
   context.globalAlpha = 1;
   context.globalCompositeOperation = "source-over";
+  context.filter = "none";
   context.fillStyle = "#030508";
   context.fillRect(0, 0, width, height);
-  if (video?.readyState >= 2) {
-    const sourceWidth = video.videoWidth || width;
-    const sourceHeight = video.videoHeight || height;
-    const sourceRatio = sourceWidth / sourceHeight;
-    const targetRatio = width / height;
-    let sx = 0;
-    let sy = 0;
-    let sw = sourceWidth;
-    let sh = sourceHeight;
-    if (sourceRatio > targetRatio) {
-      sw = sourceHeight * targetRatio;
-      sx = (sourceWidth - sw) / 2;
-    } else {
-      sh = sourceWidth / targetRatio;
-      sy = (sourceHeight - sh) / 2;
-    }
-    context.filter = filterCss;
-    if (cameraFacing === "user") {
-      context.translate(width, 0);
-      context.scale(-1, 1);
-    }
-    context.drawImage(video, sx, sy, sw, sh, 0, 0, width, height);
+  const base = renderProcessedLayer(width, height, video, {
+    selectedEffect,
+    settings: manualSettings,
+    cameraFacing
+  });
+  context.drawImage(base, 0, 0);
+
+  if (backgroundEnabled) {
+    const background = renderProcessedLayer(width, height, video, {
+      selectedEffect,
+      settings: backgroundSettings,
+      cameraFacing
+    });
+    context.save();
+    clipBackgroundMask(context, width, height, foregroundBox, autoDetectForeground);
+    context.drawImage(background, 0, 0);
+    context.restore();
   }
+
+  if (foregroundEnabled) {
+    const foreground = renderProcessedLayer(width, height, video, {
+      selectedEffect,
+      settings: foregroundSettings,
+      cameraFacing
+    });
+    context.save();
+    clipForegroundMask(context, width, height, foregroundBox, autoDetectForeground);
+    context.drawImage(foreground, 0, 0);
+    context.restore();
+  }
+
+  roiRegions
+    .filter((region) => region.enabled && region.points?.length)
+    .forEach((region) => {
+      const layer = renderProcessedLayer(width, height, video, {
+        selectedEffect,
+        settings: region.settings,
+        cameraFacing
+      });
+      context.save();
+      if (clipRoiMask(context, width, height, region)) {
+        context.drawImage(layer, 0, 0);
+      }
+      context.restore();
+    });
   context.restore();
-  paintOverlay(context, width, height, selectedEffect, manualSettings);
+}
+
+function renderProcessedLayer(width, height, video, { selectedEffect, settings, cameraFacing }) {
+  const layer = document.createElement("canvas");
+  layer.width = width;
+  layer.height = height;
+  const layerContext = layer.getContext("2d", { alpha: false, willReadFrequently: hasPixelInversion(settings) });
+  layerContext.save();
+  layerContext.filter = "none";
+  layerContext.globalAlpha = 1;
+  layerContext.globalCompositeOperation = "source-over";
+  layerContext.fillStyle = "#030508";
+  layerContext.fillRect(0, 0, width, height);
+  if (video?.readyState >= 2) {
+    const crop = coverCrop(video.videoWidth || width, video.videoHeight || height, width, height);
+    layerContext.filter = buildFilterCss(settings);
+    if (cameraFacing === "user") {
+      layerContext.translate(width, 0);
+      layerContext.scale(-1, 1);
+    }
+    layerContext.drawImage(video, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, width, height);
+  }
+  layerContext.restore();
+  paintOverlay(layerContext, width, height, selectedEffect, settings);
+  applyInversionEffects(layerContext, width, height, settings);
+  return layer;
+}
+
+function coverCrop(sourceWidth, sourceHeight, targetWidth, targetHeight) {
+  const sourceRatio = sourceWidth / sourceHeight;
+  const targetRatio = targetWidth / targetHeight;
+  let sx = 0;
+  let sy = 0;
+  let sw = sourceWidth;
+  let sh = sourceHeight;
+  if (sourceRatio > targetRatio) {
+    sw = sourceHeight * targetRatio;
+    sx = (sourceWidth - sw) / 2;
+  } else {
+    sh = sourceWidth / targetRatio;
+    sy = (sourceHeight - sh) / 2;
+  }
+  return { sx, sy, sw, sh };
+}
+
+function clipForegroundMask(context, width, height, foregroundBox, autoDetectForeground) {
+  const mask = foregroundMaskRect(width, height, foregroundBox, autoDetectForeground);
+  context.beginPath();
+  context.ellipse(mask.cx, mask.cy, mask.rx, mask.ry, 0, 0, Math.PI * 2);
+  context.clip();
+}
+
+function clipBackgroundMask(context, width, height, foregroundBox, autoDetectForeground) {
+  const mask = foregroundMaskRect(width, height, foregroundBox, autoDetectForeground);
+  const path = new Path2D();
+  path.rect(0, 0, width, height);
+  path.ellipse(mask.cx, mask.cy, mask.rx, mask.ry, 0, 0, Math.PI * 2);
+  context.clip(path, "evenodd");
+}
+
+function foregroundMaskRect(width, height, foregroundBox, autoDetectForeground) {
+  if (autoDetectForeground && foregroundBox?.width && foregroundBox?.height) {
+    const crop = coverCrop(foregroundBox.sourceWidth, foregroundBox.sourceHeight, width, height);
+    const cx = ((foregroundBox.x + foregroundBox.width / 2 - crop.sx) / crop.sw) * width;
+    const cy = ((foregroundBox.y + foregroundBox.height / 2 - crop.sy) / crop.sh) * height;
+    return {
+      cx: clamp(cx, width * 0.18, width * 0.82),
+      cy: clamp(cy + foregroundBox.height * 0.35, height * 0.18, height * 0.82),
+      rx: clamp((foregroundBox.width / crop.sw) * width * 1.55, width * 0.18, width * 0.42),
+      ry: clamp((foregroundBox.height / crop.sh) * height * 2.35, height * 0.26, height * 0.62)
+    };
+  }
+  return {
+    cx: width * 0.5,
+    cy: height * 0.48,
+    rx: width * 0.28,
+    ry: height * 0.43
+  };
+}
+
+function clipRoiMask(context, width, height, region) {
+  if (!region.points?.length) return false;
+  const path = new Path2D();
+  region.points.forEach((point) => {
+    const radius = clamp(point.radius * width, 4, width * 0.22);
+    path.moveTo(point.x * width + radius, point.y * height);
+    path.arc(point.x * width, point.y * height, radius, 0, Math.PI * 2);
+  });
+  context.clip(path);
+  return true;
 }
 
 function buildFilterCss(settings) {
@@ -1135,6 +1734,76 @@ function paintOverlay(context, width, height, effect, settings) {
     context.fillRect(0, 0, width, height);
   }
   context.restore();
+}
+
+function hasPixelInversion(settings) {
+  return INVERSION_ADJUSTMENTS.some(([key]) => setting(settings, key) > 0);
+}
+
+function applyInversionEffects(context, width, height, settings) {
+  const classic = clamp(setting(settings, "classicInvert") / 100, 0, 1);
+  const luma = clamp(setting(settings, "lumaInvert") / 100, 0, 1);
+  const channel = clamp(setting(settings, "channelInvert") / 100, 0, 1);
+  const spectral = clamp(setting(settings, "spectralInvert") / 100, 0, 1);
+  const thermal = clamp(setting(settings, "thermalInvert") / 100, 0, 1);
+  if (!classic && !luma && !channel && !spectral && !thermal) return;
+  let imageData;
+  try {
+    imageData = context.getImageData(0, 0, width, height);
+  } catch {
+    return;
+  }
+  const data = imageData.data;
+  for (let index = 0; index < data.length; index += 4) {
+    let r = data[index];
+    let g = data[index + 1];
+    let b = data[index + 2];
+    if (classic) {
+      r = mix(r, 255 - r, classic);
+      g = mix(g, 255 - g, classic);
+      b = mix(b, 255 - b, classic);
+    }
+    if (luma) {
+      const y = r * 0.2126 + g * 0.7152 + b * 0.0722;
+      const target = 255 - y;
+      r = mix(r, target, luma);
+      g = mix(g, target, luma);
+      b = mix(b, target, luma);
+    }
+    if (channel) {
+      const nr = 255 - g;
+      const ng = 255 - b;
+      const nb = 255 - r;
+      r = mix(r, nr, channel);
+      g = mix(g, ng, channel);
+      b = mix(b, nb, channel);
+    }
+    if (spectral) {
+      const nr = clamp(255 - b + g * 0.18, 0, 255);
+      const ng = clamp(255 - r + b * 0.18, 0, 255);
+      const nb = clamp(255 - g + r * 0.18, 0, 255);
+      r = mix(r, nr, spectral);
+      g = mix(g, ng, spectral);
+      b = mix(b, nb, spectral);
+    }
+    if (thermal) {
+      const heat = (r + g + b) / 3;
+      const nr = clamp(255 - heat * 0.18, 0, 255);
+      const ng = clamp(128 - heat * 0.42 + b * 0.2, 0, 255);
+      const nb = clamp(255 - heat, 0, 255);
+      r = mix(r, nr, thermal);
+      g = mix(g, ng, thermal);
+      b = mix(b, nb, thermal);
+    }
+    data[index] = r;
+    data[index + 1] = g;
+    data[index + 2] = b;
+  }
+  context.putImageData(imageData, 0, 0);
+}
+
+function mix(from, to, amount) {
+  return clamp(from + (to - from) * amount, 0, 255);
 }
 
 function setting(settings, key, fallback = 0) {

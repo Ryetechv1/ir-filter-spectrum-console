@@ -332,8 +332,25 @@
   transform: none;
 }
 
+.camera-frame video.source-camera-video {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .camera-frame video.is-mirrored {
   transform: scaleX(-1);
+}
+
+.processed-preview-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: min(60vh, 620px);
+  object-fit: cover;
+  background: #030508;
+  cursor: crosshair;
 }
 
 .studio-color-overlay,
@@ -421,6 +438,40 @@
   font-size: 13px;
 }
 
+.roi-visual-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.subject-outline {
+  position: absolute;
+  top: 7%;
+  left: 22%;
+  width: 56%;
+  height: 86%;
+  border: 2px dashed rgba(147, 69, 255, 0.92);
+  border-radius: 48% 48% 46% 46%;
+  box-shadow: 0 0 0 999px rgba(146, 70, 255, 0.08), inset 0 0 42px rgba(146, 70, 255, 0.18);
+}
+
+.subject-outline.background {
+  box-shadow: 0 0 0 999px rgba(146, 70, 255, 0.18), inset 0 0 42px rgba(0, 0, 0, 0.2);
+}
+
+.roi-region-visual span {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  background: rgba(142, 66, 255, 0.45);
+  box-shadow: 0 0 24px rgba(142, 66, 255, 0.28);
+}
+
+.roi-region-visual.active span {
+  background: rgba(165, 91, 255, 0.62);
+}
+
 .camera-placeholder {
   position: absolute;
   inset: 0;
@@ -455,6 +506,184 @@
   border-color: transparent;
   background: linear-gradient(180deg, #6ae9ff, #18b9ec);
   font-weight: 850;
+}
+
+.selective-editor-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(133, 160, 184, 0.2);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(142, 66, 255, 0.15), transparent 28%),
+    rgba(255, 255, 255, 0.035);
+}
+
+.selective-editor-heading,
+.active-scope-card {
+  display: grid;
+  gap: 4px;
+}
+
+.selective-editor-heading {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.selective-editor-heading h2 {
+  margin: 0;
+  color: #f5f8fb;
+  font-size: 14px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.selective-editor-heading span,
+.selective-editor-heading strong,
+.roi-region-list p {
+  color: #aeb9c5;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.selective-editor-heading strong {
+  min-width: 92px;
+  padding: 5px 8px;
+  border: 1px solid rgba(142, 66, 255, 0.38);
+  border-radius: 999px;
+  color: #d7c0ff;
+  text-align: center;
+  background: rgba(142, 66, 255, 0.14);
+}
+
+.area-mode-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.area-mode-row button,
+.roi-action-row button {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: 999px;
+  color: #d8e3eb;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.area-mode-row button.active {
+  border-color: rgba(168, 98, 255, 0.86);
+  color: #f5f0ff;
+  background: linear-gradient(180deg, rgba(158, 76, 255, 0.82), rgba(106, 55, 213, 0.64));
+}
+
+.selective-toggle-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.canva-switch {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid rgba(133, 160, 184, 0.2);
+  border-radius: 8px;
+  color: #d8e3eb;
+  background: rgba(2, 5, 8, 0.38);
+  font-size: 12px;
+}
+
+.canva-switch input {
+  width: 36px;
+  height: 22px;
+  margin: 0;
+  accent-color: #9342ff;
+}
+
+.canva-switch small {
+  padding: 2px 6px;
+  border-radius: 999px;
+  color: #d7c0ff;
+  background: rgba(147, 66, 255, 0.16);
+}
+
+.brush-size-control {
+  display: grid;
+  gap: 7px;
+  color: #d8e3eb;
+  font-size: 12px;
+}
+
+.brush-size-control span {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.brush-size-control input {
+  width: 100%;
+  accent-color: #9342ff;
+}
+
+.roi-action-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.roi-region-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.roi-region-list button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 2px 8px;
+  min-height: 58px;
+  padding: 8px;
+  border-radius: 8px;
+  color: #d8e3eb;
+  background: rgba(2, 5, 8, 0.38);
+  text-align: left;
+}
+
+.roi-region-list button.active {
+  border-color: rgba(168, 98, 255, 0.86);
+  background: linear-gradient(180deg, rgba(147, 66, 255, 0.32), rgba(6, 10, 16, 0.74));
+}
+
+.roi-region-list button span {
+  grid-row: span 2;
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  color: #031017;
+  background: linear-gradient(180deg, #d9c7ff, #9342ff);
+  font-weight: 900;
+}
+
+.roi-region-list button strong,
+.roi-region-list button small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.roi-region-list button small {
+  color: #aeb9c5;
 }
 
 .studio-status,
@@ -623,6 +852,34 @@
   padding-bottom: 14px;
 }
 
+.active-scope-card {
+  margin: 14px 14px 0;
+  padding: 12px;
+  border: 1px solid rgba(142, 66, 255, 0.3);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(142, 66, 255, 0.16), transparent 34%),
+    rgba(255, 255, 255, 0.04);
+}
+
+.active-scope-card span {
+  color: #aeb9c5;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.active-scope-card strong {
+  color: #f5f8fb;
+  font-size: 18px;
+}
+
+.active-scope-card small {
+  color: #c9d6e1;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .rgbw-mixer-board {
   display: grid;
   gap: 12px;
@@ -773,6 +1030,10 @@
 .studio-adjustment input {
   width: 100%;
   accent-color: #3fd0ff;
+}
+
+.inversion-adjustment input {
+  accent-color: #9342ff;
 }
 
 .studio-reference-note {
@@ -994,7 +1255,8 @@
   }
 
   .camera-frame,
-  .camera-frame video {
+  .camera-frame video,
+  .processed-preview-canvas {
     min-height: 420px;
   }
 
@@ -1003,6 +1265,9 @@
   .recording-action-row,
   .resolution-selector,
   .capture-shelf-grid,
+  .selective-toggle-grid,
+  .roi-action-row,
+  .roi-region-list,
   .camera-meta-row {
     grid-template-columns: 1fr;
   }
@@ -1010,6 +1275,15 @@
   .studio-action-row,
   .camera-meta-row {
     display: grid;
+  }
+
+  .selective-editor-heading {
+    grid-template-columns: 1fr;
+  }
+
+  .area-mode-row button,
+  .roi-action-row button {
+    flex: 1 1 130px;
   }
 
   .camera-studio-title {

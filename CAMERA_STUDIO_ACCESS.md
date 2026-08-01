@@ -28,6 +28,15 @@ The Camera Studio is opened from the main console with the `Studio` button. It r
 - Four RGBW mixer groups drive live gradient color layers: Main, Secondary, Third, and Highlights.
 - The adjustment surface includes 12 core photo sliders plus 50 advanced effect sliders for exposure-style controls, color channels, bloom/halation, scanlines, IR/UVA/thermal washes, and other photobooth effects.
 
+## Selective Editing
+
+- The studio renders the visible camera feed through a local canvas so foreground, background, and brush/click ranges can have separate adjustments.
+- `All`, `Foreground`, `Background`, `Click`, and `Brush` follow the same area-selection model used by Canva's Adjust panel.
+- Foreground/background can be toggled independently. When the browser exposes `FaceDetector`, foreground detection uses it as a local beta helper; otherwise it falls back to a center-subject mask.
+- The user can create up to 15 separate ranges of interest. Each range has the same RGBW mixers, core controls, inversion controls, and advanced controls as the full frame.
+- Five color inversion controls are available for every scope: Classic RGB Invert, Luma Negative, Channel Swap Invert, Spectral Invert, and Thermal Black-Hot Invert.
+- Brush/click masks are local UI state only. They are not uploaded or sent to any server.
+
 Current trusted hash:
 
 ```text
