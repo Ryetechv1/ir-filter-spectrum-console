@@ -7,7 +7,7 @@
 This revision removes the transparent OLED from the active build. The project now contains:
 
 - ESP32-CAM AI-Thinker module with OV2640 camera.
-- Arduino Nano retained as the LED controller.
+- ESP32 1.14 inch LCD board replaces the Arduino Nano as the LED controller.
 - OVONIC 2S 7.4 V 450 mAh LiPo pack, XT30 plug, about 61.9 mm x 16.3 mm x 13.4 mm.
 - 950 nm 5 mm IR LED, 50 mA maximum continuous current, about 1.5 V forward voltage.
 - 375 nm 5 mm UVA LED, 25 mA to 30 mA target current, about 3.2 V to 3.6 V forward voltage.
@@ -17,14 +17,14 @@ This revision removes the transparent OLED from the active build. The project no
 - Solder pads for battery/charger/buck wiring and a 14-pin JST-GH locking wire harness for the LED head.
 - Speck Presidio Perfect-Clear ClickLock-style case target with a conservative PCB camera cutout.
 
-The older 12 V/PCA9685 version is no longer the recommended electrical design. The Nano directly controls two PWM mono LEDs and one SK6812 RGBW data line with five logical RGBW zones.
+The older 12 V/PCA9685 version is no longer the recommended electrical design. The ESP32 LCD driver controls two PWM mono LEDs and one SK6812 RGBW data line with five logical RGBW zones.
 
 ## Prototype Build Stages
 
 The project is now split into five selectable build targets:
 
 ```text
-Prototype 1 -> camera module + Arduino serial link only
+Prototype 1 -> camera module + ESP32 LCD driver serial link only
 Prototype 2 -> Prototype 1 + IR LED + UVA LED
 Prototype 3 -> Prototype 2 + first two camera-side RGBW LEDs
 Prototype 4 -> Prototype 3 + six acrylic-edge RGBW LEDs
@@ -49,14 +49,14 @@ USB-C input
   -> main switch
   -> 2S battery rail
   -> 2S-to-5V buck regulator, 1A minimum / 2A recommended
-  -> ESP32-CAM 5V, Nano 5V, IR/UVA LED resistors, SK6812 LEDs
+  -> ESP32-CAM 5V, ESP32 LCD 5V/VIN, IR/UVA LED resistors, SK6812 LEDs
 ```
 
 Expected 5 V current budget:
 
 ```text
 ESP32-CAM Wi-Fi/camera peak: about 300 mA to 500 mA
-Arduino Nano:                about 30 mA to 50 mA
+ESP32 1.14 LCD driver:       allow about 120 mA to 200 mA with LCD backlight
 IR LED:                      about 35 mA with 100 ohm resistor
 UVA LED:                     about 21 mA to 26 mA with 68 ohm resistor
 8x SK6812 full RGBW white:   about 480 mA
@@ -93,46 +93,47 @@ It hosts:
 :81/stream     live MJPEG stream
 ```
 
-## ESP32-CAM To Nano Link
+## ESP32-CAM To ESP32 LCD Driver Link
 
 ```text
-ESP32-CAM GPIO14 TX -> Nano D2 RX
-Nano D4 TX -> 1k/2k divider -> ESP32-CAM GPIO13 RX
-Common GND between ESP32-CAM, Nano, buck regulator, and battery/BMS
+ESP32-CAM GPIO14 TX -> ESP32 LCD GPIO16 RX2
+ESP32 LCD GPIO17 TX2 -> ESP32-CAM GPIO13 RX
+Common GND between ESP32-CAM, ESP32 LCD driver, buck regulator, and battery/BMS
 ```
 
-GPIO13 and GPIO14 conflict with the ESP32-CAM microSD slot, so this build assumes no microSD card.
+Both sides are 3.3 V ESP32 logic, so the old Nano TX divider is removed. GPIO13 and GPIO14 conflict with the ESP32-CAM microSD slot, so this build assumes no microSD card.
 
-## Nano Lighting Pin Map
+## ESP32 LCD Driver Lighting Pin Map
 
-Nano firmware:
+ESP32 LCD driver firmware:
 
 ```text
-nano_rgbw_ir_uva_driver/nano_rgbw_ir_uva_driver.ino
+esp32_lcd_rgbw_ir_uva_driver/esp32_lcd_rgbw_ir_uva_driver.ino
 ```
 
 Pins:
 
 ```text
-D2: serial RX from ESP32-CAM GPIO14
-D4: serial TX to ESP32-CAM GPIO13 through divider
-D5: IR PWM MOSFET gate through 150 ohm
-D6: UVA PWM MOSFET gate through 150 ohm
-D7: SK6812 RGBW data through 330 ohm
-D8: optional LED-enable output
+GPIO16 RX2: serial RX from ESP32-CAM GPIO14
+GPIO17 TX2: serial TX to ESP32-CAM GPIO13
+GPIO25: IR PWM MOSFET gate through 150 ohm
+GPIO26: UVA PWM MOSFET gate through 150 ohm
+GPIO27: 3.3 V-to-5 V buffer -> 330 ohm -> SK6812 RGBW data
+GPIO33: optional LED-enable output
+Onboard ST7789: CS GPIO15, DC GPIO2, RST GPIO4, BL GPIO32, SCLK GPIO18, MOSI GPIO23
 ```
 
-Serial protocol from ESP32-CAM to Nano:
+Serial protocol from ESP32-CAM to ESP32 LCD driver:
 
 ```text
 L,<power>,<irOn>,<uvaOn>,<rgbw1On>,<rgbw2On>,<rgbw3On>,<rgbw4On>,<rgbw5On>,<ir>,<uva>,<rgbw1Dim>,<r1>,<g1>,<b1>,<w1>,<rgbw2Dim>,<r2>,<g2>,<b2>,<w2>,<rgbw3Dim>,<r3>,<g3>,<b3>,<w3>,<rgbw4Dim>,<r4>,<g4>,<b4>,<w4>,<rgbw5Dim>,<r5>,<g5>,<b5>,<w5>
 ```
 
-The Nano maps this to:
+The ESP32 LCD driver maps this to:
 
 ```text
-IR value  -> D5 PWM
-UVA value -> D6 PWM
+IR value  -> GPIO25 PWM
+UVA value -> GPIO26 PWM
 RGBW 1    -> SK6812 pixel 0, scaled by rgbw1Dim
 RGBW 2    -> SK6812 pixel 1, scaled by rgbw2Dim
 Acrylic 1 -> SK6812 pixels 2 and 3, scaled by rgbw3Dim
@@ -148,7 +149,7 @@ IR 950 nm:
 +5 V -> 100 ohm resistor -> IR LED anode
 IR LED cathode -> AO3400A drain
 AO3400A source -> GND
-Nano D5 -> 150 ohm -> AO3400A gate
+ESP32 LCD GPIO25 -> 150 ohm -> AO3400A gate
 AO3400A gate -> 100k -> GND
 ```
 
@@ -158,7 +159,7 @@ UVA 375 nm:
 +5 V -> 68 ohm resistor -> UVA LED anode
 UVA LED cathode -> AO3400A drain
 AO3400A source -> GND
-Nano D6 -> 150 ohm -> AO3400A gate
+ESP32 LCD GPIO26 -> 150 ohm -> AO3400A gate
 AO3400A gate -> 100k -> GND
 ```
 
@@ -167,7 +168,7 @@ SK6812 RGBW:
 ```text
 +5 V -> all SK6812 VDD pins
 GND -> all SK6812 GND pins
-Nano D7 -> 330 ohm -> SK6812 RGBW 1 DIN
+ESP32 LCD GPIO27 -> 330 ohm -> SK6812 RGBW 1 DIN
 RGBW 1 DOUT -> RGBW 2 DIN
 RGBW 2 DOUT -> Acrylic 1 left DIN
 Acrylic 1 left DOUT -> Acrylic 1 right DIN

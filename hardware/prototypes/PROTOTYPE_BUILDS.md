@@ -3,9 +3,9 @@
 This file splits the spectrum camera project into five practical build stages after the v0.9 hologram/S3 update. The old AI-Thinker ESP32-CAM/OV2640 firmware and prototype folders are preserved as the legacy backup path. The new primary path uses:
 
 - ESP32-S3 N16R8 camera board with GC2145 ribbon camera
-- Arduino Nano LED driver
+- ESP32 1.14 LCD LED driver
 - ESP32-C6-LCD-1.47 board for the acrylic/glass hologram projection
-- The same Nano LED protocol used by the previous webapp
+- The same serial LED protocol used by the previous webapp
 
 Quick wiring diagrams:
 
@@ -19,24 +19,25 @@ hardware/prototypes/hologram_camera_architecture_v0_9.svg
 
 ## Common Power And Signal Rules
 
-- Use a regulated 5 V rail for the Arduino Nano, LED resistors, SK6812 LEDs, and camera/display dev boards when they are not powered from USB-C.
-- Connect every ground together: ESP32-S3 GND, Nano GND, 5 V buck GND, LED GND, battery/BMS GND, and ESP32-C6 GND if you add a hardwired shared power rail.
-- ESP32-S3 GPIO1 TX connects to Nano D2 RX.
-- Nano D4 TX connects to ESP32-S3 GPIO2 RX through a divider or level shifter because the ESP32-S3 is 3.3 V logic.
-- Keep the ESP32-C6 LCD as a separate programmable device. It is controlled over `/hologram`, not through the Nano.
+- Use a regulated 5 V rail for the ESP32 1.14 LCD driver, LED resistors, SK6812 LEDs, and camera/display dev boards when they are not powered from USB-C.
+- Connect every ground together: ESP32-S3 GND, ESP32 LCD GND, 5 V buck GND, LED GND, battery/BMS GND, and ESP32-C6 GND if you add a hardwired shared power rail.
+- ESP32-S3 GPIO1 TX connects to ESP32 LCD GPIO16 RX2.
+- ESP32 LCD GPIO17 TX2 connects to ESP32-S3 GPIO2 RX. Both boards are 3.3 V ESP32 logic, so the old Nano divider is removed.
+- ESP32 LCD GPIO27 should drive the 5 V SK6812 data line through a 3.3 V-to-5 V buffer.
+- Keep the ESP32-C6 LCD as a separate programmable device. It is controlled over `/hologram`, not through the lighting driver.
 - If the S3 and C6 are on separate access points, your phone/laptop can only control the board whose Wi-Fi you are currently joined to. For full combined operation, configure both sketches for the same local Wi-Fi network and use their printed IP addresses in the webapp.
 - Keep UVA and IR emitters shielded and start with low duty cycles.
 
-## Prototype 1: S3 Camera + Nano + Hologram Display
+## Prototype 1: S3 Camera + ESP32 LCD driver + Hologram Display
 
-Goal: prove camera streaming, Wi-Fi/webapp access, Nano serial wiring, and the ESP32-C6 LCD projection before adding LEDs.
+Goal: prove camera streaming, Wi-Fi/webapp access, ESP32 LCD driver serial wiring, and the ESP32-C6 LCD projection before adding LEDs.
 
 Arduino IDE sketch folders:
 
 ```text
 prototype_sketches/prototype_01_camera_arduino/esp32_s3_camera_prototype_01
 prototype_sketches/prototype_01_camera_arduino/esp32_c6_hologram_prototype_01
-prototype_sketches/prototype_01_camera_arduino/nano_prototype_01
+prototype_sketches/prototype_01_camera_arduino/esp32_lcd_driver_prototype_01
 ```
 
 Legacy backup camera sketch:
@@ -49,11 +50,10 @@ Core wiring:
 
 ```text
 5 V regulated rail -> ESP32-S3 5V/VIN when not using USB-C
-5 V regulated rail -> Nano 5V
-GND rail           -> ESP32-S3 GND + Nano GND
-ESP32-S3 GPIO1 TX  -> Nano D2 RX
-Nano D4 TX         -> 1k resistor -> ESP32-S3 GPIO2 RX
-ESP32-S3 GPIO2 RX  -> 2k resistor -> GND
+5 V regulated rail -> ESP32 LCD 5V/VIN
+GND rail           -> ESP32-S3 GND + ESP32 LCD GND
+ESP32-S3 GPIO1 TX  -> ESP32 LCD GPIO16 RX2
+ESP32 LCD GPIO17 TX2 -> ESP32-S3 GPIO2 RX
 ```
 
 Hologram display:
@@ -81,7 +81,7 @@ Arduino IDE sketch folders:
 ```text
 prototype_sketches/prototype_02_ir_uva/esp32_s3_camera_prototype_02
 prototype_sketches/prototype_02_ir_uva/esp32_c6_hologram_prototype_02
-prototype_sketches/prototype_02_ir_uva/nano_prototype_02
+prototype_sketches/prototype_02_ir_uva/esp32_lcd_driver_prototype_02
 ```
 
 Additional parts:
@@ -102,7 +102,7 @@ IR wiring:
 +5 V -> 100 ohm -> IR LED anode
 IR LED cathode -> AO3400A drain
 AO3400A source -> GND
-Nano D5 -> 150 ohm -> AO3400A gate
+ESP32 LCD GPIO25 -> 150 ohm -> AO3400A gate
 AO3400A gate -> 100k -> GND
 ```
 
@@ -112,15 +112,15 @@ UVA wiring:
 +5 V -> 68 ohm -> UVA LED anode
 UVA LED cathode -> AO3400A drain
 AO3400A source -> GND
-Nano D6 -> 150 ohm -> AO3400A gate
+ESP32 LCD GPIO26 -> 150 ohm -> AO3400A gate
 AO3400A gate -> 100k -> GND
 ```
 
 Bench test:
 
 1. Select Prototype 2 in the webapp.
-2. Set IR to 10-20 percent and verify D5 PWM switching.
-3. Set UVA to 5-10 percent and verify D6 PWM switching.
+2. Set IR to 10-20 percent and verify GPIO25 PWM switching.
+3. Set UVA to 5-10 percent and verify GPIO26 PWM switching.
 4. Turn each toggle off and verify its slider returns to zero.
 5. Confirm the C6 display still applies pattern changes independently.
 
@@ -133,7 +133,7 @@ Arduino IDE sketch folders:
 ```text
 prototype_sketches/prototype_03_camera_rgbw/esp32_s3_camera_prototype_03
 prototype_sketches/prototype_03_camera_rgbw/esp32_c6_hologram_prototype_03
-prototype_sketches/prototype_03_camera_rgbw/nano_prototype_03
+prototype_sketches/prototype_03_camera_rgbw/esp32_lcd_driver_prototype_03
 ```
 
 Additional parts:
@@ -150,7 +150,7 @@ SK6812 wiring:
 ```text
 +5 V -> RGBW 1 VDD and RGBW 2 VDD
 GND  -> RGBW 1 GND and RGBW 2 GND
-Nano D7 -> 330 ohm -> RGBW 1 DIN
+ESP32 LCD GPIO27 -> 3.3 V-to-5 V buffer -> 330 ohm -> RGBW 1 DIN
 RGBW 1 DOUT -> RGBW 2 DIN
 RGBW 2 DOUT -> not connected for Prototype 3
 47 uF to 100 uF capacitor -> +5 V/GND near RGBW LEDs
@@ -173,7 +173,7 @@ Arduino IDE sketch folders:
 ```text
 prototype_sketches/prototype_04_acrylic_rgbw/esp32_s3_camera_prototype_04
 prototype_sketches/prototype_04_acrylic_rgbw/esp32_c6_hologram_prototype_04
-prototype_sketches/prototype_04_acrylic_rgbw/nano_prototype_04
+prototype_sketches/prototype_04_acrylic_rgbw/esp32_lcd_driver_prototype_04
 ```
 
 Additional parts beyond Prototype 3:
@@ -187,7 +187,7 @@ Extra +5 V and GND bus wiring
 SK6812 chain:
 
 ```text
-Nano D7 -> 330 ohm -> RGBW 1 camera-right DIN
+ESP32 LCD GPIO27 -> 3.3 V-to-5 V buffer -> 330 ohm -> RGBW 1 camera-right DIN
 RGBW 1 DOUT -> RGBW 2 camera-left DIN
 RGBW 2 DOUT -> Acrylic 1 left DIN
 Acrylic 1 left DOUT -> Acrylic 1 right DIN
@@ -215,7 +215,7 @@ Production sketch folders:
 ```text
 esp32_s3_gc2145_webapp
 esp32_c6_hologram_display
-nano_rgbw_ir_uva_driver
+esp32_lcd_rgbw_ir_uva_driver
 ```
 
 Legacy production backup:
@@ -239,4 +239,4 @@ Final test:
 4. Verify IR and UVA dimming.
 5. Verify RGBW 1 and RGBW 2 around the camera.
 6. Verify Acrylic 1-3 left/right pairs.
-7. Run All off and confirm every Nano-driven LED output is zero.
+7. Run All off and confirm every ESP32-driver LED output is zero.

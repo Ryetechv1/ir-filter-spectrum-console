@@ -44,22 +44,24 @@ Browser checks:
 Commands run from the transferred project root:
 
 ```powershell
-arduino-cli compile --fqbn arduino:avr:nano .\nano_rgbw_ir_uva_driver
+arduino-cli compile --fqbn esp32:esp32:esp32 .\esp32_lcd_rgbw_ir_uva_driver
 arduino-cli compile --fqbn esp32:esp32:esp32s3 .\esp32_s3_gc2145_webapp
 arduino-cli compile --fqbn esp32:esp32:esp32c6 .\esp32_c6_hologram_display
 arduino-cli compile --fqbn esp32:esp32:esp32cam .\esp32_cam_ir_uv_webapp
+arduino-cli compile --fqbn esp32:esp32:esp32 .\prototype_sketches\prototype_05_production_pcb\esp32_lcd_driver_prototype_05
 ```
 
 Results:
 
-- Nano lighting driver: pass.
+- ESP32 1.14 LCD lighting driver: pass.
 - ESP32-S3 GC2145 camera/web firmware: pass.
 - ESP32-C6 LCD hologram display firmware: pass.
 - Legacy ESP32-CAM OV2640 backup firmware: pass.
+- ESP32 1.14 LCD prototype 05 driver firmware: pass.
 
 Recursive sketch folder/name check:
 
-- 36 `.ino` files checked.
+- 24 active `.ino` files checked, excluding archived backups.
 - All sketch folder names match their `.ino` filename.
 
 ## PCB Files
@@ -105,5 +107,5 @@ iphone16e_2s_sk6812_two_board_v0_8_FULL_ORDER_PACKAGE.zip
 ## Notes
 
 - The ESP32-CAM path is preserved as legacy backup.
-- The current primary path is ESP32-S3 camera + ESP32-C6 LCD hologram display + Arduino Nano LED driver.
+- The current primary path is ESP32-S3 camera + ESP32-C6 LCD hologram display + ESP32 1.14 LCD LED driver.
 - Hardware was not physically bench-tested during this transfer.

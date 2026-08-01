@@ -17,10 +17,10 @@
   <rect class="panel" x="55" y="135" width="280" height="520" rx="12"/>
   <text class="label" x="92" y="175">Prototype 3 Base</text>
   <rect class="part" x="95" y="235" width="165" height="52" rx="8"/><text class="small" x="126" y="267">ESP32-CAM</text>
-  <rect class="part" x="95" y="315" width="165" height="52" rx="8"/><text class="small" x="139" y="347">Nano</text>
+  <rect class="part" x="95" y="315" width="165" height="52" rx="8"/><text class="small" x="139" y="347">ESP32 LCD driver</text>
   <rect class="part" x="95" y="395" width="165" height="52" rx="8"/><text class="small" x="121" y="427">IR + UVA</text>
   <rect class="part" x="95" y="475" width="165" height="52" rx="8"/><text class="small" x="111" y="507">RGBW 1 + 2</text>
-  <text class="small" x="84" y="585">Nano D7 data continues through</text>
+  <text class="small" x="84" y="585">ESP32 LCD GPIO27 data continues through</text>
   <text class="small" x="84" y="610">one SK6812 chain.</text>
 
   <rect class="panel" x="430" y="125" width="680" height="600" rx="12"/>

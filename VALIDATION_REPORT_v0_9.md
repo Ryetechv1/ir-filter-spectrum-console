@@ -24,17 +24,14 @@ arduino-cli lib install "GFX Library for Arduino"
 Compile checks:
 
 ```text
-arduino-cli compile --fqbn arduino:avr:nano nano_rgbw_ir_uva_driver
+arduino-cli compile --fqbn esp32:esp32:esp32 esp32_lcd_rgbw_ir_uva_driver
 arduino-cli compile --fqbn esp32:esp32:esp32s3 esp32_s3_gc2145_webapp
 arduino-cli compile --fqbn esp32:esp32:esp32c6 esp32_c6_hologram_display
 arduino-cli compile --fqbn esp32:esp32:esp32cam esp32_cam_ir_uv_webapp
-arduino-cli compile --fqbn esp32:esp32:esp32s3 prototype_sketches/prototype_01_camera_arduino/esp32_s3_camera_prototype_01
-arduino-cli compile --fqbn esp32:esp32:esp32c6 prototype_sketches/prototype_01_camera_arduino/esp32_c6_hologram_prototype_01
-arduino-cli compile --fqbn esp32:esp32:esp32s3 prototype_sketches/prototype_05_production_pcb/esp32_s3_camera_prototype_05
-arduino-cli compile --fqbn esp32:esp32:esp32c6 prototype_sketches/prototype_05_production_pcb/esp32_c6_hologram_prototype_05
+arduino-cli compile --fqbn esp32:esp32:esp32 prototype_sketches/prototype_05_production_pcb/esp32_lcd_driver_prototype_05
 ```
 
-All commands above completed successfully. The remaining Prototype 2-4 S3/C6 sketches were recursively checked for matching Arduino folder names and correct default prototype macros; they are mechanically generated from the same compiled roots.
+All commands above completed successfully after the Arduino Nano lighting driver was replaced by the ESP32 1.14 inch LCD lighting driver. The remaining prototype sketches were recursively checked for matching Arduino folder names and correct default prototype macros; they are mechanically generated from the same compiled roots.
 
 ## Webapp
 

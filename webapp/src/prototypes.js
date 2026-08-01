@@ -2,10 +2,10 @@ export const PROTOTYPES = [
   {
     id: 1,
     label: "Prototype 1",
-    title: "S3 camera + Nano + hologram display",
-    stage: "Camera link, Arduino serial link, and C6 LCD projection",
+    title: "S3 camera + ESP32 LCD driver + hologram display",
+    stage: "Camera link, ESP32 driver serial link, and C6 LCD projection",
     summary:
-      "Bring up the ESP32-S3 GC2145 stream, Nano serial link, and ESP32-C6 LCD hologram pattern before any external LEDs are attached.",
+      "Bring up the ESP32-S3 GC2145 stream, ESP32 LCD driver serial link, and ESP32-C6 LCD hologram pattern before any external LEDs are attached.",
     controls: {
       ir: false,
       uva: false,
@@ -14,27 +14,27 @@ export const PROTOTYPES = [
     },
     hardware: [
       "ESP32-S3 N16R8 camera board with GC2145 ribbon camera",
-      "Arduino Nano",
+      "ESP32 1.14 LCD driver",
       "ESP32-C6-LCD-1.47 hologram display",
       "USB-C cables for S3/C6 programming",
       "5 V bench/buck supply",
-      "ESP32-S3-to-Nano serial wiring"
+      "ESP32-S3-to-ESP32 LCD driver serial wiring"
     ],
-    tests: ["ESP32-S3 live stream", "Connect button/status", "Nano UART link idle", "C6 LCD hologram preview/apply"],
+    tests: ["ESP32-S3 live stream", "Connect button/status", "ESP32 LCD driver UART link idle", "C6 LCD hologram preview/apply"],
     sketches: {
       camera: "prototype_sketches/prototype_01_camera_arduino/esp32_s3_camera_prototype_01",
       display: "prototype_sketches/prototype_01_camera_arduino/esp32_c6_hologram_prototype_01",
-      nano: "prototype_sketches/prototype_01_camera_arduino/nano_prototype_01",
+      driver: "prototype_sketches/prototype_01_camera_arduino/esp32_lcd_driver_prototype_01",
       legacyCamera: "prototype_sketches/prototype_01_camera_arduino/esp32_cam_prototype_01"
     },
     diagram: "hardware/prototypes/prototype_01_wiring.svg",
-    docs: "hardware/prototypes/PROTOTYPE_BUILDS.md#prototype-1-s3-camera--nano--hologram-display"
+    docs: "hardware/prototypes/PROTOTYPE_BUILDS.md#prototype-1-s3-camera--esp32-lcd-driver--hologram-display"
   },
   {
     id: 2,
     label: "Prototype 2",
     title: "IR + UVA mono LEDs",
-    stage: "Camera, Arduino, hologram display, IR LED, and UVA LED",
+    stage: "Camera, ESP32 LCD driver, hologram display, IR LED, and UVA LED",
     summary: "Add low-current MOSFET-switched IR and UVA channels with independent toggles and dimming.",
     controls: {
       ir: true,
@@ -52,11 +52,11 @@ export const PROTOTYPES = [
       "2x 150 ohm gate resistors",
       "2x 100k pulldowns"
     ],
-    tests: ["IR dimming on Nano D5", "UVA dimming on Nano D6", "Toggle-off resets IR/UVA sliders", "C6 hologram remains independently controllable"],
+    tests: ["IR dimming on ESP32 LCD GPIO25", "UVA dimming on ESP32 LCD GPIO26", "Toggle-off resets IR/UVA sliders", "C6 hologram remains independently controllable"],
     sketches: {
       camera: "prototype_sketches/prototype_02_ir_uva/esp32_s3_camera_prototype_02",
       display: "prototype_sketches/prototype_02_ir_uva/esp32_c6_hologram_prototype_02",
-      nano: "prototype_sketches/prototype_02_ir_uva/nano_prototype_02",
+      driver: "prototype_sketches/prototype_02_ir_uva/esp32_lcd_driver_prototype_02",
       legacyCamera: "prototype_sketches/prototype_02_ir_uva/esp32_cam_prototype_02"
     },
     diagram: "hardware/prototypes/prototype_02_wiring.svg",
@@ -66,7 +66,7 @@ export const PROTOTYPES = [
     id: 3,
     label: "Prototype 3",
     title: "Camera RGBW pair",
-    stage: "Camera, Arduino, hologram display, IR, UVA, and first 2 RGBW LEDs",
+    stage: "Camera, ESP32 LCD driver, hologram display, IR, UVA, and first 2 RGBW LEDs",
     summary: "Add the two camera-side SK6812 RGBW LEDs and verify color mixing before adding acrylic zones.",
     controls: {
       ir: true,
@@ -85,7 +85,7 @@ export const PROTOTYPES = [
     sketches: {
       camera: "prototype_sketches/prototype_03_camera_rgbw/esp32_s3_camera_prototype_03",
       display: "prototype_sketches/prototype_03_camera_rgbw/esp32_c6_hologram_prototype_03",
-      nano: "prototype_sketches/prototype_03_camera_rgbw/nano_prototype_03",
+      driver: "prototype_sketches/prototype_03_camera_rgbw/esp32_lcd_driver_prototype_03",
       legacyCamera: "prototype_sketches/prototype_03_camera_rgbw/esp32_cam_prototype_03"
     },
     diagram: "hardware/prototypes/prototype_03_wiring.svg",
@@ -114,7 +114,7 @@ export const PROTOTYPES = [
     sketches: {
       camera: "prototype_sketches/prototype_04_acrylic_rgbw/esp32_s3_camera_prototype_04",
       display: "prototype_sketches/prototype_04_acrylic_rgbw/esp32_c6_hologram_prototype_04",
-      nano: "prototype_sketches/prototype_04_acrylic_rgbw/nano_prototype_04",
+      driver: "prototype_sketches/prototype_04_acrylic_rgbw/esp32_lcd_driver_prototype_04",
       legacyCamera: "prototype_sketches/prototype_04_acrylic_rgbw/esp32_cam_prototype_04"
     },
     diagram: "hardware/prototypes/prototype_04_wiring.svg",
@@ -124,7 +124,7 @@ export const PROTOTYPES = [
     id: 5,
     label: "Prototype 5",
     title: "Production PCB build",
-    stage: "Final production target with S3 camera, C6 LCD, Nano driver, and PCB carrier",
+    stage: "Final production target with S3 camera, C6 LCD, ESP32 LCD driver, and PCB carrier",
     summary:
       "Use the v0.9 hologram/S3 planning package for the next PCB revision while keeping the DRC-clean v0.8 ESP32-CAM PCB package as the fallback order set.",
     controls: {
@@ -141,11 +141,11 @@ export const PROTOTYPES = [
       "Legacy DRC-clean two-board PCB v0.8 backup",
       "2S LiPo charger/BMS and fused switch"
     ],
-    tests: ["S3 camera compile", "C6 display compile", "Nano compile", "Webapp camera/light/display controls", "v0.9 PCB mechanical clearance review"],
+    tests: ["S3 camera compile", "C6 display compile", "ESP32 LCD driver compile", "Webapp camera/light/display controls", "v0.9 PCB mechanical clearance review"],
     sketches: {
       camera: "esp32_s3_gc2145_webapp",
       display: "esp32_c6_hologram_display",
-      nano: "nano_rgbw_ir_uva_driver",
+      driver: "esp32_lcd_rgbw_ir_uva_driver",
       legacyCamera: "esp32_cam_ir_uv_webapp"
     },
     diagram: "hardware/prototypes/hologram_camera_architecture_v0_9.svg",

@@ -1,9 +1,9 @@
-# ESP32-S3/C6 + Arduino Nano 2S SK6812/IR/UVA Board Diagram
+# ESP32-S3/C6 + ESP32 1.14 LCD driver 2S SK6812/IR/UVA Board Diagram
 
 Diagram and PCB files:
 
 ```text
-hardware/esp32_nano_rgbw_ir_uva_board_diagram.svg
+hardware/esp32_lcd_rgbw_ir_uva_board_diagram.svg
 hardware/prototypes/PROTOTYPE_BUILDS.md
 hardware/prototypes/prototype_01_wiring.svg
 hardware/prototypes/prototype_02_wiring.svg
@@ -18,10 +18,10 @@ This revision is optimized for a low-current 2S LiPo phone-back build:
 
 - ESP32-S3 N16R8 camera board hosts Wi-Fi, the web API, and the MJPEG camera stream.
 - ESP32-C6-LCD-1.47 hosts the hologram/acrylic projection display and accepts `/hologram` webapp commands.
-- Arduino Nano handles the lighting protocol.
+- ESP32 1.14 LCD driver handles the lighting protocol.
 - IR and UVA are simple 5 mm LEDs switched by low-side MOSFETs from a regulated 5 V rail.
 - RGBW 1 and RGBW 2 are the two camera-side SK6812 RGBW LEDs.
-- Acrylic 1, Acrylic 2, and Acrylic 3 each use a mirrored left/right SK6812 pair, giving 8 total physical RGBW LEDs controlled as 5 logical RGBW zones from one Nano data pin.
+- Acrylic 1, Acrylic 2, and Acrylic 3 each use a mirrored left/right SK6812 pair, giving 8 total physical RGBW LEDs controlled as 5 logical RGBW zones from one ESP32 LCD driver data output.
 - The old transparent OLED branch remains removed. The active display branch is now the separate ESP32-C6 ST7789 LCD projection board.
 - The older 12 V/PCA9685 architecture is no longer used for this parts list.
 
@@ -74,7 +74,7 @@ USB-C input
   -> main switch
   -> 2S battery rail
   -> 2S-to-5V buck regulator
-  -> ESP32-S3 5V/VIN, ESP32-C6 5V/VIN or USB-C power, Nano 5V, IR/UVA LED resistors, SK6812 LEDs
+  -> ESP32-S3 5V/VIN, ESP32-C6 5V/VIN or USB-C power, ESP32 LCD 5V/VIN, IR/UVA LED resistors, SK6812 LEDs
 ```
 
 Important: the Adeept 3S/12.6 V charger module is not compatible with a 2S LiPo pack. Use a 2S/8.4 V charger/BMS.
@@ -84,22 +84,23 @@ Use a 5 V buck regulator rated at least 1 A. A 2 A module is a better practical 
 ## Logic Connections
 
 ```text
-ESP32-S3 GPIO1 TX -> Arduino Nano D2 RX
-Arduino Nano D4 TX -> 1k/2k divider -> ESP32-S3 GPIO2 RX
-ESP32-S3 GND      -> Arduino Nano GND
+ESP32-S3 GPIO1 TX -> ESP32 LCD GPIO16 RX2
+ESP32 LCD GPIO17 TX2 -> ESP32-S3 GPIO2 RX
+ESP32-S3 GND      -> ESP32 1.14 LCD driver GND
 ```
 
-The ESP32-C6 LCD display is controlled over Wi-Fi with `/hologram`; it does not need a wired signal line to the Nano in the current v0.9 prototype path.
+The S3 and ESP32 LCD driver are both 3.3 V logic, so the old Nano-to-ESP32 divider is removed. The ESP32-C6 LCD display is controlled over Wi-Fi with `/hologram`; it does not need a wired signal line to the lighting driver in the current v0.9 prototype path.
 
-## Nano Pin Map
+## ESP32 1.14 LCD Driver Pin Map
 
 ```text
-Nano D2 -> ESP32-S3 serial RX input
-Nano D4 -> ESP32-S3 serial TX output through level divider
-Nano D5 -> IR LED MOSFET gate through 150 ohm
-Nano D6 -> UVA LED MOSFET gate through 150 ohm
-Nano D7 -> SK6812 RGBW data through 330 ohm
-Nano D8 -> optional LED rail enable output
+ESP32 LCD GPIO16 RX2 <- ESP32-S3 GPIO1 TX
+ESP32 LCD GPIO17 TX2 -> ESP32-S3 GPIO2 RX
+ESP32 LCD GPIO25 -> IR LED MOSFET gate through 150 ohm
+ESP32 LCD GPIO26 -> UVA LED MOSFET gate through 150 ohm
+ESP32 LCD GPIO27 -> 3.3 V-to-5 V buffer -> 330 ohm -> SK6812 RGBW data
+ESP32 LCD GPIO33 -> optional LED rail enable output
+Onboard ST7789: CS GPIO15, DC GPIO2, RST GPIO4, BL GPIO32, SCLK GPIO18, MOSI GPIO23
 ```
 
 ## IR And UVA LED Circuits
@@ -110,7 +111,7 @@ IR LED:
 +5 V -> 100 ohm resistor -> 950 nm IR LED anode
 IR LED cathode -> AO3400A drain
 AO3400A source -> GND
-Nano D5 -> 150 ohm gate resistor -> AO3400A gate
+ESP32 LCD GPIO25 -> 150 ohm gate resistor -> AO3400A gate
 AO3400A gate -> 100k pulldown -> GND
 ```
 
@@ -122,7 +123,7 @@ UVA LED:
 +5 V -> 68 ohm resistor -> 375 nm UVA LED anode
 UVA LED cathode -> AO3400A drain
 AO3400A source -> GND
-Nano D6 -> 150 ohm gate resistor -> AO3400A gate
+ESP32 LCD GPIO26 -> 150 ohm gate resistor -> AO3400A gate
 AO3400A gate -> 100k pulldown -> GND
 ```
 
@@ -133,7 +134,7 @@ With a 3.6 V UVA forward voltage, 68 ohm gives about 21 mA. With a 3.2 V forward
 ```text
 +5 V -> all SK6812 RGBW VDD pins
 GND  -> all SK6812 RGBW GND pins
-Nano D7 -> 330 ohm resistor -> RGBW 1 DIN
+ESP32 LCD GPIO27 -> 3.3 V-to-5 V buffer -> 330 ohm resistor -> RGBW 1 DIN
 RGBW 1 DOUT -> RGBW 2 DIN
 RGBW 2 DOUT -> Acrylic 1 left DIN
 Acrylic 1 left DOUT -> Acrylic 1 right DIN
@@ -145,7 +146,7 @@ Acrylic 3 right DOUT -> not used
 47 uF to 100 uF capacitor across +5 V/GND near the RGBW LEDs
 ```
 
-Each SK6812 LED can draw about 60 mA at full RGBW white. Eight LEDs can draw about 480 mA, plus ESP32-S3 camera, ESP32-C6 LCD, and Nano current.
+Each SK6812 LED can draw about 60 mA at full RGBW white. Eight LEDs can draw about 480 mA, plus ESP32-S3 camera, ESP32-C6 LCD, and ESP32 LCD driver current.
 
 ## Web App Lighting Model
 
@@ -155,11 +156,11 @@ The web app sends:
 /led?power=<0-or-1>&irOn=<0-or-1>&uvaOn=<0-or-1>&rgbw1On=<0-or-1>&rgbw2On=<0-or-1>&rgbw3On=<0-or-1>&rgbw4On=<0-or-1>&rgbw5On=<0-or-1>&ir=<0-255>&uva=<0-255>&rgbw1Dim=<0-255>&r1=<0-255>&g1=<0-255>&b1=<0-255>&w1=<0-255>&rgbw2Dim=<0-255>&r2=<0-255>&g2=<0-255>&b2=<0-255>&w2=<0-255>&rgbw3Dim=<0-255>&r3=<0-255>&g3=<0-255>&b3=<0-255>&w3=<0-255>&rgbw4Dim=<0-255>&r4=<0-255>&g4=<0-255>&b4=<0-255>&w4=<0-255>&rgbw5Dim=<0-255>&r5=<0-255>&g5=<0-255>&b5=<0-255>&w5=<0-255>
 ```
 
-The Nano maps those fields directly:
+The ESP32 LCD driver maps those fields directly:
 
 ```text
-IR value  -> Nano D5 PWM
-UVA value -> Nano D6 PWM
+IR value  -> ESP32 LCD GPIO25 PWM
+UVA value -> ESP32 LCD GPIO26 PWM
 RGBW 1    -> SK6812 pixel 0, scaled by rgbw1Dim
 RGBW 2    -> SK6812 pixel 1, scaled by rgbw2Dim
 Acrylic 1 -> SK6812 pixels 2 and 3, scaled by rgbw3Dim
@@ -177,8 +178,8 @@ The camera snapshot endpoint stays on port 80 at `/capture`. The live camera vie
 ESP32 web/camera firmware:
 esp32_cam_ir_uv_webapp/esp32_cam_ir_uv_webapp.ino
 
-Arduino Nano 2S SK6812 LED driver:
-nano_rgbw_ir_uva_driver/nano_rgbw_ir_uva_driver.ino
+ESP32 1.14 LCD 2S SK6812 LED driver:
+esp32_lcd_rgbw_ir_uva_driver/esp32_lcd_rgbw_ir_uva_driver.ino
 ```
 
 ## Safety

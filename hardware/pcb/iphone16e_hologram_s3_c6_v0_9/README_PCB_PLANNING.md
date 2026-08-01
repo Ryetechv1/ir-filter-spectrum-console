@@ -6,7 +6,7 @@ The previous `iphone16e_2s_sk6812_two_board_v0_8` package remains the DRC-clean 
 
 - ESP32-S3 N16R8 camera board with GC2145 ribbon camera
 - ESP32-C6-LCD-1.47 display board for acrylic/glass hologram projection
-- Arduino Nano retained as the LED driver
+- ideaspark ESP32 1.14 inch LCD board replaces the Arduino Nano as the LED driver
 - Same 2S 7.4 V 450 mAh LiPo power target
 - Same IR, UVA, two camera RGBW LEDs, and six acrylic RGBW LEDs
 
@@ -28,20 +28,20 @@ The ESP32-C6 LCD must remain serviceable. Do not permanently bury its USB-C port
 
 ```text
 2S LiPo -> charger/BMS -> fused switch -> 5 V buck rail
-5 V rail -> Arduino Nano
+5 V rail -> ESP32 1.14 LCD driver
 5 V rail -> SK6812 RGBW chain
 5 V rail -> IR/UVA LED resistor + NMOS channels
 5 V or USB-C -> ESP32-S3 camera board
 5 V or USB-C -> ESP32-C6 LCD display board
 
-ESP32-S3 GPIO1 TX -> Nano D2 RX
-Nano D4 TX -> level divider -> ESP32-S3 GPIO2 RX
-Nano D5 -> IR NMOS gate resistor
-Nano D6 -> UVA NMOS gate resistor
-Nano D7 -> 330 ohm -> SK6812 DIN
+ESP32-S3 GPIO1 TX -> ESP32 LCD GPIO16 RX2
+ESP32 LCD GPIO17 TX2 -> ESP32-S3 GPIO2 RX
+ESP32 LCD GPIO25 -> IR NMOS gate resistor
+ESP32 LCD GPIO26 -> UVA NMOS gate resistor
+ESP32 LCD GPIO27 -> 3.3 V-to-5 V buffer -> 330 ohm -> SK6812 DIN
 ```
 
-The ESP32-C6 display is controlled over Wi-Fi at `/hologram`; it does not require a hardwired data line to the Nano or S3 in the current prototype plan.
+The S3 and ESP32 LCD lighting driver are both 3.3 V logic, so the old Nano divider is removed. The ESP32-C6 display is controlled over Wi-Fi at `/hologram`; it does not require a hardwired data line to the lighting driver or S3 in the current prototype plan.
 
 ## Required Measurements Before Gerbers
 
@@ -68,7 +68,7 @@ Use `MEASUREMENT_WORKSHEET.md` for the printable checklist. Capture the final va
 ```text
 esp32_s3_gc2145_webapp
 esp32_c6_hologram_display
-nano_rgbw_ir_uva_driver
+esp32_lcd_rgbw_ir_uva_driver
 ```
 
 Compile targets:
@@ -76,14 +76,14 @@ Compile targets:
 ```text
 arduino-cli compile --fqbn esp32:esp32:esp32s3 esp32_s3_gc2145_webapp
 arduino-cli compile --fqbn esp32:esp32:esp32c6 esp32_c6_hologram_display
-arduino-cli compile --fqbn arduino:avr:nano nano_rgbw_ir_uva_driver
+arduino-cli compile --fqbn esp32:esp32:esp32 esp32_lcd_rgbw_ir_uva_driver
 ```
 
 ## Folder Contents
 
 ```text
 README_PCB_PLANNING.md    planning overview and blocking decisions
-PINOUT.md                 S3, C6, Nano, and SK6812 signal plan
+PINOUT.md                 S3, C6, ESP32 LCD driver, and SK6812 signal plan
 PRELIMINARY_BOM.md        v0.9 module/BOM delta against the v0.8 baseline
 MEASUREMENT_WORKSHEET.md  printable physical measurement checklist
 measurements_template.json structured capture template for CAD/KiCad scripting

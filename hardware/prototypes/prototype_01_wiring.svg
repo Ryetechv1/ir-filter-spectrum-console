@@ -8,8 +8,8 @@
     </style>
   </defs>
   <rect class="bg" width="1100" height="720"/>
-  <text class="title" x="48" y="56">Prototype 1 - ESP32-CAM + Arduino Nano Link</text>
-  <text class="small" x="48" y="86">Purpose: validate Wi-Fi camera streaming, ESP32-CAM web server, and ESP32-to-Nano serial communication before adding LEDs.</text>
+  <text class="title" x="48" y="56">Prototype 1 - ESP32-CAM + ESP32 1.14 LCD driver Link</text>
+  <text class="small" x="48" y="86">Purpose: validate Wi-Fi camera streaming, ESP32-CAM web server, and ESP32-to-ESP32 LCD driver serial communication before adding LEDs.</text>
 
   <rect class="panel" x="70" y="150" width="250" height="350" rx="12"/>
   <text class="label" x="110" y="190">5 V Buck Regulator</text>
@@ -27,13 +27,13 @@
   <rect class="pin" x="580" y="394" width="80" height="34" rx="5"/><text class="small" x="596" y="417">IO13</text>
 
   <rect class="panel" x="780" y="120" width="250" height="420" rx="12"/>
-  <text class="label" x="820" y="162">Arduino Nano</text>
+  <text class="label" x="820" y="162">ESP32 1.14 LCD driver</text>
   <rect class="pin" x="805" y="230" width="82" height="34" rx="5"/><text class="small" x="823" y="253">5V</text>
   <rect class="pin" x="805" y="274" width="82" height="34" rx="5"/><text class="small" x="818" y="297">GND</text>
   <rect class="pin" x="922" y="230" width="82" height="34" rx="5"/><text class="small" x="943" y="253">D2</text>
   <rect class="pin" x="922" y="274" width="82" height="34" rx="5"/><text class="small" x="943" y="297">D4</text>
-  <text class="small" x="813" y="390">D2 = Nano RX from ESP32</text>
-  <text class="small" x="813" y="418">D4 = Nano TX to ESP32</text>
+  <text class="small" x="813" y="390">D2 = ESP32 LCD driver RX from ESP32</text>
+  <text class="small" x="813" y="418">D4 = ESP32 LCD driver TX to ESP32</text>
 
   <path class="wire5" d="M200 266 H452"/>
   <path class="wire5" d="M200 266 C500 75 800 90 846 230"/>
@@ -42,6 +42,6 @@
   <path class="wires" d="M660 367 C720 350 850 250 922 247"/>
   <path class="wired" d="M922 291 C825 360 725 410 660 411"/>
 
-  <text class="warn" x="674" y="455">Nano D4 to ESP32 IO13 must use 1k/2k divider.</text>
+  <text class="warn" x="674" y="455">ESP32 LCD GPIO17 TX2 to ESP32 IO13 is direct 3.3 V UART.</text>
   <text class="small" x="48" y="650">Webapp selection: Prototype 1 disables IR, UVA, and RGBW controls. Firmware clamps all light outputs off.</text>
 </svg>

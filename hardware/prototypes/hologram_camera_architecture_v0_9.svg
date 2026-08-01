@@ -21,7 +21,7 @@
 
   <rect width="1180" height="760" rx="18" fill="url(#bg)"/>
   <text x="40" y="58" fill="#eff8ff" font-family="Inter,Segoe UI,Arial" font-size="30" font-weight="700">Spectrum Camera v0.9 Hologram Architecture</text>
-  <text x="40" y="88" fill="#9fb2c0" font-family="Inter,Segoe UI,Arial" font-size="15">Primary path: ESP32-S3 GC2145 camera + Arduino Nano LED driver + ESP32-C6 LCD acrylic projection. ESP32-CAM remains backup.</text>
+  <text x="40" y="88" fill="#9fb2c0" font-family="Inter,Segoe UI,Arial" font-size="15">Primary path: ESP32-S3 GC2145 camera + ESP32 1.14 LCD LED driver + ESP32-C6 LCD acrylic projection. ESP32-CAM remains backup.</text>
 
   <g font-family="Inter,Segoe UI,Arial">
     <rect x="52" y="136" width="250" height="148" rx="10" fill="#101b25" stroke="#315067"/>
@@ -45,10 +45,10 @@
     <text x="858" y="264" fill="#9fb2c0" font-size="14">Projects into acrylic/glass sheet</text>
 
     <rect x="410" y="404" width="282" height="196" rx="12" fill="#111a21" stroke="#6ddf5c"/>
-    <text x="438" y="442" fill="#eaf6fb" font-size="22" font-weight="700">Arduino Nano Driver</text>
-    <text x="438" y="472" fill="#9fb2c0" font-size="14">D5 IR PWM via NMOS</text>
-    <text x="438" y="498" fill="#9fb2c0" font-size="14">D6 UVA PWM via NMOS</text>
-    <text x="438" y="524" fill="#9fb2c0" font-size="14">D7 SK6812 RGBW data</text>
+    <text x="438" y="442" fill="#eaf6fb" font-size="22" font-weight="700">ESP32 LCD Driver</text>
+    <text x="438" y="472" fill="#9fb2c0" font-size="14">GPIO25 IR PWM via NMOS</text>
+    <text x="438" y="498" fill="#9fb2c0" font-size="14">GPIO26 UVA PWM via NMOS</text>
+    <text x="438" y="524" fill="#9fb2c0" font-size="14">GPIO27 SK6812 RGBW data</text>
     <text x="438" y="550" fill="#9fb2c0" font-size="14">8 RGBW pixels / 5 control zones</text>
 
     <rect x="806" y="414" width="302" height="176" rx="12" fill="#111821" stroke="url(#rgb)" stroke-width="2"/>

@@ -30,8 +30,8 @@ const char *AP_PASSWORD = "change-this-password";
 #define HREF_GPIO_NUM 23
 #define PCLK_GPIO_NUM 22
 
-// UART link to the Arduino Nano LED driver. Use these only if the microSD slot
-// is not used. Nano TX must be level-shifted before ESP32 GPIO13.
+// UART link to the ESP32 1.14 LCD LED driver. Use these only if the microSD slot
+// is not used. ESP32 LCD driver UART is 3.3 V logic; no divider is required to the ESP32 RX pin.
 const uint8_t LED_UART_RX_PIN = 13;
 const uint8_t LED_UART_TX_PIN = 14;
 const uint32_t LED_LINK_BAUD = 19200;
@@ -243,7 +243,7 @@ const char INDEX_HTML[] PROGMEM = R"HTML(
       <section class="status" id="status">Connecting</section>
     </div>
   </main>
-  <footer>Lights auto-off after 60 seconds. Nano and ESP32 pins carry signal only.</footer>
+  <footer>Lights auto-off after 60 seconds. ESP32 driver and ESP32-S3 pins carry signal only.</footer>
   <script>
     const frame = document.getElementById('frame');
     const pauseButton = document.getElementById('pause');
@@ -525,7 +525,7 @@ uint8_t sanitizePrototype(int value) {
 
 const char *prototypeName(uint8_t prototype) {
   switch (sanitizePrototype(prototype)) {
-    case 1: return "Prototype 1 - Camera + Arduino link";
+    case 1: return "Prototype 1 - Camera + ESP32 driver link";
     case 2: return "Prototype 2 - IR + UVA mono LEDs";
     case 3: return "Prototype 3 - Camera RGBW pair";
     case 4: return "Prototype 4 - Acrylic RGBW stack";
@@ -831,7 +831,7 @@ String lightStatusJson() {
     body += "\":";
     body += String(rgbwW[index]);
   }
-  body += ",\"rgbwPixels\":8,\"driver\":\"nano-2s-sk6812-acrylic-v0.8\"}";
+  body += ",\"rgbwPixels\":8,\"driver\":\"esp32-lcd-1.14-sk6812-acrylic-v1.0\"}";
   return body;
 }
 

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900" role="img" aria-labelledby="title desc">
-  <title id="title">ESP32-CAM Arduino Nano 2S SK6812 IR UVA circuit diagram</title>
-  <desc id="desc">Module-level wiring diagram for ESP32-CAM, Arduino Nano, 2S LiPo battery, 2S charger BMS, 5V buck regulator, IR LED, UVA LED, and eight SK6812 RGBW LEDs arranged as five control zones.</desc>
+  <title id="title">ESP32-CAM ESP32 1.14 LCD driver 2S SK6812 IR UVA circuit diagram</title>
+  <desc id="desc">Module-level wiring diagram for ESP32-CAM, ESP32 1.14 LCD driver, 2S LiPo battery, 2S charger BMS, 5V buck regulator, IR LED, UVA LED, and eight SK6812 RGBW LEDs arranged as five control zones.</desc>
   <defs>
     <style>
       .bg { fill: #071018; }
@@ -39,7 +39,7 @@
 
   <rect class="panel power" x="1090" y="70" width="240" height="130"/>
   <text class="text" x="1133" y="118">5V System Rail</text>
-  <text class="small" x="1132" y="150">ESP32, Nano, LEDs</text>
+  <text class="small" x="1132" y="150">ESP32 boards + LEDs</text>
   <text class="tiny" x="1132" y="176">Fuse near battery positive</text>
 
   <path class="wire wirebat" d="M310 135 H390"/>
@@ -49,17 +49,17 @@
   <rect class="panel logic" x="120" y="315" width="300" height="210"/>
   <text class="text" x="183" y="365">ESP32-CAM</text>
   <text class="small" x="164" y="400">Wi-Fi + web API + MJPEG</text>
-  <text class="tiny" x="152" y="434">GPIO14 TX -> Nano D2</text>
-  <text class="tiny" x="152" y="460">GPIO13 RX <- Nano D4 divider</text>
+  <text class="tiny" x="152" y="434">GPIO14 TX -> ESP32 LCD GPIO16 RX2</text>
+  <text class="tiny" x="152" y="460">GPIO13 RX <- ESP32 LCD GPIO17 TX2</text>
   <text class="tiny" x="152" y="486">5V + GND from buck rail</text>
 
   <rect class="panel logic" x="560" y="300" width="330" height="245"/>
-  <text class="text" x="626" y="350">Arduino Nano</text>
+  <text class="text" x="626" y="350">ESP32 1.14 LCD driver</text>
   <text class="small" x="610" y="385">Lighting command decoder</text>
-  <text class="tiny" x="600" y="420">D5 IR PWM, D6 UVA PWM</text>
-  <text class="tiny" x="600" y="446">D7 SK6812 data, D8 LED enable</text>
-  <text class="tiny" x="600" y="472">D2/D4 SoftwareSerial link</text>
-  <text class="tiny" x="600" y="498">Adafruit NeoPixel library</text>
+  <text class="tiny" x="600" y="420">GPIO25 IR PWM, GPIO26 UVA PWM</text>
+  <text class="tiny" x="600" y="446">GPIO27 SK6812 data, GPIO33 LED enable</text>
+  <text class="tiny" x="600" y="472">GPIO16 RX2 / GPIO17 TX2 UART link</text>
+  <text class="tiny" x="600" y="498">ST7789 status LCD + NeoPixel library</text>
 
   <path class="wire wiredata" d="M420 405 C485 405 495 405 560 405"/>
   <path class="wire wiredata" d="M560 455 C500 455 485 455 420 455"/>
@@ -81,15 +81,15 @@
   <rect class="panel led" x="1030" y="640" width="280" height="145"/>
   <text class="text" x="1082" y="686">SK6812 RGBW x8</text>
   <text class="small" x="1068" y="718">5 zones / one data chain</text>
-  <text class="tiny" x="1065" y="744">D7 -> 330R -> RGBW1 DIN</text>
+  <text class="tiny" x="1065" y="744">GPIO27 -> level shifter -> 330R -> RGBW1 DIN</text>
   <text class="tiny" x="1065" y="768">RGBW1 -> RGBW2 -> Acrylic 1/2/3 pairs</text>
 
   <path class="wire wireled" d="M890 420 H1030"/>
-  <text class="tiny" x="922" y="407">D5 PWM</text>
+  <text class="tiny" x="922" y="407">GPIO25 PWM</text>
   <path class="wire wireled" d="M890 530 H1030"/>
-  <text class="tiny" x="922" y="517">D6 PWM</text>
+  <text class="tiny" x="922" y="517">GPIO26 PWM</text>
   <path class="wire wiredata" d="M725 545 V710 H1030"/>
-  <text class="tiny" x="738" y="690">D7 data</text>
+  <text class="tiny" x="738" y="690">GPIO27 data</text>
   <path class="wire wire5" d="M1210 260 V300"/>
   <path class="wire wire5" d="M1210 435 V470"/>
   <path class="wire wire5" d="M1210 605 V640"/>
@@ -102,3 +102,5 @@
 
   <text class="tiny" x="80" y="860">UVA and IR require shielding and eye protection. The phone camera and ESP32-CAM lens must both stay clear of the printed shell.</text>
 </svg>
+
+

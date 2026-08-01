@@ -23,13 +23,13 @@ Camera pin map used by `esp32_s3_gc2145_webapp`:
 | PWDN | -1 |
 | RESET | -1 |
 
-Nano serial link:
+ESP32 LCD driver serial link:
 
 | Signal | Pin |
 |---|---|
-| ESP32-S3 TX to Nano RX | GPIO1 -> Nano D2 |
-| Nano TX to ESP32-S3 RX | Nano D4 -> divider/level shifter -> GPIO2 |
-| Ground reference | ESP32-S3 GND <-> Nano GND |
+| ESP32-S3 TX to ESP32 LCD driver RX | GPIO1 -> ESP32 LCD GPIO16 RX2 |
+| ESP32 LCD driver TX to ESP32-S3 RX | ESP32 LCD GPIO17 TX2 -> GPIO2 |
+| Ground reference | ESP32-S3 GND <-> ESP32 LCD GND |
 
 ## ESP32-C6 LCD Board
 
@@ -45,22 +45,24 @@ Display pin map used by `esp32_c6_hologram_display`:
 | Backlight | 22 |
 | RST | 21 |
 
-The C6 display currently has no wired signal link to the S3 or Nano. It is controlled by HTTP over Wi-Fi:
+The C6 display currently has no wired signal link to the S3 or lighting driver. It is controlled by HTTP over Wi-Fi:
 
 ```text
 GET /status
 GET /hologram?power=1&mode=2&brightness=180&speed=96&r1=0&g1=210&b1=255&r2=255&g2=60&b2=190&r3=255&g3=255&b3=255
 ```
 
-## Arduino Nano LED Driver
+## ESP32 1.14 LCD Lighting Driver
 
-| Function | Nano pin |
+| Function | ESP32 1.14 LCD board pin |
 |---|---|
-| Serial RX from ESP32-S3 | D2 |
-| Serial TX to ESP32-S3 | D4 |
-| IR LED PWM | D5 |
-| UVA LED PWM | D6 |
-| SK6812 RGBW data | D7 |
+| Serial RX from ESP32-S3 | GPIO16 RX2 |
+| Serial TX to ESP32-S3 | GPIO17 TX2 |
+| IR LED PWM | GPIO25 |
+| UVA LED PWM | GPIO26 |
+| SK6812 RGBW data | GPIO27 through 3.3 V-to-5 V buffer |
+| Optional LED rail enable | GPIO33 |
+| Onboard ST7789 CS / DC / RST / BL / SCLK / MOSI | GPIO15 / GPIO2 / GPIO4 / GPIO32 / GPIO18 / GPIO23 |
 
 ## SK6812 Chain Order
 

@@ -9,13 +9,13 @@
   </defs>
   <rect class="bg" width="1100" height="760"/>
   <text class="title" x="48" y="56">Prototype 2 - Camera Link + IR and UVA LEDs</text>
-  <text class="small" x="48" y="86">Adds independent low-side MOSFET drivers for 950 nm IR and 375 nm UVA dimming from the Nano.</text>
+  <text class="small" x="48" y="86">Adds independent low-side MOSFET drivers for 950 nm IR and 375 nm UVA dimming from the ESP32 LCD driver.</text>
 
   <rect class="panel" x="60" y="140" width="245" height="390" rx="12"/>
   <text class="label" x="98" y="180">Power + Logic</text>
   <rect class="part" x="93" y="232" width="120" height="56" rx="8"/><text class="small" x="118" y="265">5 V buck</text>
   <rect class="part" x="93" y="320" width="120" height="56" rx="8"/><text class="small" x="115" y="353">ESP32-CAM</text>
-  <rect class="part" x="93" y="408" width="120" height="56" rx="8"/><text class="small" x="118" y="441">Nano</text>
+  <rect class="part" x="93" y="408" width="120" height="56" rx="8"/><text class="small" x="118" y="441">ESP32 LCD driver</text>
   <path class="wire5" d="M213 260 H270 V436 H213"/>
   <path class="wireg" d="M93 348 H55 V436 H93"/>
   <path class="wires" d="M213 342 C275 365 275 408 213 426"/>
@@ -31,7 +31,7 @@
   <rect class="part" x="606" y="348" width="68" height="72" rx="8"/><text class="small" x="623" y="391">NMOS</text>
   <path class="wireg" d="M640 420 V505 H430"/>
   <path class="gate" d="M470 382 H606"/>
-  <text class="small" x="430" y="386">Nano D5 -> 150R gate</text>
+  <text class="small" x="430" y="386">ESP32 LCD GPIO25 -> 150R gate</text>
   <text class="small" x="430" y="522">100k gate pulldown to GND</text>
 
   <rect class="panel" x="750" y="130" width="290" height="520" rx="12"/>
@@ -44,7 +44,7 @@
   <rect class="part" x="966" y="348" width="68" height="72" rx="8"/><text class="small" x="983" y="391">NMOS</text>
   <path class="wireg" d="M1000 420 V505 H790"/>
   <path class="gate" d="M830 382 H966"/>
-  <text class="small" x="790" y="386">Nano D6 -> 150R gate</text>
+  <text class="small" x="790" y="386">ESP32 LCD GPIO26 -> 150R gate</text>
   <text class="small" x="790" y="522">100k gate pulldown to GND</text>
 
   <text class="warn" x="48" y="705">Shield UVA and IR. Do not aim emitters at eyes. Webapp selection: Prototype 2 enables IR/UVA only.</text>

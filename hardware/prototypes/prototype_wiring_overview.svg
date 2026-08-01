@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1500" height="980" viewBox="0 0 1500 980" role="img" aria-labelledby="title desc">
   <title id="title">Five prototype wiring overview</title>
-  <desc id="desc">Prototype stages for ESP32-CAM, Arduino Nano, IR, UVA, two camera RGBW LEDs, six acrylic RGBW LEDs, and production PCB.</desc>
+  <desc id="desc">Prototype stages for ESP32-CAM, ESP32 1.14 LCD driver, IR, UVA, two camera RGBW LEDs, six acrylic RGBW LEDs, and production PCB.</desc>
   <defs>
     <style>
       .bg { fill: #071018; }
@@ -17,24 +17,24 @@
     </style>
   </defs>
   <rect class="bg" width="1500" height="980"/>
-  <text class="text" x="54" y="54">ESP32-CAM / Nano staged prototype path</text>
+  <text class="text" x="54" y="54">ESP32-CAM / ESP32 LCD driver staged prototype path</text>
 
   <rect class="card active" x="54" y="92" width="260" height="160"/>
   <text class="text" x="82" y="135">Prototype 1</text>
-  <text class="small" x="82" y="170">Camera + Nano</text>
-  <text class="tiny" x="82" y="202">GPIO14 -> Nano D2</text>
-  <text class="tiny" x="82" y="224">Nano D4 -> divider -> GPIO13</text>
+  <text class="small" x="82" y="170">Camera + ESP32 LCD driver</text>
+  <text class="tiny" x="82" y="202">GPIO14 -> ESP32 LCD GPIO16 RX2</text>
+  <text class="tiny" x="82" y="224">ESP32 LCD GPIO17 TX2 -> GPIO13</text>
 
   <rect class="card active" x="348" y="92" width="260" height="160"/>
   <text class="text" x="376" y="135">Prototype 2</text>
   <text class="small" x="376" y="170">Add IR + UVA</text>
-  <text class="tiny" x="376" y="202">Nano D5 -> IR NMOS</text>
-  <text class="tiny" x="376" y="224">Nano D6 -> UVA NMOS</text>
+  <text class="tiny" x="376" y="202">ESP32 LCD GPIO25 -> IR NMOS</text>
+  <text class="tiny" x="376" y="224">ESP32 LCD GPIO26 -> UVA NMOS</text>
 
   <rect class="card active" x="642" y="92" width="260" height="160"/>
   <text class="text" x="670" y="135">Prototype 3</text>
   <text class="small" x="670" y="170">Add RGBW 1 + 2</text>
-  <text class="tiny" x="670" y="202">Nano D7 -> 330R -> RGBW1</text>
+  <text class="tiny" x="670" y="202">ESP32 LCD GPIO27 -> 330R -> RGBW1</text>
   <text class="tiny" x="670" y="224">RGBW1 DOUT -> RGBW2 DIN</text>
 
   <rect class="card active" x="936" y="92" width="260" height="160"/>
@@ -59,8 +59,8 @@
   <text class="small" x="122" y="414">ESP32-CAM</text>
   <text class="tiny" x="122" y="444">5V, GND, camera stream</text>
   <text class="tiny" x="122" y="468">Webapp /status and /led</text>
-  <text class="small" x="122" y="512">Arduino Nano</text>
-  <text class="tiny" x="122" y="542">D2 RX, D4 TX, D5/D6 PWM, D7 RGBW</text>
+  <text class="small" x="122" y="512">ESP32 1.14 LCD driver</text>
+  <text class="tiny" x="122" y="542">GPIO16 RX2, GPIO17 TX2, GPIO25/26 PWM, GPIO27 RGBW</text>
 
   <rect class="card" x="470" y="330" width="300" height="250"/>
   <text class="text" x="502" y="374">Mono LED branch</text>
@@ -73,7 +73,7 @@
   <text class="text" x="882" y="374">RGBW chain</text>
   <text class="small" x="882" y="414">Prototype 3+</text>
   <text class="tiny" x="882" y="444">SK6812 5V and GND bus</text>
-  <text class="tiny" x="882" y="468">D7 -> RGBW1 -> RGBW2</text>
+  <text class="tiny" x="882" y="468">GPIO27 -> RGBW1 -> RGBW2</text>
   <text class="tiny" x="882" y="492">Prototype 4 adds six more pixels</text>
 
   <rect class="card" x="1230" y="330" width="220" height="250"/>

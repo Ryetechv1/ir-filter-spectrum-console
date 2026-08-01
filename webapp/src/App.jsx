@@ -171,11 +171,11 @@ const presets = [
 ];
 
 const telemetrySeed = [
-  ["Link", "ESP32-S3 UART to Nano"],
+  ["Link", "ESP32-S3 UART to ESP32 LCD driver"],
   ["Battery", "2S LiPo to 5V buck"],
   ["Power state", "Firmware output shutdown"],
-  ["IR / UVA", "Nano D5 / D6 PWM"],
-  ["RGBW data", "Nano D7 SK6812"],
+  ["IR / UVA", "ESP32 LCD GPIO25 / GPIO26 PWM"],
+  ["RGBW data", "ESP32 LCD GPIO27 SK6812"],
   ["RGBW LEDs", "8 pixels / 5 control zones"],
   ["Acrylic stack", "3 paired left/right square zones"],
   ["Hologram", "ESP32-C6 LCD over acrylic glass"]
@@ -1064,7 +1064,7 @@ function App() {
           <DimmableLedControl
             channel="IR"
             wavelength="950 nm"
-            pwm="Nano D5 PWM"
+            pwm="ESP32 GPIO25 PWM"
             value={lights.ir}
             enabled={Boolean(lights.irOn)}
             disabled={!prototypeSupportsMono(selectedPrototype, "ir")}
@@ -1077,7 +1077,7 @@ function App() {
           <DimmableLedControl
             channel="UVA"
             wavelength="375 nm"
-            pwm="Nano D6 PWM"
+            pwm="ESP32 GPIO26 PWM"
             value={lights.uva}
             enabled={Boolean(lights.uvaOn)}
             disabled={!prototypeSupportsMono(selectedPrototype, "uva")}
@@ -1173,7 +1173,7 @@ function App() {
         </section>
 
         <section className="hardware-panel">
-          <PanelHeader title="Hardware reference" icon={<SatelliteDish size={18} />} meta="S3 camera, C6 display, Nano driver" />
+          <PanelHeader title="Hardware reference" icon={<SatelliteDish size={18} />} meta="S3 camera, C6 display, ESP32 LCD driver" />
           <div className="hardware-content">
             <figure>
               <img src="/assets/esp32-front.jpg" alt="ESP32-CAM front with OV2640 camera" />
@@ -1207,8 +1207,8 @@ function App() {
               <span />
             </div>
             <div className="driver-box">
-              <strong>Arduino Nano 2S driver</strong>
-              <span>D5/D6 PWM + D7 SK6812 data + C6 LCD display on its own USB-C board</span>
+              <strong>ESP32 1.14 LCD 2S driver</strong>
+              <span>GPIO25/GPIO26 PWM + GPIO27 SK6812 data + onboard status LCD</span>
             </div>
             <div className="led-stack">
               {selectedPrototype.controls.ir ? <div className="led-box ir-led">IR LED<br />950 nm</div> : null}
@@ -1224,8 +1224,8 @@ function App() {
           <div className="safety-callout">
             <AlertTriangle size={18} />
             <div>
-              <strong>Nano and ESP32 pins carry signal only.</strong>
-              <span>Use a fused 2S pack, a regulated 5 V buck rail, MOSFET switching for IR/UVA, and separate USB-C programming/power access for the S3 and C6 boards.</span>
+              <strong>ESP32 driver and ESP32-S3 pins carry signal only.</strong>
+              <span>Use a fused 2S pack, a regulated 5 V buck rail, MOSFET switching for IR/UVA, a 3.3 V-to-5 V SK6812 data buffer, and separate USB-C programming/power access for the S3, C6, and 1.14 LCD driver boards.</span>
             </div>
           </div>
         </section>
