@@ -468,6 +468,17 @@
   box-shadow: 0 0 24px rgba(142, 66, 255, 0.28);
 }
 
+.roi-region-visual .smart-mask-dot {
+  border: 2px solid rgba(255, 255, 255, 0.82);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.13), rgba(142, 66, 255, 0.48)),
+    rgba(142, 66, 255, 0.28);
+  box-shadow:
+    0 0 0 999px rgba(142, 66, 255, 0.035),
+    inset 0 0 28px rgba(255, 255, 255, 0.16),
+    0 0 28px rgba(142, 66, 255, 0.36);
+}
+
 .roi-region-visual.active span {
   background: rgba(165, 91, 255, 0.62);
 }
@@ -585,6 +596,112 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+}
+
+.smart-recognition-panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(142, 66, 255, 0.28);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(142, 66, 255, 0.14), transparent 34%),
+    rgba(2, 5, 8, 0.36);
+}
+
+.smart-recognition-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.smart-recognition-heading h3 {
+  margin: 0;
+  color: #f5f8fb;
+  font-size: 13px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.smart-recognition-heading span {
+  color: #aeb9c5;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.mini-toggle {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid rgba(133, 160, 184, 0.22);
+  border-radius: 999px;
+  color: #d8e3eb;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.mini-toggle input {
+  accent-color: #9342ff;
+}
+
+.smart-region-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.smart-region-grid button {
+  display: grid;
+  gap: 4px;
+  min-height: 76px;
+  padding: 9px;
+  border-radius: 8px;
+  color: #d8e3eb;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.065), rgba(255, 255, 255, 0.025)),
+    rgba(2, 5, 8, 0.44);
+  text-align: left;
+}
+
+.smart-region-grid button:hover,
+.smart-region-grid button:focus-visible {
+  border-color: rgba(168, 98, 255, 0.76);
+  background:
+    linear-gradient(180deg, rgba(147, 66, 255, 0.24), rgba(2, 5, 8, 0.6)),
+    rgba(2, 5, 8, 0.44);
+}
+
+.smart-region-grid span {
+  width: fit-content;
+  padding: 2px 6px;
+  border-radius: 999px;
+  color: #d7c0ff;
+  background: rgba(147, 66, 255, 0.16);
+  font-size: 10px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.smart-region-grid strong,
+.smart-region-grid small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.smart-region-grid strong {
+  color: #f5f8fb;
+  font-size: 12px;
+}
+
+.smart-region-grid small {
+  color: #aeb9c5;
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 .canva-switch {
@@ -1266,6 +1383,7 @@
   .resolution-selector,
   .capture-shelf-grid,
   .selective-toggle-grid,
+  .smart-region-grid,
   .roi-action-row,
   .roi-region-list,
   .camera-meta-row {

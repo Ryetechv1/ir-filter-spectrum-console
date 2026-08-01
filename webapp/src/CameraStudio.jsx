@@ -36,6 +36,7 @@ const CONTACT_EMAIL = "alola99990@gmail.com";
 const CAPTURE_LIBRARY_LIMIT = 3;
 const MAX_RECORDING_MS = 180000;
 const ROI_LIMIT = 15;
+const SMART_RECOGNITION_INTERVAL_MS = 900;
 const RECORDING_RESOLUTIONS = {
   "1080p": { label: "1080P", width: 1920, height: 1080 },
   "2k": { label: "2K", width: 2560, height: 1440 }
@@ -337,6 +338,8 @@ function CameraStudio() {
   const [foregroundEnabled, setForegroundEnabled] = useState(true);
   const [backgroundEnabled, setBackgroundEnabled] = useState(true);
   const [autoDetectForeground, setAutoDetectForeground] = useState(true);
+  const [smartRecognitionEnabled, setSmartRecognitionEnabled] = useState(true);
+  const [smartAnalysis, setSmartAnalysis] = useState(() => fallbackSmartAnalysis(false));
   const [brushSize, setBrushSize] = useState(40);
   const [roiRegions, setRoiRegions] = useState([]);
   const [activeRoiId, setActiveRoiId] = useState("");
@@ -368,6 +371,8 @@ function CameraStudio() {
     () => activeSettingsForMode(areaMode, manualSettings, foregroundSettings, backgroundSettings, activeRoi),
     [activeRoi, areaMode, backgroundSettings, foregroundSettings, manualSettings]
   );
+
+  const smartRegions = smartAnalysis.regions || [];
 
   useEffect(() => {
     renderStateRef.current = {
@@ -426,6 +431,10 @@ function CameraStudio() {
       );
       return;
     }
+    if (areaMode === "click" || areaMode === "brush") {
+      setCameraStatus("Select or paint a range of interest before changing range-only adjustments.");
+      return;
+    }
     setManualSettings((current) => apply(current));
   }, [activeRoiId, areaMode]);
 
@@ -433,7 +442,7 @@ function CameraStudio() {
     let existing = null;
     setRoiRegions((current) => {
       if (activeRoiId) {
-        existing = current.find((region) => region.id === activeRoiId) || null;
+        existing = current.find((region) => region.id === activeRoiId && region.mode === mode) || null;
         if (existing) return current;
       }
       if (current.length >= ROI_LIMIT) {
@@ -467,7 +476,7 @@ function CameraStudio() {
     let regionId = activeRoiId;
     setRoiRegions((current) => {
       let next = current;
-      let region = regionId ? current.find((candidate) => candidate.id === regionId) : null;
+      let region = regionId ? current.find((candidate) => candidate.id === regionId && candidate.mode === mode && !candidate.smartRegion) : null;
       if (!region) {
         if (current.length >= ROI_LIMIT) {
           setCameraStatus("15 ranges of interest are already active. Remove one before adding another.");
@@ -745,6 +754,20 @@ function CameraStudio() {
     };
   }, [autoDetectForeground, cameraActive]);
 
+  useEffect(() => {
+    if (!cameraActive || !smartRecognitionEnabled) {
+      setSmartAnalysis(fallbackSmartAnalysis(cameraActive));
+      return undefined;
+    }
+    const analyze = () => {
+      const video = videoRef.current;
+      setSmartAnalysis(analyzeCameraFrame(video, foregroundBoxRef.current));
+    };
+    analyze();
+    const timer = window.setInterval(analyze, SMART_RECOGNITION_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [cameraActive, smartRecognitionEnabled]);
+
   async function unlockStudio(event) {
     event.preventDefault();
     setAuthError("");
@@ -795,7 +818,13 @@ function CameraStudio() {
 
   function setAreaModeAndScope(mode) {
     setAreaMode(mode);
-    if (mode === "click" || mode === "brush") ensureActiveRoi(mode);
+    if (mode === "click") {
+      setCameraStatus("Click mode ready. Tap the preview to select the best matching smart-recognized area.");
+    } else if (mode === "brush") {
+      setCameraStatus("Brush mode ready. Drag on the preview to paint a local range of interest.");
+    } else {
+      setCameraStatus(`${activeScopeLabel(mode)} adjustments are active.`);
+    }
   }
 
   function autoAdjustActiveScope() {
@@ -831,6 +860,10 @@ function CameraStudio() {
     event.preventDefault();
     const point = pointerToCanvasPoint(event, previewCanvasRef.current, brushSize);
     if (!point) return;
+    if (areaMode === "click") {
+      createSmartRoiFromPoint(point);
+      return;
+    }
     addRoiPoint(point, areaMode);
     if (areaMode === "brush") {
       brushPaintingRef.current = true;
@@ -848,6 +881,36 @@ function CameraStudio() {
   function handlePreviewPointerUp(event) {
     brushPaintingRef.current = false;
     event.currentTarget.releasePointerCapture?.(event.pointerId);
+  }
+
+  function createSmartRoiFromPoint(point) {
+    const selectedSmartRegion = selectSmartRegionAtPoint(point, smartRegions);
+    const smartRegion = selectedSmartRegion || clickSpotSmartRegion(point);
+    setRoiRegions((current) => {
+      if (current.length >= ROI_LIMIT) {
+        setCameraStatus("15 ranges of interest are already active. Remove one before adding another.");
+        return current;
+      }
+      const region = createSmartRoiRegion(current.length, smartRegion);
+      setActiveRoiId(region.id);
+      setAreaMode("click");
+      setCameraStatus(`Click selected smart area: ${smartRegion.label}.`);
+      return [region, ...current];
+    });
+  }
+
+  function createSmartRoiFromRegion(region) {
+    setRoiRegions((current) => {
+      if (current.length >= ROI_LIMIT) {
+        setCameraStatus("15 ranges of interest are already active. Remove one before adding another.");
+        return current;
+      }
+      const roi = createSmartRoiRegion(current.length, region);
+      setActiveRoiId(roi.id);
+      setAreaMode("click");
+      setCameraStatus(`Smart recognition selected: ${region.label}.`);
+      return [roi, ...current];
+    });
   }
 
   async function captureSnapshot() {
@@ -1007,17 +1070,11 @@ function CameraStudio() {
                 .filter((region) => region.enabled)
                 .map((region) => (
                   <div className={`roi-region-visual${region.id === activeRoiId ? " active" : ""}`} key={region.id}>
-                    {region.points.map((point, index) => (
-                      <span
-                        key={`${region.id}-${index}`}
-                        style={{
-                          left: `${point.x * 100}%`,
-                          top: `${point.y * 100}%`,
-                          width: `${point.radius * 200 * 100}%`,
-                          height: `${point.radius * 200 * 100}%`
-                        }}
-                      />
-                    ))}
+                    {region.smartRegion ? (
+                      <span className="smart-mask-dot" style={roiSmartVisualStyle(region.smartRegion)} />
+                    ) : (
+                      region.points.map((point, index) => <span key={`${region.id}-${index}`} style={roiPointVisualStyle(point)} />)
+                    )}
                   </div>
                 ))}
             </div>
@@ -1080,6 +1137,31 @@ function CameraStudio() {
                 {backgroundEnabled ? <Eye size={15} /> : <EyeOff size={15} />}
               </label>
             </div>
+            <section className="smart-recognition-panel" aria-labelledby="smartRecognitionTitle">
+              <div className="smart-recognition-heading">
+                <div>
+                  <h3 id="smartRecognitionTitle">Smart recognition</h3>
+                  <span>{smartAnalysis.status}</span>
+                </div>
+                <label className="mini-toggle">
+                  <input
+                    type="checkbox"
+                    checked={smartRecognitionEnabled}
+                    onChange={(event) => setSmartRecognitionEnabled(event.target.checked)}
+                  />
+                  On
+                </label>
+              </div>
+              <div className="smart-region-grid" aria-label="Recognized scene areas">
+                {smartRegions.map((region) => (
+                  <button key={region.id} type="button" onClick={() => createSmartRoiFromRegion(region)}>
+                    <span>{region.category}</span>
+                    <strong>{region.label}</strong>
+                    <small>{Math.round(region.confidence * 100)}% • {region.description}</small>
+                  </button>
+                ))}
+              </div>
+            </section>
             <label className="brush-size-control">
               <span>Brush size <output>{brushSize}</output></span>
               <input type="range" min="8" max="140" value={brushSize} onChange={(event) => setBrushSize(Number(event.target.value))} />
@@ -1116,7 +1198,7 @@ function CameraStudio() {
                   >
                     <span>{String(index + 1).padStart(2, "0")}</span>
                     <strong>{region.name}</strong>
-                    <small>{region.points.length} marks • {region.enabled ? "on" : "off"}</small>
+                    <small>{region.smartRegion ? region.smartRegion.category : `${region.points.length} marks`} • {region.enabled ? "on" : "off"}</small>
                   </button>
                 ))
               ) : (
@@ -1423,6 +1505,7 @@ function activeSettingsForMode(mode, allSettings, foregroundSettings, background
   if (mode === "foreground") return foregroundSettings;
   if (mode === "background") return backgroundSettings;
   if ((mode === "click" || mode === "brush") && activeRoi?.settings) return activeRoi.settings;
+  if (mode === "click" || mode === "brush") return DEFAULT_SETTINGS;
   return allSettings;
 }
 
@@ -1448,14 +1531,311 @@ function createRoiRegion(index, mode = "brush") {
   };
 }
 
+function createSmartRoiRegion(index, smartRegion) {
+  const region = createRoiRegion(index, "click");
+  return {
+    ...region,
+    name: smartRegion.label || `Smart area ${String(index + 1).padStart(2, "0")}`,
+    smartRegion,
+    points: [],
+    updatedAt: new Date().toISOString()
+  };
+}
+
 function pointerToCanvasPoint(event, canvas, brushSize) {
   if (!canvas) return null;
   const rect = canvas.getBoundingClientRect();
   if (!rect.width || !rect.height) return null;
   const x = clamp((event.clientX - rect.left) / rect.width, 0, 1);
   const y = clamp((event.clientY - rect.top) / rect.height, 0, 1);
-  const radius = clamp((Number(brushSize) || 40) / 2 / rect.width, 0.006, 0.18);
-  return { x, y, radius };
+  const radiusX = clamp((Number(brushSize) || 40) / 2 / rect.width, 0.004, 0.16);
+  const radiusY = clamp((Number(brushSize) || 40) / 2 / rect.height, 0.004, 0.16);
+  return { x, y, radius: Math.max(radiusX, radiusY), radiusX, radiusY };
+}
+
+function fallbackSmartAnalysis(active) {
+  return {
+    status: active ? "Using estimated scene fields until the next camera analysis pass." : "Start the camera to detect scene fields.",
+    regions: buildDefaultSmartRegions(),
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function buildDefaultSmartRegions(foregroundBox = null) {
+  const subject = foregroundBoxToSmartRegion(foregroundBox) || {
+    id: "depth-near-subject",
+    category: "Depth",
+    label: "Near-field subject",
+    confidence: 0.72,
+    description: "Estimated center subject plane",
+    shape: "ellipse",
+    cx: 0.5,
+    cy: 0.48,
+    rx: 0.28,
+    ry: 0.43,
+    priority: 14
+  };
+  const farBackground = {
+    id: "depth-far-background",
+    category: "Depth",
+    label: "Far background",
+    confidence: 0.63,
+    description: "Outer area behind the near subject",
+    shape: "outside-ellipse",
+    cx: subject.cx,
+    cy: subject.cy,
+    rx: clamp(subject.rx * 1.12, 0.18, 0.48),
+    ry: clamp(subject.ry * 1.08, 0.24, 0.62),
+    priority: 8
+  };
+  return [
+    subject,
+    {
+      id: "depth-mid-field",
+      category: "Depth",
+      label: "Mid-field focus",
+      confidence: 0.58,
+      description: "Middle depth band around the subject",
+      shape: "ellipse",
+      cx: 0.5,
+      cy: 0.5,
+      rx: 0.43,
+      ry: 0.52,
+      priority: 6
+    },
+    farBackground,
+    {
+      id: "depth-upper-plane",
+      category: "Depth",
+      label: "Upper depth plane",
+      confidence: 0.52,
+      description: "Top third of the camera view",
+      shape: "rect",
+      x: 0,
+      y: 0,
+      w: 1,
+      h: 0.34,
+      priority: 4
+    },
+    {
+      id: "depth-lower-plane",
+      category: "Depth",
+      label: "Lower foreground plane",
+      confidence: 0.52,
+      description: "Lower third of the camera view",
+      shape: "rect",
+      x: 0,
+      y: 0.66,
+      w: 1,
+      h: 0.34,
+      priority: 4
+    }
+  ];
+}
+
+function analyzeCameraFrame(video, foregroundBox) {
+  if (!video || video.readyState < 2) return fallbackSmartAnalysis(Boolean(video));
+  const sampleWidth = 96;
+  const sampleHeight = 54;
+  const canvas = document.createElement("canvas");
+  canvas.width = sampleWidth;
+  canvas.height = sampleHeight;
+  const context = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
+  try {
+    context.drawImage(video, 0, 0, sampleWidth, sampleHeight);
+    const { data } = context.getImageData(0, 0, sampleWidth, sampleHeight);
+    const cells = [];
+    const cols = 4;
+    const rows = 3;
+    for (let row = 0; row < rows; row += 1) {
+      for (let col = 0; col < cols; col += 1) {
+        cells.push(sampleCellStats(data, sampleWidth, sampleHeight, col, row, cols, rows));
+      }
+    }
+
+    const by = (key) => [...cells].sort((a, b) => b[key] - a[key]);
+    const bright = by("luma")[0];
+    const dark = by("shadow")[0];
+    const detail = by("edge")[0];
+    const warm = by("warmth")[0];
+    const cool = by("coolness")[0];
+    const saturated = by("saturation")[0];
+    const regions = [
+      ...buildDefaultSmartRegions(foregroundBox),
+      buildCellSmartRegion("aspect-highlights", "Bright highlights", "Aspect", "Highest luminance field", bright, 0.7, 10),
+      buildCellSmartRegion("aspect-shadows", "Deep shadows", "Aspect", "Darkest low-light field", dark, 0.67, 10),
+      buildCellSmartRegion("aspect-detail", "High-detail edge field", "Aspect", "Strongest edge/texture field", detail, 0.64, 9),
+      buildCellSmartRegion("aspect-warm", "Warm color field", "Color", "Warmest red/yellow-biased field", warm, 0.6, 7),
+      buildCellSmartRegion("aspect-cool", "Cool color field", "Color", "Coolest blue/cyan-biased field", cool, 0.6, 7),
+      buildCellSmartRegion("aspect-saturated", "Saturated color field", "Color", "Most color-rich field", saturated, 0.62, 8)
+    ];
+    return {
+      status: `${regions.length} local depth/aspect fields detected.`,
+      regions: regions.filter(Boolean),
+      updatedAt: new Date().toISOString()
+    };
+  } catch {
+    return fallbackSmartAnalysis(true);
+  }
+}
+
+function sampleCellStats(data, width, height, col, row, cols, rows) {
+  const x0 = Math.floor((col / cols) * width);
+  const x1 = Math.floor(((col + 1) / cols) * width);
+  const y0 = Math.floor((row / rows) * height);
+  const y1 = Math.floor(((row + 1) / rows) * height);
+  let count = 0;
+  let luma = 0;
+  let saturation = 0;
+  let warmth = 0;
+  let coolness = 0;
+  let shadow = 0;
+  let edge = 0;
+  for (let y = y0; y < y1; y += 2) {
+    for (let x = x0; x < x1; x += 2) {
+      const index = (y * width + x) * 4;
+      const r = data[index];
+      const g = data[index + 1];
+      const b = data[index + 2];
+      const currentLuma = r * 0.2126 + g * 0.7152 + b * 0.0722;
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      const rightIndex = (y * width + Math.min(width - 1, x + 2)) * 4;
+      const downIndex = (Math.min(height - 1, y + 2) * width + x) * 4;
+      const rightLuma = data[rightIndex] * 0.2126 + data[rightIndex + 1] * 0.7152 + data[rightIndex + 2] * 0.0722;
+      const downLuma = data[downIndex] * 0.2126 + data[downIndex + 1] * 0.7152 + data[downIndex + 2] * 0.0722;
+      luma += currentLuma;
+      saturation += max ? (max - min) / max : 0;
+      warmth += (r + g * 0.35 - b * 0.8 + 255) / 510;
+      coolness += (b + g * 0.24 - r * 0.65 + 255) / 510;
+      shadow += 255 - currentLuma;
+      edge += Math.abs(currentLuma - rightLuma) + Math.abs(currentLuma - downLuma);
+      count += 1;
+    }
+  }
+  return {
+    col,
+    row,
+    cols,
+    rows,
+    luma: count ? luma / count : 0,
+    saturation: count ? saturation / count : 0,
+    warmth: count ? warmth / count : 0,
+    coolness: count ? coolness / count : 0,
+    shadow: count ? shadow / count : 0,
+    edge: count ? edge / count : 0
+  };
+}
+
+function buildCellSmartRegion(id, label, category, description, cell, baseConfidence, priority) {
+  if (!cell) return null;
+  const padX = 0.01;
+  const padY = 0.014;
+  return {
+    id,
+    category,
+    label,
+    confidence: clamp(baseConfidence + Math.min(0.18, (cell.edge || cell.saturation || 0) / 480), 0.46, 0.94),
+    description,
+    shape: "rect",
+    x: clamp(cell.col / cell.cols + padX, 0, 0.95),
+    y: clamp(cell.row / cell.rows + padY, 0, 0.95),
+    w: clamp(1 / cell.cols - padX * 2, 0.08, 1),
+    h: clamp(1 / cell.rows - padY * 2, 0.08, 1),
+    priority
+  };
+}
+
+function foregroundBoxToSmartRegion(foregroundBox) {
+  if (!foregroundBox?.width || !foregroundBox?.height || !foregroundBox?.sourceWidth || !foregroundBox?.sourceHeight) return null;
+  const cx = clamp((foregroundBox.x + foregroundBox.width / 2) / foregroundBox.sourceWidth, 0.12, 0.88);
+  const cy = clamp((foregroundBox.y + foregroundBox.height * 0.88) / foregroundBox.sourceHeight, 0.16, 0.88);
+  return {
+    id: "depth-detected-subject",
+    category: "Depth",
+    label: "Detected near-field subject",
+    confidence: 0.86,
+    description: "Face/subject-based foreground plane",
+    shape: "ellipse",
+    cx,
+    cy,
+    rx: clamp((foregroundBox.width / foregroundBox.sourceWidth) * 1.55, 0.18, 0.44),
+    ry: clamp((foregroundBox.height / foregroundBox.sourceHeight) * 2.35, 0.24, 0.62),
+    priority: 16
+  };
+}
+
+function selectSmartRegionAtPoint(point, regions = []) {
+  const candidates = regions
+    .filter((region) => smartRegionContainsPoint(region, point))
+    .sort((a, b) => b.priority + b.confidence * 3 - smartRegionArea(b) - (a.priority + a.confidence * 3 - smartRegionArea(a)));
+  return candidates[0] || null;
+}
+
+function clickSpotSmartRegion(point) {
+  return {
+    id: `click-spot-${Date.now()}`,
+    category: "Click",
+    label: "Clicked local spot",
+    confidence: 1,
+    description: "Manual click-centered selection",
+    shape: "ellipse",
+    cx: point.x,
+    cy: point.y,
+    rx: clamp(point.radiusX * 2.6, 0.04, 0.16),
+    ry: clamp(point.radiusY * 2.6, 0.04, 0.16),
+    priority: 18
+  };
+}
+
+function smartRegionContainsPoint(region, point) {
+  if (!region || !point) return false;
+  if (region.shape === "rect") {
+    return point.x >= region.x && point.x <= region.x + region.w && point.y >= region.y && point.y <= region.y + region.h;
+  }
+  const dx = (point.x - region.cx) / Math.max(region.rx, 0.001);
+  const dy = (point.y - region.cy) / Math.max(region.ry, 0.001);
+  const inside = dx * dx + dy * dy <= 1;
+  return region.shape === "outside-ellipse" ? !inside : inside;
+}
+
+function smartRegionArea(region) {
+  if (region.shape === "rect") return (region.w || 0) * (region.h || 0);
+  const ellipse = Math.PI * (region.rx || 0) * (region.ry || 0);
+  return region.shape === "outside-ellipse" ? Math.max(0.12, 1 - ellipse) : ellipse;
+}
+
+function roiPointVisualStyle(point) {
+  const radiusX = point.radiusX ?? point.radius ?? 0.04;
+  const radiusY = point.radiusY ?? point.radius ?? 0.04;
+  return {
+    left: `${point.x * 100}%`,
+    top: `${point.y * 100}%`,
+    width: `${radiusX * 200 * 100}%`,
+    height: `${radiusY * 200 * 100}%`,
+    transform: "translate(-50%, -50%)"
+  };
+}
+
+function roiSmartVisualStyle(region) {
+  if (region.shape === "rect") {
+    return {
+      left: `${region.x * 100}%`,
+      top: `${region.y * 100}%`,
+      width: `${region.w * 100}%`,
+      height: `${region.h * 100}%`,
+      borderRadius: "18px",
+      transform: "none"
+    };
+  }
+  return {
+    left: `${(region.cx - region.rx) * 100}%`,
+    top: `${(region.cy - region.ry) * 100}%`,
+    width: `${region.rx * 200 * 100}%`,
+    height: `${region.ry * 200 * 100}%`,
+    borderRadius: "999px",
+    transform: "none"
+  };
 }
 
 function drawStudioFrame(context, width, height, video, renderState) {
@@ -1509,7 +1889,7 @@ function drawStudioFrame(context, width, height, video, renderState) {
   }
 
   roiRegions
-    .filter((region) => region.enabled && region.points?.length)
+    .filter((region) => region.enabled && (region.smartRegion || region.points?.length))
     .forEach((region) => {
       const layer = renderProcessedLayer(width, height, video, {
         selectedEffect,
@@ -1604,13 +1984,38 @@ function foregroundMaskRect(width, height, foregroundBox, autoDetectForeground) 
 }
 
 function clipRoiMask(context, width, height, region) {
+  if (region.smartRegion) return clipSmartRegionMask(context, width, height, region.smartRegion);
   if (!region.points?.length) return false;
   const path = new Path2D();
   region.points.forEach((point) => {
-    const radius = clamp(point.radius * width, 4, width * 0.22);
-    path.moveTo(point.x * width + radius, point.y * height);
-    path.arc(point.x * width, point.y * height, radius, 0, Math.PI * 2);
+    const radiusX = clamp((point.radiusX ?? point.radius ?? 0.04) * width, 4, width * 0.22);
+    const radiusY = clamp((point.radiusY ?? point.radius ?? 0.04) * height, 4, height * 0.22);
+    path.moveTo(point.x * width + radiusX, point.y * height);
+    path.ellipse(point.x * width, point.y * height, radiusX, radiusY, 0, 0, Math.PI * 2);
   });
+  context.clip(path);
+  return true;
+}
+
+function clipSmartRegionMask(context, width, height, region) {
+  if (!region) return false;
+  const path = new Path2D();
+  if (region.shape === "rect") {
+    path.rect(region.x * width, region.y * height, region.w * width, region.h * height);
+    context.clip(path);
+    return true;
+  }
+  const cx = region.cx * width;
+  const cy = region.cy * height;
+  const rx = clamp(region.rx * width, 6, width);
+  const ry = clamp(region.ry * height, 6, height);
+  if (region.shape === "outside-ellipse") {
+    path.rect(0, 0, width, height);
+    path.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    context.clip(path, "evenodd");
+    return true;
+  }
+  path.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
   context.clip(path);
   return true;
 }
