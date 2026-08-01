@@ -31,6 +31,7 @@ import {
   setLights as sendLights,
   streamUrl
 } from "./deviceApi.js";
+import CameraStudio from "./CameraStudio.jsx";
 import { DEFAULT_PROTOTYPE_ID, PROTOTYPES, getPrototype } from "./prototypes.js";
 
 const DEFAULT_ADDRESS = "http://192.168.4.1";
@@ -180,6 +181,23 @@ const telemetrySeed = [
   ["Acrylic stack", "3 paired left/right square zones"],
   ["Hologram", "ESP32-C6 LCD over acrylic glass"]
 ];
+
+function isCameraStudioRoute() {
+  return new URLSearchParams(window.location.search).get("studio") === "camera";
+}
+
+function openCameraStudioWindow() {
+  const url = new URL(window.location.href);
+  url.searchParams.set("studio", "camera");
+  const studioWindow = window.open(
+    url.toString(),
+    "ir-filter-camera-studio",
+    "popup,width=1440,height=960"
+  );
+  if (!studioWindow) {
+    window.location.href = url.toString();
+  }
+}
 
 function loadSavedAddress() {
   try {
@@ -400,6 +418,10 @@ function groupOffPatch(groupKey) {
 }
 
 function App() {
+  if (isCameraStudioRoute()) {
+    return <CameraStudio />;
+  }
+
   const [address, setAddress] = useState(loadSavedAddress);
   const [hologramAddress, setHologramAddress] = useState(loadSavedHologramAddress);
   const [deviceBase, setDeviceBase] = useState("");
@@ -878,6 +900,10 @@ function App() {
             <strong>{connected ? "Connected" : "Offline"}</strong>
             <span>{deviceBase || connectionTarget || "No address"}</span>
           </div>
+          <button type="button" className="studio-launch-button" onClick={openCameraStudioWindow} title="Open secure camera studio">
+            <Camera size={17} />
+            Studio
+          </button>
           <button type="button" className="icon-button" onClick={disconnect} title="Disconnect">
             <Unplug size={18} />
           </button>
