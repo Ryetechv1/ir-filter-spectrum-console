@@ -1,6 +1,7 @@
 import {
   Camera,
   Download,
+  FlipHorizontal,
   KeyRound,
   LockKeyhole,
   RefreshCw,
@@ -24,6 +25,88 @@ const TRUSTED_ACCESS = [
   }
 ];
 
+const RGBW_MIXERS = [
+  { key: "main", label: "Main", defaults: { R: 64, G: 196, B: 255, W: 40 } },
+  { key: "secondary", label: "Secondary", defaults: { R: 255, G: 78, B: 180, W: 24 } },
+  { key: "third", label: "Third", defaults: { R: 132, G: 90, B: 255, W: 14 } },
+  { key: "highlights", label: "Highlights", defaults: { R: 255, G: 238, B: 180, W: 96 } }
+];
+
+const RGBW_CHANNELS = [
+  { key: "R", label: "Red", min: 0, max: 255, color: "#ff4d66" },
+  { key: "G", label: "Green", min: 0, max: 255, color: "#61df7d" },
+  { key: "B", label: "Blue", min: 0, max: 255, color: "#4cc7ff" },
+  { key: "W", label: "White", min: 0, max: 255, color: "#f5f8fb" }
+];
+
+const CORE_ADJUSTMENTS = [
+  ["brightness", "Brightness", 20, 220, "%"],
+  ["contrast", "Contrast", 20, 220, "%"],
+  ["exposure", "Exposure", -80, 80, ""],
+  ["saturation", "Saturation", 0, 260, "%"],
+  ["hue", "Hue", -180, 180, "deg"],
+  ["temperature", "Temperature", -80, 80, ""],
+  ["tint", "Tint", -80, 80, ""],
+  ["blur", "Blur", 0, 12, "px"],
+  ["vignette", "Vignette", 0, 90, "%"],
+  ["grain", "Grain", 0, 80, "%"],
+  ["duotone", "Duotone", 0, 100, "%"],
+  ["glow", "Glow", 0, 60, "px"]
+];
+
+const EXTRA_ADJUSTMENTS = [
+  ["gamma", "Gamma", -100, 100, "", 0],
+  ["shadows", "Shadows", -100, 100, "", 0],
+  ["highlights", "Highlights", -100, 100, "", 0],
+  ["whites", "Whites", -100, 100, "", 0],
+  ["blacks", "Blacks", -100, 100, "", 0],
+  ["clarity", "Clarity", -100, 100, "", 0],
+  ["dehaze", "Dehaze", -100, 100, "", 0],
+  ["fade", "Fade", 0, 100, "%", 0],
+  ["vibrance", "Vibrance", -100, 100, "", 0],
+  ["sharpen", "Sharpen", 0, 100, "%", 0],
+  ["pixelate", "Pixelate", 0, 100, "%", 0],
+  ["posterize", "Posterize", 0, 100, "%", 0],
+  ["solarize", "Solarize", 0, 100, "%", 0],
+  ["threshold", "Threshold", 0, 100, "%", 0],
+  ["noiseReduction", "Noise Reduction", 0, 100, "%", 0],
+  ["edgeEnhance", "Edge Enhance", 0, 100, "%", 0],
+  ["emboss", "Emboss", 0, 100, "%", 0],
+  ["bloom", "Bloom", 0, 100, "%", 0],
+  ["halo", "Halo", 0, 100, "%", 0],
+  ["lensFlare", "Lens Flare", 0, 100, "%", 0],
+  ["chromaticAberration", "Chromatic", 0, 100, "%", 0],
+  ["colorizeHue", "Colorize Hue", -180, 180, "deg", 0],
+  ["colorizeStrength", "Colorize Strength", 0, 100, "%", 0],
+  ["cyanBalance", "Cyan Balance", -100, 100, "", 0],
+  ["magentaBalance", "Magenta Balance", -100, 100, "", 0],
+  ["yellowBalance", "Yellow Balance", -100, 100, "", 0],
+  ["redChannel", "Red Channel", 0, 200, "%", 100],
+  ["greenChannel", "Green Channel", 0, 200, "%", 100],
+  ["blueChannel", "Blue Channel", 0, 200, "%", 100],
+  ["whiteBalance", "White Balance", -100, 100, "", 0],
+  ["midtoneLift", "Midtone Lift", -100, 100, "", 0],
+  ["shadowCrush", "Shadow Crush", 0, 100, "%", 0],
+  ["matte", "Matte", 0, 100, "%", 0],
+  ["glowRadius", "Glow Radius", 0, 80, "px", 0],
+  ["glowStrength", "Glow Strength", 0, 100, "%", 0],
+  ["softFocus", "Soft Focus", 0, 100, "%", 0],
+  ["tiltShift", "Tilt Shift", 0, 100, "%", 0],
+  ["radialBlur", "Radial Blur", 0, 100, "%", 0],
+  ["motionBlur", "Motion Blur", 0, 100, "%", 0],
+  ["filmGrainSize", "Film Grain Size", 0, 100, "%", 0],
+  ["scanlines", "Scanlines", 0, 100, "%", 0],
+  ["crtCurve", "CRT Curve", 0, 100, "%", 0],
+  ["halation", "Halation", 0, 100, "%", 0],
+  ["prismSplit", "Prism Split", 0, 100, "%", 0],
+  ["infraredWash", "Infrared Wash", 0, 100, "%", 0],
+  ["ultravioletWash", "Ultraviolet Wash", 0, 100, "%", 0],
+  ["thermalBlend", "Thermal Blend", 0, 100, "%", 0],
+  ["splitTone", "Split Tone", -100, 100, "", 0],
+  ["colorDodge", "Color Dodge", 0, 100, "%", 0],
+  ["overlayStrength", "Overlay Strength", 0, 100, "%", 28]
+];
+
 const DEFAULT_SETTINGS = {
   brightness: 100,
   contrast: 100,
@@ -39,7 +122,13 @@ const DEFAULT_SETTINGS = {
   glow: 0,
   sepia: 0,
   grayscale: 0,
-  invert: 0
+  invert: 0,
+  ...Object.fromEntries(EXTRA_ADJUSTMENTS.map(([key, , , , , initial = 0]) => [key, initial])),
+  ...Object.fromEntries(
+    RGBW_MIXERS.flatMap((group) =>
+      RGBW_CHANNELS.map((channel) => [`${group.key}${channel.key}`, group.defaults[channel.key]])
+    )
+  )
 };
 
 const EFFECT_FAMILIES = [
@@ -156,21 +245,6 @@ const CAMERA_EFFECTS = EFFECT_FAMILIES.flatMap((family, familyIndex) =>
 
 const CATEGORIES = ["All Presets", "Favorites", ...EFFECT_FAMILIES.map((family) => family.category)];
 
-const ADJUSTMENTS = [
-  ["brightness", "Brightness", 20, 220, "%"],
-  ["contrast", "Contrast", 20, 220, "%"],
-  ["exposure", "Exposure", -80, 80, ""],
-  ["saturation", "Saturation", 0, 260, "%"],
-  ["hue", "Hue", -180, 180, "deg"],
-  ["temperature", "Temperature", -80, 80, ""],
-  ["tint", "Tint", -80, 80, ""],
-  ["blur", "Blur", 0, 12, "px"],
-  ["vignette", "Vignette", 0, 90, "%"],
-  ["grain", "Grain", 0, 80, "%"],
-  ["duotone", "Duotone", 0, 100, "%"],
-  ["glow", "Glow", 0, 60, "px"]
-];
-
 function CameraStudio() {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -179,6 +253,7 @@ function CameraStudio() {
   const [authError, setAuthError] = useState("");
   const [cameraStatus, setCameraStatus] = useState("Enter the trusted access code. After unlock, use Start Camera to request browser permission.");
   const [cameraActive, setCameraActive] = useState(false);
+  const [cameraFacing, setCameraFacing] = useState("user");
   const [selectedCategory, setSelectedCategory] = useState("All Presets");
   const [search, setSearch] = useState("");
   const [selectedEffectId, setSelectedEffectId] = useState(CAMERA_EFFECTS[0].id);
@@ -204,6 +279,25 @@ function CameraStudio() {
 
   const filterCss = useMemo(() => buildFilterCss(manualSettings), [manualSettings]);
   const overlayStyle = useMemo(() => buildOverlayStyle(selectedEffect, manualSettings), [manualSettings, selectedEffect]);
+  const specialOverlayStyle = useMemo(() => buildSpecialOverlayStyle(manualSettings), [manualSettings]);
+  const videoStyle = useMemo(
+    () => ({
+      filter: filterCss,
+      imageRendering: manualSettings.pixelate > 48 ? "pixelated" : "auto"
+    }),
+    [filterCss, manualSettings.pixelate]
+  );
+
+  const attachCameraStream = useCallback(async (stream, nextFacing = cameraFacing) => {
+    streamRef.current = stream;
+    if (videoRef.current) {
+      videoRef.current.srcObject = stream;
+      await videoRef.current.play();
+    }
+    setCameraFacing(nextFacing);
+    setCameraActive(true);
+    setCameraStatus("Camera active. The video is local to this device and is not uploaded.");
+  }, [cameraFacing]);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -223,18 +317,30 @@ function CameraStudio() {
     setCameraStatus("Requesting camera permission...");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-      setCameraActive(true);
-      setCameraStatus("Camera active. The video is local to this device and is not uploaded.");
+      await attachCameraStream(stream, "user");
     } catch (error) {
       setCameraActive(false);
       setCameraStatus(`Camera permission failed: ${error.message || error}`);
     }
-  }, [stopCamera]);
+  }, [attachCameraStream, stopCamera]);
+
+  const flipCamera = useCallback(async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraStatus("Camera access is not supported in this browser.");
+      return;
+    }
+    const nextFacing = cameraFacing === "user" ? "environment" : "user";
+    stopCamera();
+    setCameraStatus(`Requesting ${nextFacing === "user" ? "front" : "rear"} camera...`);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: nextFacing } });
+      await attachCameraStream(stream, nextFacing);
+      setCameraStatus(`${nextFacing === "user" ? "Front" : "Rear"} camera active. Local-only stream.`);
+    } catch (error) {
+      setCameraActive(false);
+      setCameraStatus(`Camera flip failed: ${error.message || error}`);
+    }
+  }, [attachCameraStream, cameraFacing, stopCamera]);
 
   useEffect(() => () => stopCamera(), [stopCamera]);
 
@@ -370,8 +476,9 @@ function CameraStudio() {
 
         <section className="camera-preview-panel studio-panel">
           <div className="camera-frame">
-            <video ref={videoRef} autoPlay playsInline muted style={{ filter: filterCss }} />
+            <video ref={videoRef} className={cameraFacing === "user" ? "is-mirrored" : ""} autoPlay playsInline muted style={videoStyle} />
             <div className="studio-color-overlay" style={overlayStyle} />
+            <div className="studio-special-overlay" style={specialOverlayStyle} />
             <div className="studio-grain" style={{ opacity: manualSettings.grain / 160 }} />
             <div className="studio-vignette" style={{ opacity: manualSettings.vignette / 100 }} />
             {!cameraActive && (
@@ -385,7 +492,7 @@ function CameraStudio() {
             <div className="camera-live-badge">{cameraActive ? "Live" : "Locked"}</div>
             <div className="camera-meta-row">
               <span>{cameraActive ? "Local camera stream" : "No stream active"}</span>
-              <span>{window.location.host || "local device"}</span>
+              <span>{cameraFacing === "user" ? "Front camera" : "Rear camera"}</span>
               <span>{selectedEffect.name}</span>
             </div>
           </div>
@@ -398,6 +505,10 @@ function CameraStudio() {
             <button type="button" onClick={handleStopCamera} disabled={!cameraActive}>
               <X size={18} />
               Stop Camera
+            </button>
+            <button type="button" onClick={flipCamera} disabled={!cameraActive}>
+              <FlipHorizontal size={18} />
+              Flip Camera
             </button>
             <button type="button" className="studio-snapshot" onClick={captureSnapshot} disabled={!cameraActive}>
               <Download size={19} />
@@ -422,8 +533,63 @@ function CameraStudio() {
             <h2>Adjustments</h2>
             <button type="button" onClick={resetStudio}>Reset all</button>
           </div>
+          <div className="rgbw-mixer-board" aria-label="RGBW color mixers">
+            {RGBW_MIXERS.map((group) => (
+              <section className="rgbw-mixer" key={group.key}>
+                <div className="rgbw-mixer-header">
+                  <h3>{group.label}</h3>
+                  <span style={{ background: rgbwCss(manualSettings, group.key, 1) }} />
+                </div>
+                {RGBW_CHANNELS.map((channel) => {
+                  const settingKey = `${group.key}${channel.key}`;
+                  const value = manualSettings[settingKey] ?? 0;
+                  return (
+                    <label key={settingKey} className={`rgbw-slider channel-${channel.key.toLowerCase()}`}>
+                      <span>
+                        <strong>{channel.key}</strong>
+                        {channel.label}
+                        <output>{value}</output>
+                      </span>
+                      <input
+                        type="range"
+                        min={channel.min}
+                        max={channel.max}
+                        value={value}
+                        onChange={(event) => updateSetting(settingKey, event.target.value)}
+                        style={{
+                          "--value": `${(value / channel.max) * 100}%`,
+                          "--channel-color": channel.color
+                        }}
+                      />
+                    </label>
+                  );
+                })}
+              </section>
+            ))}
+          </div>
+          <div className="adjustment-group-label">Core photo controls</div>
           <div className="adjustment-list">
-            {ADJUSTMENTS.map(([key, label, min, max, unit]) => (
+            {CORE_ADJUSTMENTS.map(([key, label, min, max, unit]) => (
+              <label key={key} className="studio-adjustment">
+                <span>
+                  <SlidersHorizontal size={15} />
+                  {label}
+                  <output>{manualSettings[key]}{unit}</output>
+                </span>
+                <input
+                  type="range"
+                  min={min}
+                  max={max}
+                  value={manualSettings[key]}
+                  onChange={(event) => updateSetting(key, event.target.value)}
+                  style={{ "--value": `${((manualSettings[key] - min) / (max - min)) * 100}%` }}
+                />
+              </label>
+            ))}
+          </div>
+          <div className="adjustment-group-label">Advanced effect controls +50</div>
+          <div className="adjustment-list advanced-adjustment-list">
+            {EXTRA_ADJUSTMENTS.map(([key, label, min, max, unit]) => (
               <label key={key} className="studio-adjustment">
                 <span>
                   <SlidersHorizontal size={15} />
@@ -477,18 +643,32 @@ function CameraStudio() {
 }
 
 function buildFilterCss(settings) {
-  const brightness = clamp(settings.brightness + settings.exposure * 0.55, 5, 260);
-  const contrast = clamp(settings.contrast + Math.abs(settings.exposure) * 0.12, 5, 260);
+  const gammaLift = setting(settings, "gamma") * 0.2;
+  const shadowLift = setting(settings, "shadows") * 0.16;
+  const highlightLift = setting(settings, "highlights") * 0.18;
+  const clarityBoost = setting(settings, "clarity") * 0.18;
+  const dehazeBoost = setting(settings, "dehaze") * 0.2;
+  const vibranceBoost = setting(settings, "vibrance") * 0.28;
+  const channelAverage = (setting(settings, "redChannel", 100) + setting(settings, "greenChannel", 100) + setting(settings, "blueChannel", 100)) / 3 - 100;
+  const brightness = clamp(settings.brightness + settings.exposure * 0.55 + gammaLift + shadowLift + highlightLift * 0.38 + channelAverage * 0.12, 5, 280);
+  const contrast = clamp(settings.contrast + Math.abs(settings.exposure) * 0.12 + clarityBoost + dehazeBoost - setting(settings, "fade") * 0.28, 5, 280);
+  const saturation = clamp(settings.saturation + vibranceBoost + setting(settings, "colorizeStrength") * 0.35 - setting(settings, "matte") * 0.15, 0, 320);
+  const hue = clamp(settings.hue + setting(settings, "colorizeHue") * (setting(settings, "colorizeStrength") / 120), -360, 360);
+  const sepia = clamp(settings.sepia + setting(settings, "whiteBalance") * 0.12 + Math.max(0, setting(settings, "temperature")) * 0.12, 0, 100);
+  const grayscale = clamp(settings.grayscale + setting(settings, "threshold") * 0.2 - setting(settings, "vibrance") * 0.08, 0, 100);
+  const invert = clamp(settings.invert + setting(settings, "solarize") * 0.35, 0, 100);
+  const blur = clamp(settings.blur + setting(settings, "softFocus") * 0.04 + setting(settings, "radialBlur") * 0.02 + setting(settings, "motionBlur") * 0.018, 0, 18);
+  const glowRadius = clamp(settings.glow + setting(settings, "glowRadius") * 0.28 + setting(settings, "bloom") * 0.13 + setting(settings, "halation") * 0.18, 0, 90);
   return [
     `brightness(${brightness}%)`,
     `contrast(${contrast}%)`,
-    `saturate(${settings.saturation}%)`,
-    `hue-rotate(${settings.hue}deg)`,
-    `blur(${settings.blur}px)`,
-    `sepia(${settings.sepia}%)`,
-    `grayscale(${settings.grayscale}%)`,
-    `invert(${settings.invert}%)`,
-    settings.glow ? `drop-shadow(0 0 ${settings.glow}px rgba(63,208,255,0.34))` : ""
+    `saturate(${saturation}%)`,
+    `hue-rotate(${hue}deg)`,
+    `blur(${blur}px)`,
+    `sepia(${sepia}%)`,
+    `grayscale(${grayscale}%)`,
+    `invert(${invert}%)`,
+    glowRadius ? `drop-shadow(0 0 ${glowRadius}px ${rgbwCss(settings, "highlights", 0.34)})` : ""
   ]
     .filter(Boolean)
     .join(" ");
@@ -497,10 +677,50 @@ function buildFilterCss(settings) {
 function buildOverlayStyle(effect, settings) {
   const warm = settings.temperature > 0 ? `rgba(255,132,48,${settings.temperature / 260})` : `rgba(51,143,255,${Math.abs(settings.temperature) / 280})`;
   const tint = settings.tint > 0 ? `rgba(255,69,190,${settings.tint / 280})` : `rgba(67,255,122,${Math.abs(settings.tint) / 300})`;
+  const main = rgbwCss(settings, "main", clamp(0.08 + setting(settings, "overlayStrength") / 180, 0.04, 0.72));
+  const secondary = rgbwCss(settings, "secondary", clamp(0.04 + setting(settings, "duotone") / 180, 0, 0.66));
+  const third = rgbwCss(settings, "third", clamp(0.04 + setting(settings, "splitTone") / 280, 0, 0.52));
   return {
-    background: `linear-gradient(120deg, ${effect.overlayColor}, ${warm}), linear-gradient(300deg, ${tint}, transparent 62%)`,
+    background: `linear-gradient(120deg, ${effect.overlayColor}, ${warm}, ${main}), linear-gradient(300deg, ${tint}, ${secondary}, transparent 62%), radial-gradient(circle at 50% 12%, ${third}, transparent 46%)`,
     mixBlendMode: effect.blendMode,
-    opacity: clamp(0.1 + settings.duotone / 150, 0, 0.92)
+    opacity: clamp(0.1 + settings.duotone / 150 + setting(settings, "overlayStrength") / 240, 0, 0.94)
+  };
+}
+
+function buildSpecialOverlayStyle(settings) {
+  const main = rgbwCss(settings, "main", clamp(setting(settings, "overlayStrength") / 100, 0, 0.9));
+  const secondary = rgbwCss(settings, "secondary", clamp(setting(settings, "colorDodge") / 120, 0, 0.82));
+  const third = rgbwCss(settings, "third", clamp(setting(settings, "prismSplit") / 150, 0, 0.72));
+  const highlights = rgbwCss(settings, "highlights", clamp((setting(settings, "bloom") + setting(settings, "halation") + setting(settings, "lensFlare")) / 260, 0, 0.88));
+  const infrared = `rgba(255, 48, 44, ${clamp(setting(settings, "infraredWash") / 150, 0, 0.68)})`;
+  const ultraviolet = `rgba(144, 82, 255, ${clamp(setting(settings, "ultravioletWash") / 145, 0, 0.72)})`;
+  const thermal = `rgba(255, 188, 30, ${clamp(setting(settings, "thermalBlend") / 140, 0, 0.7)})`;
+  const scanlineAlpha = clamp(setting(settings, "scanlines") / 160, 0, 0.62);
+  const grainAlpha = clamp(setting(settings, "filmGrainSize") / 180, 0, 0.56);
+  const split = clamp(setting(settings, "chromaticAberration") + setting(settings, "prismSplit"), 0, 200);
+  return {
+    backgroundImage: `
+      radial-gradient(circle at 18% 18%, ${highlights}, transparent ${clamp(28 + setting(settings, "bloom") * 0.22, 28, 54)}%),
+      radial-gradient(circle at 84% 14%, rgba(255,255,255,${clamp(setting(settings, "lensFlare") / 110, 0, 0.66)}), transparent 24%),
+      linear-gradient(${88 + setting(settings, "colorizeHue") * 0.2}deg, ${main}, ${secondary}, ${third}, transparent 72%),
+      linear-gradient(90deg, ${infrared}, transparent 38%, ${ultraviolet}, transparent 70%, ${thermal}),
+      repeating-linear-gradient(0deg, rgba(255,255,255,${scanlineAlpha}) 0 1px, transparent 1px ${clamp(8 - setting(settings, "scanlines") / 20, 3, 8)}px),
+      radial-gradient(circle at 50% 50%, transparent ${clamp(34 - setting(settings, "tiltShift") * 0.12, 18, 34)}%, rgba(0,0,0,${clamp(setting(settings, "shadowCrush") / 150, 0, 0.68)}) 100%),
+      repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,${grainAlpha}) 0 1px, transparent 1px 5px)
+    `,
+    mixBlendMode: setting(settings, "colorDodge") > 24 ? "color-dodge" : setting(settings, "matte") > 24 ? "soft-light" : "screen",
+    opacity: clamp(
+      0.06 +
+        setting(settings, "overlayStrength") / 160 +
+        setting(settings, "bloom") / 240 +
+        setting(settings, "infraredWash") / 320 +
+        setting(settings, "ultravioletWash") / 320 +
+        setting(settings, "thermalBlend") / 320,
+      0,
+      0.94
+    ),
+    transform: `translateX(${(setting(settings, "redChannel", 100) - setting(settings, "blueChannel", 100)) * 0.018 + split * 0.018}px) scale(${1 + setting(settings, "crtCurve") * 0.0009})`,
+    filter: `blur(${clamp(setting(settings, "halo") * 0.03 + setting(settings, "softFocus") * 0.02, 0, 5)}px) contrast(${clamp(100 + setting(settings, "edgeEnhance") * 0.4 + setting(settings, "emboss") * 0.2, 100, 180)}%)`
   };
 }
 
@@ -515,6 +735,22 @@ function paintOverlay(context, width, height, effect, settings) {
     context.fillStyle = settings.temperature > 0 ? "rgb(255,128,42)" : "rgb(54,138,255)";
     context.fillRect(0, 0, width, height);
   }
+  context.globalCompositeOperation = "screen";
+  context.globalAlpha = clamp(setting(settings, "overlayStrength") / 170, 0.03, 0.62);
+  const linear = context.createLinearGradient(0, 0, width, height);
+  linear.addColorStop(0, rgbwCss(settings, "main", 1));
+  linear.addColorStop(0.5, rgbwCss(settings, "secondary", 1));
+  linear.addColorStop(1, rgbwCss(settings, "third", 1));
+  context.fillStyle = linear;
+  context.fillRect(0, 0, width, height);
+  if (setting(settings, "bloom") || setting(settings, "halation") || setting(settings, "lensFlare")) {
+    context.globalAlpha = clamp((setting(settings, "bloom") + setting(settings, "halation") + setting(settings, "lensFlare")) / 260, 0, 0.78);
+    const flare = context.createRadialGradient(width * 0.5, height * 0.14, 0, width * 0.5, height * 0.14, width * 0.58);
+    flare.addColorStop(0, rgbwCss(settings, "highlights", 1));
+    flare.addColorStop(1, "rgba(255,255,255,0)");
+    context.fillStyle = flare;
+    context.fillRect(0, 0, width, height);
+  }
   if (settings.vignette > 0) {
     context.globalCompositeOperation = "multiply";
     const gradient = context.createRadialGradient(width / 2, height / 2, width * 0.12, width / 2, height / 2, width * 0.72);
@@ -525,6 +761,24 @@ function paintOverlay(context, width, height, effect, settings) {
     context.fillRect(0, 0, width, height);
   }
   context.restore();
+}
+
+function setting(settings, key, fallback = 0) {
+  return Number(settings?.[key] ?? fallback) || 0;
+}
+
+function rgbwComponents(settings, groupKey) {
+  const white = clamp(setting(settings, `${groupKey}W`), 0, 255);
+  return {
+    r: clamp(setting(settings, `${groupKey}R`) + white, 0, 255),
+    g: clamp(setting(settings, `${groupKey}G`) + white, 0, 255),
+    b: clamp(setting(settings, `${groupKey}B`) + white, 0, 255)
+  };
+}
+
+function rgbwCss(settings, groupKey, alpha = 1) {
+  const { r, g, b } = rgbwComponents(settings, groupKey);
+  return `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${clamp(alpha, 0, 1)})`;
 }
 
 function canvasCompositeMode(mode) {
