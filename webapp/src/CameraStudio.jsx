@@ -116,7 +116,7 @@ const MP4_MIME_TYPES = [
   "video/mp4"
 ];
 const PREVIEW_CANVAS_SCALE_CAP = 1.25;
-const THERMAL_EFFECT_PIXEL_BUDGET = 112_000;
+const THERMAL_EFFECT_PIXEL_BUDGET = 180_000;
 let thermalWorkCanvas;
 let mediaLayerWorkCanvas;
 const TRUSTED_ACCESS = [
@@ -757,6 +757,173 @@ const CAMERA_EFFECTS = EFFECT_FAMILIES.flatMap((family, familyIndex) =>
 
 const CATEGORIES = ["All Presets", "Favorites", ...EFFECT_FAMILIES.map((family) => family.category)];
 
+const EQUATION_DEFAULT_VALUE = "SP3CTR4L-37";
+const EQUATION_THERMAL_PALETTES = [
+  "rainbow",
+  "predator",
+  "blue-core",
+  "ironbow",
+  "lava-rainbow",
+  "deep-ocean",
+  "toxic-heat",
+  "dark-rainbow",
+  "blue-flame",
+  "object-heat-isolate",
+  "radar-heat",
+  "cobalt-hot"
+];
+const EQUATION_MUTATION_KEYS = [
+  "brightness",
+  "contrast",
+  "exposure",
+  "saturation",
+  "hue",
+  "temperature",
+  "tint",
+  "glow",
+  "thermalBlend",
+  "thermalContour",
+  "heatEdge",
+  "edgeEnhance",
+  "clarity",
+  "dehaze",
+  "vibrance",
+  "localContrast",
+  "highlightRecovery",
+  "shadowDepth",
+  "colorSeparation",
+  "chromaticGlow",
+  "nearIrBoost",
+  "ultravioletWash",
+  "infraredWash",
+  "classicInvert",
+  "spectralInvert",
+  "thermalInvert"
+];
+
+function createEquationModel(value, baseEffect = CAMERA_EFFECTS[0], baseSettings = DEFAULT_SETTINGS) {
+  const X = String(value || "").trim() || EQUATION_DEFAULT_VALUE;
+  const seed = seededHash(`${X}|${baseEffect.id || "effect"}|spectral-equation`);
+  const rand = seededRandom(seed);
+  const palette = EQUATION_THERMAL_PALETTES[Math.floor(rand() * EQUATION_THERMAL_PALETTES.length)] || "classic";
+  const blendMode = MEDIA_BLEND_MODES[Math.floor(rand() * MEDIA_BLEND_MODES.length)]?.[0] || "screen";
+  const primary = [randomInt(rand, 38, 255), randomInt(rand, 42, 255), randomInt(rand, 46, 255)];
+  const secondary = [randomInt(rand, 0, 255), randomInt(rand, 0, 255), randomInt(rand, 0, 255)];
+  const targetSettings = {
+    brightness: randomInt(rand, 88, 138),
+    contrast: randomInt(rand, 146, 220),
+    exposure: randomInt(rand, -34, 34),
+    saturation: randomInt(rand, 185, 300),
+    hue: randomInt(rand, -120, 120),
+    temperature: randomInt(rand, -48, 48),
+    tint: randomInt(rand, -48, 48),
+    glow: randomInt(rand, 2, 22),
+    thermalPalette: palette,
+    thermalBlend: randomInt(rand, 78, 100),
+    thermalContour: randomInt(rand, 62, 100),
+    heatEdge: randomInt(rand, 54, 100),
+    edgeEnhance: randomInt(rand, 18, 72),
+    clarity: randomInt(rand, 8, 56),
+    dehaze: randomInt(rand, 4, 48),
+    vibrance: randomInt(rand, 18, 76),
+    localContrast: randomInt(rand, 10, 64),
+    highlightRecovery: randomInt(rand, 4, 44),
+    shadowDepth: randomInt(rand, 8, 64),
+    colorSeparation: randomInt(rand, 8, 64),
+    chromaticGlow: randomInt(rand, 0, 26),
+    nearIrBoost: randomInt(rand, 0, 42),
+    ultravioletWash: randomInt(rand, 0, 38),
+    infraredWash: randomInt(rand, 0, 42),
+    classicInvert: randomInt(rand, 0, 28),
+    spectralInvert: randomInt(rand, 0, 42),
+    thermalInvert: randomInt(rand, 0, 38)
+  };
+  RGBW_MIXERS.forEach((group, groupIndex) => {
+    RGBW_CHANNELS.forEach((channel, channelIndex) => {
+      const key = `${group.key}${channel.key}`;
+      const baseChannel = groupIndex === 0 ? primary[channelIndex] : secondary[(channelIndex + groupIndex) % 3] || randomInt(rand, 20, 255);
+      targetSettings[key] = channel.key === "W" ? randomInt(rand, 12, 148) : clamp(baseChannel + randomInt(rand, -36, 36), 0, 255);
+    });
+  });
+
+  const W = Math.abs(seed >>> 0);
+  const outputNumber = Math.round(
+    (W % 100000) * 0.37 +
+      setting(baseSettings, "contrast", 100) * 11 +
+      setting(baseSettings, "thermalBlend") * 19 +
+      targetSettings.thermalContour * 23
+  );
+  const effectName = `Equation Z-${String(outputNumber).slice(-5)}`;
+  const overlayColor = `rgba(${primary[0]}, ${primary[1]}, ${primary[2]}, 0.36)`;
+  return {
+    A: `pipeline:${X}`,
+    B: `hash:${W.toString(16).toUpperCase()} palette:${palette}`,
+    C: `${EQUATION_MUTATION_KEYS.length} controls + RGBW matrix`,
+    W: String(W),
+    X,
+    Y: String(outputNumber),
+    Z: `${effectName} / ${palette}`,
+    settings: targetSettings,
+    effect: {
+      id: "equation-generated-filter",
+      name: effectName,
+      category: "Algorithmic Equation",
+      overlayColor,
+      blendMode,
+      favorite: false,
+      settings: { ...DEFAULT_SETTINGS, ...targetSettings }
+    },
+    summary: `Z returns a layered ${palette} pseudo-thermal render from ${baseEffect.name}, mixed with ${blendMode} overlay math and the current slider stack.`
+  };
+}
+
+function applyEquationSettings(baseSettings = DEFAULT_SETTINGS, equationModel) {
+  if (!equationModel?.settings) return baseSettings;
+  const next = { ...baseSettings, thermalPalette: equationModel.settings.thermalPalette };
+  Object.entries(equationModel.settings).forEach(([key, target]) => {
+    if (key === "thermalPalette") return;
+    const base = Number(baseSettings[key] ?? DEFAULT_SETTINGS[key] ?? 0);
+    const range = settingRange(key);
+    const blend = STACKED_SETTING_KEYS.has(key) ? 0.72 : 0.68;
+    next[key] = Math.round(clamp(base * (1 - blend) + Number(target) * blend, range.min, range.max));
+  });
+  return next;
+}
+
+function settingRange(key) {
+  const control = ADJUSTMENT_LOOKUP.get(key);
+  if (control) return { min: Number(control[2]), max: Number(control[3]) };
+  if (RGBW_MIXERS.some((group) => RGBW_CHANNELS.some((channel) => `${group.key}${channel.key}` === key))) {
+    return { min: 0, max: 255 };
+  }
+  return { min: 0, max: 100 };
+}
+
+function seededHash(value) {
+  let hash = 2166136261;
+  const text = String(value || "");
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function seededRandom(seed) {
+  let value = seed >>> 0;
+  return () => {
+    value += 0x6d2b79f5;
+    let mixed = value;
+    mixed = Math.imul(mixed ^ (mixed >>> 15), mixed | 1);
+    mixed ^= mixed + Math.imul(mixed ^ (mixed >>> 7), mixed | 61);
+    return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function randomInt(rand, min, max) {
+  return Math.round(min + rand() * (max - min));
+}
+
 function CameraStudio() {
   const videoRef = useRef(null);
   const hudVideoRef = useRef(null);
@@ -773,6 +940,8 @@ function CameraStudio() {
   const recordingCanvasRef = useRef(null);
   const recordingFrameRef = useRef(0);
   const previewFrameRef = useRef(0);
+  const pausedFrameCanvasRef = useRef(null);
+  const cameraFeedPausedRef = useRef(false);
   const recordingTimerRef = useRef(null);
   const recordingStartedAtRef = useRef(0);
   const captureShelfRef = useRef([]);
@@ -788,6 +957,7 @@ function CameraStudio() {
   const [authError, setAuthError] = useState("");
   const [cameraStatus, setCameraStatus] = useState("Enter the trusted access code. After unlock, use Start Camera to request browser permission.");
   const [cameraActive, setCameraActive] = useState(false);
+  const [cameraFeedPaused, setCameraFeedPaused] = useState(false);
   const [cameraFacing, setCameraFacing] = useState("user");
   const [recording, setRecording] = useState(false);
   const [recordingResolution, setRecordingResolution] = useState("1080p");
@@ -810,6 +980,9 @@ function CameraStudio() {
   const [selectedMediaLayerId, setSelectedMediaLayerId] = useState("");
   const [mediaComposerStatus, setMediaComposerStatus] = useState("Upload 1-3 local images or videos to build a separate composited edit.");
   const [mediaSnapshotUrl, setMediaSnapshotUrl] = useState("");
+  const [equationValue, setEquationValue] = useState(EQUATION_DEFAULT_VALUE);
+  const [equationLiveEnabled, setEquationLiveEnabled] = useState(false);
+  const [equationMediaEnabled, setEquationMediaEnabled] = useState(false);
 
   const selectedEffect = useMemo(
     () => CAMERA_EFFECTS.find((effect) => effect.id === selectedEffectId) || CAMERA_EFFECTS[0],
@@ -838,15 +1011,34 @@ function CameraStudio() {
     [selectedYoutubeVideoId]
   );
 
-  const filterCss = useMemo(() => buildFilterCss(manualSettings), [manualSettings]);
+  const equationModel = useMemo(
+    () => createEquationModel(equationValue, selectedEffect, manualSettings),
+    [equationValue, manualSettings, selectedEffect]
+  );
+  const liveManualSettings = useMemo(
+    () => (equationLiveEnabled ? applyEquationSettings(manualSettings, equationModel) : manualSettings),
+    [equationLiveEnabled, equationModel, manualSettings]
+  );
+  const mediaManualSettings = useMemo(
+    () => (equationMediaEnabled ? applyEquationSettings(manualSettings, equationModel) : manualSettings),
+    [equationMediaEnabled, equationModel, manualSettings]
+  );
+  const liveSelectedEffect = equationLiveEnabled ? equationModel.effect : selectedEffect;
+  const mediaSelectedEffect = equationMediaEnabled ? equationModel.effect : selectedEffect;
+  const filterCss = useMemo(() => buildFilterCss(liveManualSettings), [liveManualSettings]);
+  const mediaFilterCss = useMemo(() => buildFilterCss(mediaManualSettings), [mediaManualSettings]);
   const selectedMediaLayer = useMemo(
     () => mediaLayers.find((layer) => layer.id === selectedMediaLayerId) || mediaLayers[0] || null,
     [mediaLayers, selectedMediaLayerId]
   );
 
   useEffect(() => {
-    renderStateRef.current = { filterCss, selectedEffect, manualSettings, cameraFacing };
-  }, [cameraFacing, filterCss, manualSettings, selectedEffect]);
+    renderStateRef.current = { filterCss, selectedEffect: liveSelectedEffect, manualSettings: liveManualSettings, cameraFacing };
+  }, [cameraFacing, filterCss, liveManualSettings, liveSelectedEffect]);
+
+  useEffect(() => {
+    cameraFeedPausedRef.current = cameraFeedPaused;
+  }, [cameraFeedPaused]);
 
   useEffect(() => {
     mediaLayersRef.current = mediaLayers;
@@ -862,16 +1054,18 @@ function CameraStudio() {
     const drawPreview = (timestamp) => {
       const video = videoRef.current;
       const renderState = renderStateRef.current;
-      if (video?.readyState >= 2) {
+      const source = cameraFeedPausedRef.current && pausedFrameCanvasRef.current ? pausedFrameCanvasRef.current : video;
+      if (isDrawableMediaSource(source)) {
         if (!lastDraw || timestamp - lastDraw > 58) {
-          drawCameraOutputCanvas(previewCanvasRef.current, cameraFrameRef.current, video, renderState, {
+          const cameraLabel = cameraFeedPausedRef.current ? "Paused still frame" : "Local camera stream";
+          drawCameraOutputCanvas(previewCanvasRef.current, cameraFrameRef.current, source, renderState, {
             includePreviewChrome: true,
-            metaLabels: ["Local camera stream", renderState.cameraFacing === "user" ? "Front camera" : "Rear camera", renderState.selectedEffect.name]
+            metaLabels: [cameraLabel, renderState.cameraFacing === "user" ? "Front camera" : "Rear camera", renderState.selectedEffect.name]
           });
           if (cameraHudVisible) {
-            drawCameraOutputCanvas(hudCanvasRef.current, null, video, renderState, {
+            drawCameraOutputCanvas(hudCanvasRef.current, null, source, renderState, {
               includePreviewChrome: true,
-              metaLabels: ["Local camera stream", renderState.cameraFacing === "user" ? "Front camera" : "Rear camera", renderState.selectedEffect.name]
+              metaLabels: [cameraLabel, renderState.cameraFacing === "user" ? "Front camera" : "Rear camera", renderState.selectedEffect.name]
             });
           }
           lastDraw = timestamp;
@@ -898,10 +1092,10 @@ function CameraStudio() {
       const hasVideo = mediaLayers.some((layer) => layer.kind === "video");
       if (!lastDraw || hasVideo || timestamp - lastDraw > 120) {
         drawUploadedMediaComposite(mediaCanvasRef.current, mediaFrameRef.current, mediaLayers, {
-          filterCss,
-          selectedEffect,
+          filterCss: mediaFilterCss,
+          selectedEffect: mediaSelectedEffect,
           selectedEffectId,
-          manualSettings
+          manualSettings: mediaManualSettings
         });
         lastDraw = timestamp;
       }
@@ -914,7 +1108,7 @@ function CameraStudio() {
         mediaCompositeFrameRef.current = 0;
       }
     };
-  }, [filterCss, manualSettings, mediaLayers, selectedEffect, selectedEffectId]);
+  }, [mediaFilterCss, mediaManualSettings, mediaLayers, mediaSelectedEffect, selectedEffectId]);
 
   useEffect(() => {
     const frame = cameraFrameRef.current;
@@ -1007,8 +1201,11 @@ function CameraStudio() {
     }
     if (videoRef.current) videoRef.current.srcObject = null;
     if (hudVideoRef.current) hudVideoRef.current.srcObject = null;
+    pausedFrameCanvasRef.current = null;
+    cameraFeedPausedRef.current = false;
     setTorchActive(false);
     setTorchSupported(false);
+    setCameraFeedPaused(false);
     setCameraActive(false);
   }, []);
 
@@ -1077,6 +1274,47 @@ function CameraStudio() {
       setCameraStatus(`Flashlight toggle failed: ${error.message || error}`);
     }
   }, [attachCameraStream, cameraFacing, stopCamera, torchActive]);
+
+  function currentCameraRenderSource() {
+    return cameraFeedPausedRef.current && pausedFrameCanvasRef.current ? pausedFrameCanvasRef.current : videoRef.current;
+  }
+
+  function capturePausedCameraFrame(video) {
+    if (!video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) return null;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext("2d", { alpha: false });
+    if (!context) return null;
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    return canvas;
+  }
+
+  function toggleCameraFeedPause() {
+    if (!cameraActive || !videoRef.current) {
+      setCameraStatus("Start the camera before pausing the feed.");
+      return;
+    }
+    if (cameraFeedPausedRef.current) {
+      pausedFrameCanvasRef.current = null;
+      cameraFeedPausedRef.current = false;
+      setCameraFeedPaused(false);
+      videoRef.current.play().catch(() => undefined);
+      const hudPlay = hudVideoRef.current?.play?.();
+      if (hudPlay?.catch) hudPlay.catch(() => undefined);
+      setCameraStatus("Live camera feed resumed. Current filters remain active.");
+      return;
+    }
+    const frozenFrame = capturePausedCameraFrame(videoRef.current);
+    if (!frozenFrame) {
+      setCameraStatus("Pause failed because the camera frame is not ready yet.");
+      return;
+    }
+    pausedFrameCanvasRef.current = frozenFrame;
+    cameraFeedPausedRef.current = true;
+    setCameraFeedPaused(true);
+    setCameraStatus("Camera frame paused. Adjust filters, equation mode, or export while viewing the still frame.");
+  }
 
   const stopRecording = useCallback((message = "Recording stopped.") => {
     if (recordingTimerRef.current) {
@@ -1166,9 +1404,9 @@ function CameraStudio() {
     };
 
     const drawFrame = () => {
-      const video = videoRef.current;
+      const source = currentCameraRenderSource();
       const renderState = renderStateRef.current;
-      drawStudioFrame(context, resolution.width, resolution.height, video, renderState);
+      if (isDrawableMediaSource(source)) drawStudioFrame(context, resolution.width, resolution.height, source, renderState);
       recordingFrameRef.current = window.requestAnimationFrame(drawFrame);
     };
     drawFrame();
@@ -1246,6 +1484,21 @@ function CameraStudio() {
     setSelectedEffectId(CAMERA_EFFECTS[0].id);
     setManualSettings(CAMERA_EFFECTS[0].settings);
     setSnapshotUrl("");
+    setEquationLiveEnabled(false);
+    setEquationMediaEnabled(false);
+  }
+
+  function randomizeEquationValue() {
+    const bytes = new Uint32Array(2);
+    if (window.crypto?.getRandomValues) {
+      window.crypto.getRandomValues(bytes);
+    } else {
+      bytes[0] = Date.now();
+      bytes[1] = Math.floor(Math.random() * 0xffffffff);
+    }
+    const nextValue = `A-${bytes[0].toString(36).toUpperCase()}-${bytes[1].toString(36).toUpperCase()}`;
+    setEquationValue(nextValue);
+    setCameraStatus("Generated a new deterministic A to Z equation filter value.");
   }
 
   async function handleMediaUpload(event) {
@@ -1339,10 +1592,10 @@ function CameraStudio() {
     }
     const canvas = mediaCanvasRef.current;
     drawUploadedMediaComposite(canvas, mediaFrameRef.current, mediaLayers, {
-      filterCss,
-      selectedEffect,
+      filterCss: mediaFilterCss,
+      selectedEffect: mediaSelectedEffect,
       selectedEffectId,
-      manualSettings
+      manualSettings: mediaManualSettings
     });
     if (!canvas?.width || !canvas?.height) {
       setMediaComposerStatus("Composite export failed because the canvas is not ready yet.");
@@ -1380,12 +1633,13 @@ function CameraStudio() {
   }
 
   async function captureSnapshot() {
-    const video = videoRef.current;
-    if (!video || !cameraActive) {
+    const source = currentCameraRenderSource();
+    if (!source || !cameraActive) {
       setCameraStatus("Start the camera before taking a snapshot.");
       return;
     }
-    const size = getRenderedCameraFrameSize(cameraFrameRef.current || previewCanvasRef.current, video.videoWidth || 1280, video.videoHeight || 720, {
+    const sourceSize = mediaSourceSize(source, 1280, 720);
+    const size = getRenderedCameraFrameSize(cameraFrameRef.current || previewCanvasRef.current, sourceSize.width, sourceSize.height, {
       scaleCap: PREVIEW_CANVAS_SCALE_CAP
     });
     const canvas = document.createElement("canvas");
@@ -1396,7 +1650,7 @@ function CameraStudio() {
       setCameraStatus("Snapshot failed because this browser could not create an export canvas.");
       return;
     }
-    drawStudioFrame(context, size.width, size.height, video, { filterCss, selectedEffect, manualSettings, cameraFacing }, {
+    drawStudioFrame(context, size.width, size.height, source, { filterCss, selectedEffect: liveSelectedEffect, manualSettings: liveManualSettings, cameraFacing }, {
       forcePixelFilters: true,
       pixelScale: size.scale,
       cssWidth: size.cssWidth,
@@ -1496,6 +1750,76 @@ function CameraStudio() {
           </section>
         ))}
       </div>
+    );
+  }
+
+  function renderEquationEnginePanel() {
+    const rows = [
+      ["A", "Value pipeline", equationModel.A],
+      ["B", "Fetch data", equationModel.B],
+      ["C", "Return data", equationModel.C],
+      ["W", "Base value", equationModel.W],
+      ["X", "New input", equationModel.X],
+      ["Y", "Output value", equationModel.Y],
+      ["Z", "Result", equationModel.Z]
+    ];
+    return (
+      <section className="equation-engine-panel" aria-labelledby="equationEngineTitle">
+        <div className="equation-engine-header">
+          <div>
+            <h2 id="equationEngineTitle">A→Z Equation Filter Engine</h2>
+            <p>Enter any value to generate a repeatable algorithmic filter stack from the active studio controls.</p>
+          </div>
+          <span>{equationModel.effect.name}</span>
+        </div>
+
+        <div className="equation-engine-controls">
+          <label>
+            X input value
+            <input
+              value={equationValue}
+              onChange={(event) => setEquationValue(event.target.value)}
+              placeholder={EQUATION_DEFAULT_VALUE}
+            />
+          </label>
+          <button type="button" onClick={randomizeEquationValue}>
+            <RefreshCw size={16} />
+            Generate Value
+          </button>
+        </div>
+
+        <div className="equation-toggle-row" aria-label="Equation engine toggles">
+          <button
+            type="button"
+            className={equationLiveEnabled ? "equation-toggle active" : "equation-toggle"}
+            aria-pressed={equationLiveEnabled}
+            onClick={() => setEquationLiveEnabled((enabled) => !enabled)}
+          >
+            <Sparkles size={16} />
+            Live Camera {equationLiveEnabled ? "On" : "Off"}
+          </button>
+          <button
+            type="button"
+            className={equationMediaEnabled ? "equation-toggle active" : "equation-toggle"}
+            aria-pressed={equationMediaEnabled}
+            onClick={() => setEquationMediaEnabled((enabled) => !enabled)}
+          >
+            <Layers size={16} />
+            1-3 Media Layers {equationMediaEnabled ? "On" : "Off"}
+          </button>
+        </div>
+
+        <div className="equation-pipeline-grid" aria-label="Equation pipeline values">
+          {rows.map(([letter, label, value]) => (
+            <div className="equation-pipeline-cell" key={letter}>
+              <strong>{letter}</strong>
+              <span>{label}</span>
+              <em>{value}</em>
+            </div>
+          ))}
+        </div>
+        <p>{equationModel.summary}</p>
+      </section>
     );
   }
 
@@ -1765,7 +2089,7 @@ function CameraStudio() {
                 <div className="camera-meta-row">
                   <span>No stream active</span>
                   <span>{cameraFacing === "user" ? "Front camera" : "Rear camera"}</span>
-                  <span>{selectedEffect.name}</span>
+                  <span>{liveSelectedEffect.name}</span>
                 </div>
               </>
             )}
@@ -1779,6 +2103,15 @@ function CameraStudio() {
             <button type="button" onClick={handleStopCamera} disabled={!cameraActive}>
               <X size={18} />
               Stop Camera
+            </button>
+            <button
+              type="button"
+              className={cameraFeedPaused ? "studio-pause-button active" : "studio-pause-button"}
+              onClick={toggleCameraFeedPause}
+              disabled={!cameraActive}
+            >
+              {cameraFeedPaused ? <Play size={18} /> : <Pause size={18} />}
+              {cameraFeedPaused ? "Resume Feed" : "Pause Feed"}
             </button>
             <button type="button" onClick={flipCamera} disabled={!cameraActive}>
               <FlipHorizontal size={18} />
@@ -1797,6 +2130,8 @@ function CameraStudio() {
               Reset
             </button>
           </div>
+
+          {renderEquationEnginePanel()}
 
           <section className="recording-panel" aria-labelledby="recordingPanelTitle">
             <div className="recording-panel-heading">
@@ -2151,7 +2486,7 @@ function CameraStudio() {
             <canvas ref={hudCanvasRef} className="camera-output-canvas" aria-hidden="true" />
             <div className="camera-floating-hud-label">
               <span>{cameraFacing === "user" ? "Front" : "Rear"}</span>
-              <strong>{selectedEffect.name}</strong>
+              <strong>{liveSelectedEffect.name}</strong>
             </div>
           </div>
         </button>
@@ -2292,7 +2627,7 @@ function drawMediaLayer(context, width, height, layer, renderState) {
 }
 
 function mediaLayerSettings(effect, manualSettings) {
-  const globalKeys = [
+  const globalKeys = Array.from(new Set([
     "brightness",
     "contrast",
     "exposure",
@@ -2307,8 +2642,10 @@ function mediaLayerSettings(effect, manualSettings) {
     "glow",
     "sepia",
     "grayscale",
-    "invert"
-  ];
+    "invert",
+    "thermalPalette",
+    ...EQUATION_MUTATION_KEYS
+  ]));
   return {
     ...DEFAULT_SETTINGS,
     ...effect.settings,
@@ -2347,6 +2684,7 @@ function isDrawableMediaSource(source) {
   if (!source) return false;
   if (typeof HTMLVideoElement !== "undefined" && source instanceof HTMLVideoElement) return source.readyState >= 2 && source.videoWidth > 0 && source.videoHeight > 0;
   if (typeof HTMLImageElement !== "undefined" && source instanceof HTMLImageElement) return source.complete && source.naturalWidth > 0 && source.naturalHeight > 0;
+  if (typeof HTMLCanvasElement !== "undefined" && source instanceof HTMLCanvasElement) return source.width > 0 && source.height > 0;
   return false;
 }
 
@@ -2363,13 +2701,20 @@ function mediaSourceSize(source, fallbackWidth, fallbackHeight) {
       height: source.naturalHeight || fallbackHeight
     };
   }
+  if (typeof HTMLCanvasElement !== "undefined" && source instanceof HTMLCanvasElement) {
+    return {
+      width: source.width || fallbackWidth,
+      height: source.height || fallbackHeight
+    };
+  }
   return { width: fallbackWidth, height: fallbackHeight };
 }
 
-function drawCameraOutputCanvas(canvas, frameElement, video, renderState, options = {}) {
-  if (!canvas || !video) return false;
-  const fallbackWidth = video.videoWidth || 1280;
-  const fallbackHeight = video.videoHeight || 720;
+function drawCameraOutputCanvas(canvas, frameElement, source, renderState, options = {}) {
+  if (!canvas || !source) return false;
+  const sourceSize = mediaSourceSize(source, 1280, 720);
+  const fallbackWidth = sourceSize.width || 1280;
+  const fallbackHeight = sourceSize.height || 720;
   const size = getRenderedCameraFrameSize(frameElement || canvas, fallbackWidth, fallbackHeight, {
     scaleCap: PREVIEW_CANVAS_SCALE_CAP
   });
@@ -2378,7 +2723,7 @@ function drawCameraOutputCanvas(canvas, frameElement, video, renderState, option
   if (canvas.height !== size.height) canvas.height = size.height;
   const context = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
   if (!context) return false;
-  drawStudioFrame(context, size.width, size.height, video, renderState, {
+  drawStudioFrame(context, size.width, size.height, source, renderState, {
     includePreviewChrome: options.includePreviewChrome,
     forcePixelFilters: true,
     pixelScale: size.scale,
@@ -2627,9 +2972,17 @@ function applyAdvancedCameraPixelEffectsToContext(context, width, height, settin
   }
 
   const data = frame.data;
-  const source = setting(settings, "heatEdge") || setting(settings, "thermalContour") ? new Uint8ClampedArray(data) : data;
-  const edgeBoost = clamp((setting(settings, "heatEdge") + setting(settings, "thermalContour") * 0.48) / 140, 0, 1);
-  const contrastPush = 1 + setting(settings, "thermalContour") / 115;
+  const source = new Uint8ClampedArray(data);
+  const edgeBoost = clamp((setting(settings, "heatEdge") + setting(settings, "thermalContour") * 0.54 + setting(settings, "edgeEnhance") * 0.32) / 150, 0, 1.35);
+  const contour = clamp((setting(settings, "thermalContour") + setting(settings, "localContrast") * 0.45) / 100, 0, 1.45);
+  const contrastPush = 1 + contour * 1.12 + setting(settings, "dehaze") / 210;
+  const shadowDepth = clamp(setting(settings, "shadowDepth") / 100, 0, 1);
+  const heatLift = clamp(setting(settings, "thermalBlend") / 100, 0, 1);
+  const coldPalette = thermalColdPalette(palette);
+  const hotPalette = thermalHotPalette(palette);
+  const keepWhiteBackground = thermalAllowsWhiteBackground(palette);
+  const lumaAt = (pixelIndex) =>
+    (source[pixelIndex] * 0.2126 + source[pixelIndex + 1] * 0.7152 + source[pixelIndex + 2] * 0.0722) / 255;
 
   for (let index = 0; index < data.length; index += 4) {
     let r = data[index];
@@ -2638,20 +2991,44 @@ function applyAdvancedCameraPixelEffectsToContext(context, width, height, settin
     const pixel = index / 4;
     const x = pixel % width;
     const y = Math.floor(pixel / width);
-    let luma = (r * 0.2126 + g * 0.7152 + b * 0.0722) / 255;
+    const luma = lumaAt(index);
+    const left = x > 0 ? lumaAt(index - 4) : luma;
+    const right = x < width - 1 ? lumaAt(index + 4) : luma;
+    const up = y > 0 ? lumaAt(index - width * 4) : luma;
+    const down = y < height - 1 ? lumaAt(index + width * 4) : luma;
+    const localAverage = (luma * 2 + left + right + up + down) / 6;
+    const gradientEdge = clamp(Math.abs(right - left) + Math.abs(down - up), 0, 1);
+    const localTexture = clamp(Math.abs(luma - localAverage) * 2.8 + gradientEdge * 0.9, 0, 1);
+    const flatness = clamp(1 - localTexture * 5, 0, 1);
+    let thermalDepth = luma * 0.62 + localAverage * 0.24 + localTexture * 0.78 + gradientEdge * edgeBoost * 1.35;
+    thermalDepth -= shadowDepth * flatness * 0.12;
+    if (!keepWhiteBackground) thermalDepth -= flatness * 0.16;
+    thermalDepth = clamp((thermalDepth - 0.5) * contrastPush + 0.5, 0, 1);
+    thermalDepth = clamp(Math.pow(thermalDepth, clamp(0.96 - heatLift * 0.28 - edgeBoost * 0.08, 0.58, 1.16)), 0, 1);
 
-    if (edgeBoost && x > 0 && y > 0) {
-      const left = index - 4;
-      const up = index - width * 4;
-      const leftLuma = (source[left] * 0.2126 + source[left + 1] * 0.7152 + source[left + 2] * 0.0722) / 255;
-      const upLuma = (source[up] * 0.2126 + source[up + 1] * 0.7152 + source[up + 2] * 0.0722) / 255;
-      const edge = clamp(Math.abs(luma - leftLuma) + Math.abs(luma - upLuma), 0, 1);
-      luma = clamp(luma + edge * edgeBoost * 1.55, 0, 1);
-    }
-
-    const mappedLuma = clamp((luma - 0.5) * contrastPush + 0.5, 0, 1);
+    let mappedLuma = thermalDepth;
     if (thermalAmount) {
-      const [tr, tg, tb] = thermalPaletteColor(mappedLuma, palette);
+      const coldDepth = clamp(mappedLuma * 0.64 - localTexture * 0.34 - flatness * 0.08, 0, 1);
+      const hotDepth = clamp(mappedLuma + gradientEdge * edgeBoost * 1.9 + localTexture * 0.42 + heatLift * 0.08, 0, 1);
+      const baseColor = thermalPaletteColor(mappedLuma, palette);
+      const coldColor = thermalPaletteColor(coldDepth, coldPalette);
+      const hotColor = thermalPaletteColor(hotDepth, hotPalette);
+      const detailAlpha = clamp(0.12 + contour * 0.22 + localTexture * 0.52, 0, 0.68);
+      const heatAlpha = clamp(heatLift * 0.18 + gradientEdge * edgeBoost * 0.86 + localTexture * 0.24, 0, 0.76);
+      let [tr, tg, tb] = baseColor;
+      tr = mixChannel(coldColor[0], tr, detailAlpha);
+      tg = mixChannel(coldColor[1], tg, detailAlpha);
+      tb = mixChannel(coldColor[2], tb, detailAlpha);
+      tr = mixChannel(tr, hotColor[0], heatAlpha);
+      tg = mixChannel(tg, hotColor[1], heatAlpha);
+      tb = mixChannel(tb, hotColor[2], heatAlpha);
+      if (!keepWhiteBackground && flatness > 0.45 && mappedLuma > 0.68) {
+        const coolGuard = thermalPaletteColor(clamp(0.18 + luma * 0.34, 0, 0.58), coldPalette);
+        const guardAlpha = clamp((flatness - 0.35) * 0.38, 0, 0.28);
+        tr = mixChannel(tr, coolGuard[0], guardAlpha);
+        tg = mixChannel(tg, coolGuard[1], guardAlpha);
+        tb = mixChannel(tb, coolGuard[2], guardAlpha);
+      }
       r = mixChannel(r, tr, thermalAmount);
       g = mixChannel(g, tg, thermalAmount);
       b = mixChannel(b, tb, thermalAmount);
@@ -2672,6 +3049,24 @@ function applyAdvancedCameraPixelEffectsToContext(context, width, height, settin
     data[index + 2] = clamp(b, 0, 255);
   }
   context.putImageData(frame, 0, 0);
+}
+
+function thermalColdPalette(paletteName) {
+  if (["ironbow", "molten", "carbon-fire", "copper-hot", "midnight-ironbow"].includes(paletteName)) return "deep-ocean";
+  if (["white-hot", "ghost-thermal", "xls"].includes(paletteName)) return "blue-core";
+  if (["toxic-heat", "radar-heat", "emerald-heat"].includes(paletteName)) return "predator";
+  return "dark-rainbow";
+}
+
+function thermalHotPalette(paletteName) {
+  if (["deep-ocean", "blue-core", "cold-room", "arctic", "blue-flame"].includes(paletteName)) return "lava-rainbow";
+  if (["ghost-thermal", "xls", "white-hot"].includes(paletteName)) return "pink-plate";
+  if (["black-hot"].includes(paletteName)) return "ironbow";
+  return paletteName || "classic";
+}
+
+function thermalAllowsWhiteBackground(paletteName) {
+  return ["white-hot", "ghost-thermal", "xls"].includes(paletteName);
 }
 
 function thermalPaletteColor(value, paletteName) {

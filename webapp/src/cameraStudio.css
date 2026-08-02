@@ -535,7 +535,7 @@
 
 .studio-action-row {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
   gap: 10px;
 }
 
@@ -556,6 +556,122 @@
   background: linear-gradient(180deg, #fff4a6, #ffbf2e);
   box-shadow: 0 0 22px rgba(255, 211, 76, 0.28);
   font-weight: 850;
+}
+
+.studio-pause-button.active,
+.equation-toggle.active {
+  color: #031017;
+  border-color: transparent;
+  background: linear-gradient(180deg, #f5f8fb, #9aa5af);
+  box-shadow: 0 0 22px rgba(245, 248, 251, 0.18);
+  font-weight: 850;
+}
+
+.equation-engine-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(245, 248, 251, 0.18);
+  border-radius: 8px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+    rgba(2, 5, 8, 0.68);
+}
+
+.equation-engine-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.equation-engine-header h2 {
+  margin: 0;
+  color: #f5f8fb;
+  font-size: 14px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.equation-engine-header p,
+.equation-engine-panel p {
+  margin: 0;
+  color: #aeb9c5;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.equation-engine-header > span {
+  flex: 0 0 auto;
+  max-width: 180px;
+  padding: 6px 8px;
+  border: 1px solid rgba(245, 248, 251, 0.18);
+  border-radius: 7px;
+  color: #f5f8fb;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(0, 0, 0, 0.28));
+  font-size: 12px;
+  font-weight: 850;
+  text-align: center;
+}
+
+.equation-engine-controls,
+.equation-toggle-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.equation-engine-controls label {
+  display: grid;
+  gap: 6px;
+  color: #d8e3eb;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.equation-engine-controls input {
+  min-height: 42px;
+  border: 1px solid rgba(245, 248, 251, 0.22);
+  border-radius: 8px;
+  color: #f5f8fb;
+  background: rgba(0, 0, 0, 0.34);
+}
+
+.equation-pipeline-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.equation-pipeline-cell {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(245, 248, 251, 0.14);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.3));
+}
+
+.equation-pipeline-cell strong {
+  color: #f5f8fb;
+  font-size: 16px;
+}
+
+.equation-pipeline-cell span {
+  color: #aeb9c5;
+  font-size: 11px;
+}
+
+.equation-pipeline-cell em {
+  min-width: 0;
+  overflow: hidden;
+  color: #ffffff;
+  font-size: 11px;
+  font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .studio-status,
@@ -1665,6 +1781,9 @@
 
   .effect-preset-grid,
   .studio-action-row,
+  .equation-engine-controls,
+  .equation-toggle-row,
+  .equation-pipeline-grid,
   .recording-action-row,
   .resolution-selector,
   .media-compositor-actions,
