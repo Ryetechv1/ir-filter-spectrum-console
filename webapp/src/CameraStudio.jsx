@@ -31,6 +31,8 @@ const YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@azel222";
 const YOUTUBE_SHARED_CHANNEL_URL = "https://youtube.com/@azel222?si=Uj_ZFMax1TYTZWbJ";
 const YOUTUBE_UPLOADS_PLAYLIST_URL = `https://www.youtube.com/playlist?list=${YOUTUBE_UPLOADS_PLAYLIST_ID}`;
 const YOUTUBE_UPLOADS_PLAYER_URL = `https://www.youtube.com/embed/videoseries?list=${YOUTUBE_UPLOADS_PLAYLIST_ID}&rel=0&modestbranding=1&playsinline=1`;
+const SUPERNATURAL_DATABASE_URL =
+  "https://sites.google.com/view/official-supernatural-database/home?utm_source=ig&utm_medium=social&utm_content=link_in_bio&fbclid=PAdGRleATchEVwZG9mAmV4dG4DYWVtAjExAHNydGMGYXBwX2lkDzEyNDAyNDU3NDI4NzQxNAABp4kyShMbfla_wLLCmECwIfS0phlvjyEn6urZXfMOS_gmHda0hM77-z2hPeY0_aem_pT0EssEVQDKDRjWWvtdp0g";
 const YOUTUBE_RECENT_UPLOADS = [
   {
     id: "5_T2LfeRDEY",
@@ -81,6 +83,7 @@ const MP4_MIME_TYPES = [
   "video/mp4;codecs=h264",
   "video/mp4"
 ];
+const PREVIEW_CANVAS_SCALE_CAP = 1.5;
 const TRUSTED_ACCESS = [
   {
     name: "Studio Access Holder",
@@ -508,7 +511,72 @@ const EFFECT_FAMILIES = [
     names: ["Heat Map", "Solar Scan", "Amber Thermal", "Plasma Core", "Ember Field", "Radiant Skin", "Blue Heat", "Thermal Edge", "White Hot", "Black Hot"],
     color: "rgba(255,76,18,0.28)",
     blendMode: "color-dodge",
-    settings: { brightness: 115, contrast: 152, saturation: 170, hue: -18, duotone: 36, glow: 20 }
+    settings: { brightness: 115, contrast: 152, saturation: 170, hue: -18, duotone: 36, glow: 20, thermalPalette: "classic", thermalBlend: 70, thermalContour: 44, heatEdge: 36 }
+  },
+  {
+    category: "Thermal Variations",
+    variants: [
+      {
+        name: "Prismatic Heat",
+        color: "rgba(255, 224, 32, 0.34)",
+        settings: { thermalPalette: "rainbow", thermalBlend: 100, thermalContour: 68, heatEdge: 66, brightness: 118, contrast: 170, saturation: 230, posterize: 18, edgeEnhance: 34 }
+      },
+      {
+        name: "Predator Spectrum",
+        color: "rgba(24, 220, 255, 0.34)",
+        settings: { thermalPalette: "predator", thermalBlend: 96, thermalContour: 74, heatEdge: 70, brightness: 106, contrast: 182, saturation: 240, sharpen: 26, scanlines: 10 }
+      },
+      {
+        name: "Blue Core Heat",
+        color: "rgba(31, 116, 255, 0.32)",
+        settings: { thermalPalette: "blue-core", thermalBlend: 94, thermalContour: 58, heatEdge: 54, brightness: 110, contrast: 164, saturation: 218, hue: -18 }
+      },
+      {
+        name: "Ironbow Thermal",
+        color: "rgba(255, 98, 26, 0.34)",
+        settings: { thermalPalette: "ironbow", thermalBlend: 98, thermalContour: 62, heatEdge: 48, brightness: 112, contrast: 172, saturation: 214, sepia: 8 }
+      },
+      {
+        name: "White Hot Scan",
+        color: "rgba(255, 255, 255, 0.22)",
+        settings: { thermalPalette: "white-hot", thermalBlend: 90, thermalContour: 72, heatEdge: 52, brightness: 122, contrast: 188, saturation: 48, grayscale: 18, glow: 12 }
+      },
+      {
+        name: "Black Hot Scan",
+        color: "rgba(25, 36, 52, 0.35)",
+        settings: { thermalPalette: "black-hot", thermalBlend: 92, thermalContour: 78, heatEdge: 56, brightness: 104, contrast: 194, saturation: 36, grayscale: 30 }
+      },
+      {
+        name: "Molten Edge",
+        color: "rgba(255, 52, 18, 0.36)",
+        settings: { thermalPalette: "molten", thermalBlend: 96, thermalContour: 86, heatEdge: 88, brightness: 114, contrast: 190, saturation: 226, edgeGlow: 16 }
+      },
+      {
+        name: "Neon Thermal",
+        color: "rgba(0, 255, 196, 0.32)",
+        settings: { thermalPalette: "neon", thermalBlend: 100, thermalContour: 56, heatEdge: 62, brightness: 116, contrast: 166, saturation: 250, glow: 18, chromaticGlow: 18 }
+      },
+      {
+        name: "Arctic Heat",
+        color: "rgba(80, 210, 255, 0.34)",
+        settings: { thermalPalette: "arctic", thermalBlend: 94, thermalContour: 64, heatEdge: 50, brightness: 108, contrast: 170, saturation: 220, temperature: -20 }
+      },
+      {
+        name: "Pink Thermal Plate",
+        color: "rgba(255, 76, 144, 0.32)",
+        settings: { thermalPalette: "pink-plate", thermalBlend: 92, thermalContour: 54, heatEdge: 42, brightness: 120, contrast: 154, saturation: 212, tint: 18 }
+      }
+    ],
+    color: "rgba(255,76,18,0.28)",
+    blendMode: "color-dodge",
+    settings: { brightness: 114, contrast: 166, saturation: 220, thermalBlend: 92, thermalContour: 60, heatEdge: 54, overlayStrength: 30 }
+  },
+  {
+    category: "XLS Camera",
+    names: ["XLS Spectral Camera"],
+    color: "rgba(90, 255, 214, 0.32)",
+    blendMode: "screen",
+    settings: { brightness: 112, contrast: 168, saturation: 205, hue: 20, thermalPalette: "xls", thermalBlend: 82, thermalContour: 70, heatEdge: 58, xrayGhost: 42, nearIrBoost: 34, ultravioletWash: 28, infraredWash: 24, edgeEnhance: 22, glow: 12 }
   },
   {
     category: "Exposure Tools",
@@ -527,25 +595,26 @@ const EFFECT_FAMILIES = [
 ];
 
 const CAMERA_EFFECTS = EFFECT_FAMILIES.flatMap((family, familyIndex) =>
-  family.names.map((name, index) => {
+  (family.variants || family.names.map((name) => ({ name }))).map((variant, index) => {
+    const baseSettings = { ...family.settings, ...(variant.settings || {}) };
     const wave = index - 4.5;
     return {
       id: `${family.category.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${index}`,
-      name,
+      name: variant.name,
       category: family.category,
-      overlayColor: family.color,
-      blendMode: family.blendMode,
+      overlayColor: variant.color || family.color,
+      blendMode: variant.blendMode || family.blendMode,
       favorite: index === 0 || index === 5,
       settings: {
         ...DEFAULT_SETTINGS,
-        ...family.settings,
-        brightness: clamp((family.settings.brightness ?? 100) + Math.round(wave * 1.5), 20, 220),
-        contrast: clamp((family.settings.contrast ?? 100) + Math.round((index % 5) * 3), 20, 220),
-        saturation: clamp((family.settings.saturation ?? 100) + Math.round((index % 4) * 5), 0, 260),
-        hue: clamp((family.settings.hue ?? 0) + ((familyIndex * 17 + index * 9) % 82) - 41, -180, 180),
-        vignette: clamp((family.settings.vignette ?? 12) + (index % 3) * 5, 0, 90),
-        grain: clamp((family.settings.grain ?? 0) + (index % 4) * 2, 0, 80),
-        glow: clamp((family.settings.glow ?? 0) + (index % 3) * 3, 0, 60)
+        ...baseSettings,
+        brightness: clamp((baseSettings.brightness ?? 100) + Math.round(wave * 1.5), 20, 220),
+        contrast: clamp((baseSettings.contrast ?? 100) + Math.round((index % 5) * 3), 20, 220),
+        saturation: clamp((baseSettings.saturation ?? 100) + Math.round((index % 4) * 5), 0, 260),
+        hue: clamp((baseSettings.hue ?? 0) + ((familyIndex * 17 + index * 9) % 82) - 41, -180, 180),
+        vignette: clamp((baseSettings.vignette ?? 12) + (index % 3) * 5, 0, 90),
+        grain: clamp((baseSettings.grain ?? 0) + (index % 4) * 2, 0, 80),
+        glow: clamp((baseSettings.glow ?? 0) + (index % 3) * 3, 0, 60)
       }
     };
   })
@@ -556,12 +625,15 @@ const CATEGORIES = ["All Presets", "Favorites", ...EFFECT_FAMILIES.map((family) 
 function CameraStudio() {
   const videoRef = useRef(null);
   const hudVideoRef = useRef(null);
+  const previewCanvasRef = useRef(null);
+  const hudCanvasRef = useRef(null);
   const cameraFrameRef = useRef(null);
   const streamRef = useRef(null);
   const recorderRef = useRef(null);
   const recordingChunksRef = useRef([]);
   const recordingCanvasRef = useRef(null);
   const recordingFrameRef = useRef(0);
+  const previewFrameRef = useRef(0);
   const recordingTimerRef = useRef(null);
   const recordingStartedAtRef = useRef(0);
   const captureShelfRef = useRef([]);
@@ -583,6 +655,7 @@ function CameraStudio() {
   const [recordingMimeType, setRecordingMimeType] = useState("");
   const [captureShelf, setCaptureShelf] = useState([]);
   const [youtubeWindowOpen, setYoutubeWindowOpen] = useState(false);
+  const [databaseWindowOpen, setDatabaseWindowOpen] = useState(false);
   const [selectedYoutubeVideoId, setSelectedYoutubeVideoId] = useState(YOUTUBE_RECENT_UPLOADS[0]?.id || "");
   const [torchActive, setTorchActive] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
@@ -622,27 +695,46 @@ function CameraStudio() {
   );
 
   const filterCss = useMemo(() => buildFilterCss(manualSettings), [manualSettings]);
-  const overlayStyle = useMemo(() => buildOverlayStyle(selectedEffect, manualSettings), [manualSettings, selectedEffect]);
-  const specialOverlayStyle = useMemo(() => buildSpecialOverlayStyle(manualSettings), [manualSettings]);
-  const grainOpacity = useMemo(
-    () => clamp((manualSettings.grain + setting(manualSettings, "filmGrainSize") + setting(manualSettings, "noiseMono") + setting(manualSettings, "dust")) / 260, 0, 0.72),
-    [manualSettings]
-  );
-  const vignetteOpacity = useMemo(
-    () => clamp((manualSettings.vignette + setting(manualSettings, "shadowDepth") * 0.24 + setting(manualSettings, "negativeDepth") * 0.18) / 100, 0, 0.96),
-    [manualSettings]
-  );
-  const videoStyle = useMemo(
-    () => ({
-      filter: filterCss,
-      imageRendering: manualSettings.pixelate > 48 ? "pixelated" : "auto"
-    }),
-    [filterCss, manualSettings.pixelate]
-  );
 
   useEffect(() => {
     renderStateRef.current = { filterCss, selectedEffect, manualSettings, cameraFacing };
   }, [cameraFacing, filterCss, manualSettings, selectedEffect]);
+
+  useEffect(() => {
+    if (!cameraActive) {
+      clearCameraOutputCanvas(previewCanvasRef.current);
+      clearCameraOutputCanvas(hudCanvasRef.current);
+      return undefined;
+    }
+    let lastDraw = 0;
+    const drawPreview = (timestamp) => {
+      const video = videoRef.current;
+      const renderState = renderStateRef.current;
+      if (video?.readyState >= 2) {
+        if (!lastDraw || timestamp - lastDraw > 58) {
+          drawCameraOutputCanvas(previewCanvasRef.current, cameraFrameRef.current, video, renderState, {
+            includePreviewChrome: true,
+            metaLabels: ["Local camera stream", renderState.cameraFacing === "user" ? "Front camera" : "Rear camera", renderState.selectedEffect.name]
+          });
+          if (cameraHudVisible) {
+            drawCameraOutputCanvas(hudCanvasRef.current, null, video, renderState, {
+              includePreviewChrome: true,
+              metaLabels: ["Local camera stream", renderState.cameraFacing === "user" ? "Front camera" : "Rear camera", renderState.selectedEffect.name]
+            });
+          }
+          lastDraw = timestamp;
+        }
+      }
+      previewFrameRef.current = window.requestAnimationFrame(drawPreview);
+    };
+    previewFrameRef.current = window.requestAnimationFrame(drawPreview);
+    return () => {
+      if (previewFrameRef.current) {
+        window.cancelAnimationFrame(previewFrameRef.current);
+        previewFrameRef.current = 0;
+      }
+    };
+  }, [cameraActive, cameraHudVisible]);
 
   useEffect(() => {
     const frame = cameraFrameRef.current;
@@ -915,6 +1007,7 @@ function CameraStudio() {
 
   useEffect(
     () => () => {
+      if (previewFrameRef.current) window.cancelAnimationFrame(previewFrameRef.current);
       stopRecording("Recording stopped because the studio closed.");
       stopCamera();
       captureShelfRef.current.forEach((item) => URL.revokeObjectURL(item.url));
@@ -979,28 +1072,22 @@ function CameraStudio() {
       setCameraStatus("Start the camera before taking a snapshot.");
       return;
     }
-    const width = video.videoWidth || 1280;
-    const height = video.videoHeight || 720;
-    const snapshotSize = getRenderedCameraFrameSize(cameraFrameRef.current, width, height);
+    const previewCanvas = previewCanvasRef.current;
+    drawCameraOutputCanvas(previewCanvas, cameraFrameRef.current, video, { filterCss, selectedEffect, manualSettings, cameraFacing }, {
+      includePreviewChrome: true,
+      metaLabels: ["Local camera stream", cameraFacing === "user" ? "Front camera" : "Rear camera", selectedEffect.name]
+    });
+    if (!previewCanvas?.width || !previewCanvas?.height) {
+      setCameraStatus("Snapshot failed because the preview canvas is not ready yet.");
+      return;
+    }
     const canvas = document.createElement("canvas");
-    canvas.width = snapshotSize.width;
-    canvas.height = snapshotSize.height;
+    canvas.width = previewCanvas.width;
+    canvas.height = previewCanvas.height;
     const context = canvas.getContext("2d");
-    drawStudioFrame(
-      context,
-      snapshotSize.width,
-      snapshotSize.height,
-      video,
-      { filterCss, selectedEffect, manualSettings, cameraFacing },
-      {
-        includePreviewChrome: true,
-        forcePixelFilters: true,
-        pixelScale: snapshotSize.scale,
-        cssWidth: snapshotSize.cssWidth,
-        metaLabels: ["Local camera stream", cameraFacing === "user" ? "Front camera" : "Rear camera", selectedEffect.name]
-      }
-    );
-    canvas.toBlob((blob) => {
+    context.drawImage(previewCanvas, 0, 0);
+    try {
+      const blob = await canvasToPngBlob(canvas);
       if (!blob) return;
       const url = URL.createObjectURL(blob);
       setSnapshotUrl(url);
@@ -1019,7 +1106,9 @@ function CameraStudio() {
       link.download = `spectral-imaging-studio-${new Date().toISOString().replace(/[:.]/g, "-")}.png`;
       link.click();
       setCameraStatus("Snapshot downloaded locally.");
-    }, "image/png");
+    } catch (error) {
+      setCameraStatus(`Snapshot export failed: ${error.message || error}`);
+    }
   }
 
   function scrollToCameraFrame() {
@@ -1175,7 +1264,7 @@ function CameraStudio() {
         <div className="studio-guide-box">
           <h3>What The Studio Offers</h3>
           <ul>
-            <li>120 local visual presets for IR-style, UVA-style, thermal, cinematic, monochrome, duotone, retro, and color-lab looks.</li>
+            <li>{CAMERA_EFFECTS.length} local visual presets for IR-style, UVA-style, thermal, XLS, cinematic, monochrome, duotone, retro, and color-lab looks.</li>
             <li>Four RGBW gradient mixers for Main, Secondary, Third, and Highlights color layers that now drive overlays and filter math.</li>
             <li>12 core photo controls, 10 color inversion tools, and 100 advanced sliders for exposure, color channels, glow, scanlines, IR/UVA washes, and more.</li>
             <li>Processed PNG snapshots and 1080P or 2K MP4 recordings with the studio effects applied.</li>
@@ -1227,11 +1316,8 @@ function CameraStudio() {
 
         <section className="camera-preview-panel studio-panel">
           <div className="camera-frame" ref={cameraFrameRef}>
-            <video ref={videoRef} className={cameraFacing === "user" ? "is-mirrored" : ""} autoPlay playsInline muted style={videoStyle} />
-            <div className="studio-color-overlay" style={overlayStyle} />
-            <div className="studio-special-overlay" style={specialOverlayStyle} />
-            <div className="studio-grain" style={{ opacity: grainOpacity }} />
-            <div className="studio-vignette" style={{ opacity: vignetteOpacity }} />
+            <video ref={videoRef} className="camera-source-video" autoPlay playsInline muted aria-hidden="true" />
+            <canvas ref={previewCanvasRef} className="camera-output-canvas" aria-label="Live camera preview with studio effects applied" />
             {!cameraActive && (
               <div className="camera-placeholder">
                 <LockKeyhole size={40} />
@@ -1239,13 +1325,17 @@ function CameraStudio() {
                 <span>{authorized ? "Start camera to trigger the browser permission popup." : "Unlock the studio to request device camera access."}</span>
               </div>
             )}
-            <div className="camera-corners" aria-hidden="true" />
-            <div className="camera-live-badge">{cameraActive ? "Live" : "Locked"}</div>
-            <div className="camera-meta-row">
-              <span>{cameraActive ? "Local camera stream" : "No stream active"}</span>
-              <span>{cameraFacing === "user" ? "Front camera" : "Rear camera"}</span>
-              <span>{selectedEffect.name}</span>
-            </div>
+            {!cameraActive && (
+              <>
+                <div className="camera-corners" aria-hidden="true" />
+                <div className="camera-live-badge">Locked</div>
+                <div className="camera-meta-row">
+                  <span>No stream active</span>
+                  <span>{cameraFacing === "user" ? "Front camera" : "Rear camera"}</span>
+                  <span>{selectedEffect.name}</span>
+                </div>
+              </>
+            )}
           </div>
 
           <div className="studio-action-row">
@@ -1426,10 +1516,16 @@ function CameraStudio() {
                   player and an in-app recent-upload browser.
                 </p>
               </div>
-              <a href={YOUTUBE_CHANNEL_URL} target="_blank" rel="noreferrer">
-                <ExternalLink size={16} />
-                Open channel
-              </a>
+              <div className="youtube-channel-actions">
+                <a href={YOUTUBE_CHANNEL_URL} target="_blank" rel="noreferrer">
+                  <ExternalLink size={16} />
+                  Open channel
+                </a>
+                <button type="button" onClick={() => setDatabaseWindowOpen(true)}>
+                  <ExternalLink size={16} />
+                  Open database GUI
+                </button>
+              </div>
             </section>
 
             {selectedYoutubeVideo && (
@@ -1497,6 +1593,10 @@ function CameraStudio() {
                 <ExternalLink size={16} />
                 Open Channel Homepage
               </a>
+              <button type="button" onClick={() => setDatabaseWindowOpen(true)}>
+                <ExternalLink size={16} />
+                Open Supernatural Database GUI
+              </button>
               <a href={YOUTUBE_UPLOADS_PLAYLIST_URL} target="_blank" rel="noreferrer">
                 <Film size={16} />
                 Open Uploads Player
@@ -1506,16 +1606,45 @@ function CameraStudio() {
         </div>
       )}
 
+      {databaseWindowOpen && (
+        <div className="database-window-backdrop" role="dialog" aria-modal="true" aria-labelledby="databaseWindowTitle">
+          <section className="database-window">
+            <div className="youtube-window-heading">
+              <div>
+                <ExternalLink size={22} />
+                <h2 id="databaseWindowTitle">Official Supernatural Database</h2>
+              </div>
+              <button type="button" onClick={() => setDatabaseWindowOpen(false)} aria-label="Close Supernatural database window">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="database-frame-shell">
+              <iframe
+                title="Official Supernatural Database"
+                src={SUPERNATURAL_DATABASE_URL}
+                referrerPolicy="strict-origin-when-cross-origin"
+                allow="fullscreen; clipboard-read; clipboard-write"
+              />
+              <div className="youtube-frame-fallback">
+                <strong>Database window</strong>
+                <span>If the Google Sites homepage blocks embedded viewing on this device, open it externally with the button below.</span>
+              </div>
+            </div>
+            <div className="youtube-window-actions">
+              <a href={SUPERNATURAL_DATABASE_URL} target="_blank" rel="noreferrer">
+                <ExternalLink size={16} />
+                Open Database Externally
+              </a>
+            </div>
+          </section>
+        </div>
+      )}
+
       {cameraActive && cameraHudVisible && (
         <button className="camera-floating-hud" type="button" onClick={scrollToCameraFrame} aria-label="Return to full camera preview">
           <div className="camera-floating-hud-frame">
-            <video ref={hudVideoRef} className={cameraFacing === "user" ? "is-mirrored" : ""} autoPlay playsInline muted style={videoStyle} />
-            <div className="studio-color-overlay" style={overlayStyle} />
-            <div className="studio-special-overlay" style={specialOverlayStyle} />
-            <div className="studio-grain" style={{ opacity: grainOpacity }} />
-            <div className="studio-vignette" style={{ opacity: vignetteOpacity }} />
-            <div className="camera-corners" aria-hidden="true" />
-            <div className="camera-live-badge">Live</div>
+            <video ref={hudVideoRef} className="camera-source-video" autoPlay playsInline muted aria-hidden="true" />
+            <canvas ref={hudCanvasRef} className="camera-output-canvas" aria-hidden="true" />
             <div className="camera-floating-hud-label">
               <span>{cameraFacing === "user" ? "Front" : "Rear"}</span>
               <strong>{selectedEffect.name}</strong>
@@ -1532,7 +1661,78 @@ function supportedMp4MimeType() {
   return MP4_MIME_TYPES.find((type) => MediaRecorder.isTypeSupported(type)) || "";
 }
 
-function getRenderedCameraFrameSize(frameElement, fallbackWidth, fallbackHeight) {
+function drawCameraOutputCanvas(canvas, frameElement, video, renderState, options = {}) {
+  if (!canvas || !video) return false;
+  const fallbackWidth = video.videoWidth || 1280;
+  const fallbackHeight = video.videoHeight || 720;
+  const size = getRenderedCameraFrameSize(frameElement || canvas, fallbackWidth, fallbackHeight, {
+    scaleCap: PREVIEW_CANVAS_SCALE_CAP
+  });
+  if (!size.width || !size.height) return false;
+  if (canvas.width !== size.width) canvas.width = size.width;
+  if (canvas.height !== size.height) canvas.height = size.height;
+  const context = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
+  if (!context) return false;
+  drawStudioFrame(context, size.width, size.height, video, renderState, {
+    includePreviewChrome: options.includePreviewChrome,
+    forcePixelFilters: true,
+    pixelScale: size.scale,
+    cssWidth: size.cssWidth,
+    metaLabels: options.metaLabels
+  });
+  return true;
+}
+
+function clearCameraOutputCanvas(canvas) {
+  if (!canvas) return;
+  const context = canvas.getContext("2d");
+  context?.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function canvasToPngBlob(canvas) {
+  return new Promise((resolve, reject) => {
+    if (!canvas) {
+      resolve(null);
+      return;
+    }
+    let settled = false;
+    const done = (blob) => {
+      if (settled) return;
+      settled = true;
+      resolve(blob || dataUrlToBlob(canvas.toDataURL("image/png")));
+    };
+    const fallbackTimer = window.setTimeout(() => {
+      try {
+        done(dataUrlToBlob(canvas.toDataURL("image/png")));
+      } catch (error) {
+        reject(error);
+      }
+    }, 1200);
+    try {
+      canvas.toBlob((blob) => {
+        window.clearTimeout(fallbackTimer);
+        done(blob);
+      }, "image/png");
+    } catch (error) {
+      window.clearTimeout(fallbackTimer);
+      reject(error);
+    }
+  });
+}
+
+function dataUrlToBlob(dataUrl) {
+  const [header, data] = String(dataUrl || "").split(",");
+  if (!data) return null;
+  const mime = header.match(/data:([^;]+)/)?.[1] || "image/png";
+  const binary = window.atob(data);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return new Blob([bytes], { type: mime });
+}
+
+function getRenderedCameraFrameSize(frameElement, fallbackWidth, fallbackHeight, options = {}) {
   if (!frameElement?.getBoundingClientRect) {
     return {
       width: Math.max(1, Math.round(fallbackWidth || 1280)),
@@ -1542,7 +1742,7 @@ function getRenderedCameraFrameSize(frameElement, fallbackWidth, fallbackHeight)
     };
   }
   const rect = frameElement.getBoundingClientRect();
-  const deviceScale = clamp(window.devicePixelRatio || 1, 1, 2);
+  const deviceScale = clamp(window.devicePixelRatio || 1, 1, options.scaleCap || 2);
   const width = Math.round(rect.width * deviceScale);
   const height = Math.round(rect.height * deviceScale);
   if (width > 0 && height > 0) return { width, height, scale: deviceScale, cssWidth: rect.width };
@@ -1589,6 +1789,7 @@ function drawStudioFrame(context, width, height, video, renderState, options = {
   }
   context.restore();
   if (!useCanvasFilter) applyCanvasPreviewFilters(context, width, height, previewFilterCss);
+  applyAdvancedCameraPixelEffects(context, width, height, manualSettings, selectedEffect);
   paintOverlay(context, width, height, selectedEffect, manualSettings);
   paintSpecialOverlay(context, width, height, manualSettings);
   paintCanvasGrain(context, width, height, manualSettings);
@@ -1672,6 +1873,200 @@ function applyCanvasPreviewFilters(context, width, height, filterCss) {
     data[index + 2] = clamp(b, 0, 255);
   }
   context.putImageData(frame, 0, 0);
+}
+
+function applyAdvancedCameraPixelEffects(context, width, height, settings, effect) {
+  const paletteName = settings?.thermalPalette || "";
+  const thermalSignal = setting(settings, "thermalBlend") + setting(settings, "thermalContour") * 0.75 + setting(settings, "heatEdge") * 0.68;
+  const thermalPresetSignal = paletteName || effect?.category?.includes("Thermal") ? 54 : 0;
+  const xlsSignal = setting(settings, "xrayGhost") + (paletteName === "xls" || effect?.category === "XLS Camera" ? 72 : 0);
+  const thermalAmount = clamp((thermalSignal + thermalPresetSignal) / 210, 0, 1);
+  const xlsAmount = clamp(xlsSignal / 150, 0, 1);
+  if (!thermalAmount && !xlsAmount) return;
+
+  let frame;
+  try {
+    frame = context.getImageData(0, 0, width, height);
+  } catch {
+    return;
+  }
+
+  const data = frame.data;
+  const source = setting(settings, "heatEdge") || setting(settings, "thermalContour") ? new Uint8ClampedArray(data) : data;
+  const edgeBoost = clamp((setting(settings, "heatEdge") + setting(settings, "thermalContour") * 0.48) / 140, 0, 1);
+  const contrastPush = 1 + setting(settings, "thermalContour") / 115;
+  const palette = paletteName || (xlsAmount > thermalAmount ? "xls" : "classic");
+
+  for (let index = 0; index < data.length; index += 4) {
+    let r = data[index];
+    let g = data[index + 1];
+    let b = data[index + 2];
+    const pixel = index / 4;
+    const x = pixel % width;
+    const y = Math.floor(pixel / width);
+    let luma = (r * 0.2126 + g * 0.7152 + b * 0.0722) / 255;
+
+    if (edgeBoost && x > 0 && y > 0) {
+      const left = index - 4;
+      const up = index - width * 4;
+      const leftLuma = (source[left] * 0.2126 + source[left + 1] * 0.7152 + source[left + 2] * 0.0722) / 255;
+      const upLuma = (source[up] * 0.2126 + source[up + 1] * 0.7152 + source[up + 2] * 0.0722) / 255;
+      const edge = clamp(Math.abs(luma - leftLuma) + Math.abs(luma - upLuma), 0, 1);
+      luma = clamp(luma + edge * edgeBoost * 1.55, 0, 1);
+    }
+
+    const mappedLuma = clamp((luma - 0.5) * contrastPush + 0.5, 0, 1);
+    if (thermalAmount) {
+      const [tr, tg, tb] = thermalPaletteColor(mappedLuma, palette);
+      r = mixChannel(r, tr, thermalAmount);
+      g = mixChannel(g, tg, thermalAmount);
+      b = mixChannel(b, tb, thermalAmount);
+    }
+
+    if (xlsAmount) {
+      const cold = thermalPaletteColor(1 - mappedLuma, "xls");
+      r = mixChannel(r, cold[0], xlsAmount * 0.62);
+      g = mixChannel(g, cold[1], xlsAmount * 0.62);
+      b = mixChannel(b, cold[2], xlsAmount * 0.62);
+      r = mixChannel(r, 255 - r, xlsAmount * 0.16);
+      g = mixChannel(g, 255 - g, xlsAmount * 0.16);
+      b = mixChannel(b, 255 - b, xlsAmount * 0.16);
+    }
+
+    data[index] = clamp(r, 0, 255);
+    data[index + 1] = clamp(g, 0, 255);
+    data[index + 2] = clamp(b, 0, 255);
+  }
+  context.putImageData(frame, 0, 0);
+}
+
+function thermalPaletteColor(value, paletteName) {
+  const palette = {
+    rainbow: [
+      [0, 0, 0, 96],
+      [0.18, 0, 34, 255],
+      [0.36, 0, 226, 255],
+      [0.52, 40, 255, 76],
+      [0.68, 255, 244, 0],
+      [0.84, 255, 66, 0],
+      [1, 255, 255, 255]
+    ],
+    predator: [
+      [0, 0, 0, 68],
+      [0.22, 0, 28, 188],
+      [0.42, 0, 255, 235],
+      [0.58, 84, 255, 0],
+      [0.74, 255, 238, 0],
+      [0.9, 255, 28, 0],
+      [1, 255, 255, 210]
+    ],
+    "blue-core": [
+      [0, 0, 0, 94],
+      [0.25, 0, 72, 255],
+      [0.48, 0, 222, 255],
+      [0.66, 255, 236, 0],
+      [0.84, 255, 67, 0],
+      [1, 255, 238, 210]
+    ],
+    ironbow: [
+      [0, 4, 0, 18],
+      [0.22, 28, 0, 72],
+      [0.42, 155, 0, 54],
+      [0.62, 255, 74, 0],
+      [0.8, 255, 199, 0],
+      [1, 255, 255, 230]
+    ],
+    "white-hot": [
+      [0, 0, 0, 0],
+      [0.45, 72, 72, 72],
+      [0.72, 196, 196, 196],
+      [1, 255, 255, 255]
+    ],
+    "black-hot": [
+      [0, 255, 255, 255],
+      [0.42, 160, 160, 160],
+      [0.72, 52, 52, 52],
+      [1, 0, 0, 0]
+    ],
+    molten: [
+      [0, 0, 0, 0],
+      [0.3, 62, 0, 22],
+      [0.52, 194, 0, 0],
+      [0.72, 255, 111, 0],
+      [0.9, 255, 228, 46],
+      [1, 255, 255, 255]
+    ],
+    neon: [
+      [0, 26, 0, 122],
+      [0.25, 0, 72, 255],
+      [0.45, 0, 255, 244],
+      [0.62, 84, 255, 0],
+      [0.78, 255, 238, 0],
+      [0.92, 255, 0, 118],
+      [1, 255, 255, 255]
+    ],
+    arctic: [
+      [0, 4, 8, 84],
+      [0.28, 0, 96, 255],
+      [0.5, 0, 252, 255],
+      [0.68, 215, 255, 130],
+      [0.84, 255, 217, 0],
+      [1, 255, 80, 0]
+    ],
+    "pink-plate": [
+      [0, 25, 0, 70],
+      [0.3, 40, 220, 255],
+      [0.5, 102, 255, 167],
+      [0.7, 255, 238, 28],
+      [0.86, 255, 74, 168],
+      [1, 255, 235, 242]
+    ],
+    xls: [
+      [0, 4, 10, 22],
+      [0.24, 0, 110, 174],
+      [0.46, 52, 255, 224],
+      [0.64, 145, 255, 84],
+      [0.82, 255, 77, 196],
+      [1, 255, 255, 255]
+    ],
+    classic: [
+      [0, 0, 0, 120],
+      [0.25, 0, 79, 255],
+      [0.44, 0, 224, 255],
+      [0.58, 22, 255, 94],
+      [0.72, 255, 232, 0],
+      [0.88, 255, 52, 0],
+      [1, 255, 255, 210]
+    ]
+  }[paletteName] || [
+    [0, 0, 0, 120],
+    [0.25, 0, 79, 255],
+    [0.5, 0, 224, 255],
+    [0.72, 255, 232, 0],
+    [1, 255, 52, 0]
+  ];
+  return interpolatePalette(value, palette);
+}
+
+function interpolatePalette(value, stops) {
+  const amount = clamp(value, 0, 1);
+  for (let index = 1; index < stops.length; index += 1) {
+    const previous = stops[index - 1];
+    const next = stops[index];
+    if (amount <= next[0]) {
+      const local = clamp((amount - previous[0]) / Math.max(0.001, next[0] - previous[0]), 0, 1);
+      return [
+        mixChannel(previous[1], next[1], local),
+        mixChannel(previous[2], next[2], local),
+        mixChannel(previous[3], next[3], local)
+      ];
+    }
+  }
+  return stops[stops.length - 1].slice(1);
+}
+
+function mixChannel(a, b, amount) {
+  return a * (1 - amount) + b * amount;
 }
 
 function supportsCanvasContextFilter(context) {
