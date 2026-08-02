@@ -38,6 +38,7 @@ const YOUTUBE_SHARED_CHANNEL_URL = "https://youtube.com/@azel222?si=Uj_ZFMax1TYT
 const YOUTUBE_UPLOADS_PLAYLIST_URL = `https://www.youtube.com/playlist?list=${YOUTUBE_UPLOADS_PLAYLIST_ID}`;
 const YOUTUBE_UPLOADS_PLAYER_URL = `https://www.youtube.com/embed/videoseries?list=${YOUTUBE_UPLOADS_PLAYLIST_ID}&rel=0&modestbranding=1&playsinline=1`;
 const SUPERNATURAL_DATABASE_URL = "https://sites.google.com/view/official-supernatural-database/home?igu=1";
+const studioAssetUrl = (path) => `${import.meta.env.BASE_URL}${path.replace(/^\/+/, "")}`;
 const YOUTUBE_RECENT_UPLOADS = [
   {
     id: "5_T2LfeRDEY",
@@ -74,6 +75,64 @@ const YOUTUBE_RECENT_UPLOADS = [
     title: "Cute Wolf Mimicry - Wolf Says Hello Back",
     published: "2026-07-04",
     type: "Short"
+  }
+];
+const PRIME_SPECTRAL_EXAMPLES = [
+  {
+    id: "prime-01",
+    title: "PRIME Spectral Result 01",
+    tone: "Red and gold heat boundary",
+    src: studioAssetUrl("assets/prime-spectral-examples/prime-spectral-01.jpg"),
+    description: "High-contrast spectral boundary with a black subject silhouette and red/yellow energetic field separation."
+  },
+  {
+    id: "prime-02",
+    title: "PRIME Spectral Result 02",
+    tone: "Solar red field trace",
+    src: studioAssetUrl("assets/prime-spectral-examples/prime-spectral-02.jpg"),
+    description: "Red thermal-style field with white annotation trace and bright bloom concentration across the upper plane."
+  },
+  {
+    id: "prime-03",
+    title: "PRIME Spectral Result 03",
+    tone: "Cyan floor depth map",
+    src: studioAssetUrl("assets/prime-spectral-examples/prime-spectral-03.jpg"),
+    description: "Cool-spectrum depth emphasis using cyan, green, and blue contrast to expose floor texture and dark object edges."
+  },
+  {
+    id: "prime-04",
+    title: "PRIME Spectral Result 04",
+    tone: "Red/gold vertical apparition study",
+    src: studioAssetUrl("assets/prime-spectral-examples/prime-spectral-04.jpg"),
+    description: "Dense red/gold thermal grain with dark central form separation and white field annotation overlay."
+  },
+  {
+    id: "prime-05",
+    title: "PRIME Spectral Result 05",
+    tone: "Wall bloom heat wash",
+    src: studioAssetUrl("assets/prime-spectral-examples/prime-spectral-05.jpg"),
+    description: "Warm wall-surface spectral wash showing layered red, orange, and yellow bloom intensity bands."
+  },
+  {
+    id: "prime-06",
+    title: "PRIME Spectral Result 06",
+    tone: "Green night-vision particulate",
+    src: studioAssetUrl("assets/prime-spectral-examples/prime-spectral-06.jpg"),
+    description: "Green/black spectral particulate effect with dense pixel breakup and highlighted contour annotation."
+  },
+  {
+    id: "prime-07",
+    title: "PRIME Spectral Result 07",
+    tone: "Annotated shadow morphology",
+    src: studioAssetUrl("assets/prime-spectral-examples/prime-spectral-07.jpg"),
+    description: "Desaturated shadow-field result with annotations, high-grain texture, and bright edge markers."
+  },
+  {
+    id: "prime-08",
+    title: "PRIME Spectral Result 08",
+    tone: "Dark multicolor noise trace",
+    src: studioAssetUrl("assets/prime-spectral-examples/prime-spectral-08.jpg"),
+    description: "Black-field spectral noise study with red region boxes and multicolor particulate highlights."
   }
 ];
 const CONTACT_EMAIL = "alola99990@gmail.com";
@@ -966,7 +1025,9 @@ function CameraStudio() {
   const [captureShelf, setCaptureShelf] = useState([]);
   const [youtubeWindowOpen, setYoutubeWindowOpen] = useState(false);
   const [databaseWindowOpen, setDatabaseWindowOpen] = useState(false);
+  const [primeResultsWindowOpen, setPrimeResultsWindowOpen] = useState(false);
   const [selectedYoutubeVideoId, setSelectedYoutubeVideoId] = useState(YOUTUBE_RECENT_UPLOADS[0]?.id || "");
+  const [selectedPrimeResultId, setSelectedPrimeResultId] = useState(PRIME_SPECTRAL_EXAMPLES[0]?.id || "");
   const [torchActive, setTorchActive] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("All Presets");
@@ -1009,6 +1070,11 @@ function CameraStudio() {
   const selectedYoutubeVideo = useMemo(
     () => YOUTUBE_RECENT_UPLOADS.find((video) => video.id === selectedYoutubeVideoId) || YOUTUBE_RECENT_UPLOADS[0],
     [selectedYoutubeVideoId]
+  );
+
+  const selectedPrimeResult = useMemo(
+    () => PRIME_SPECTRAL_EXAMPLES.find((example) => example.id === selectedPrimeResultId) || PRIME_SPECTRAL_EXAMPLES[0],
+    [selectedPrimeResultId]
   );
 
   const equationModel = useMemo(
@@ -1989,6 +2055,10 @@ function CameraStudio() {
           <Youtube size={16} />
           YouTube channel
         </button>
+        <button type="button" className="trusted-user-pill" onClick={() => setPrimeResultsWindowOpen(true)}>
+          <Sparkles size={16} />
+          PRIME results
+        </button>
         <button type="button" className="studio-close" onClick={closeStudioWindow} title="Close studio">
           <X size={22} />
         </button>
@@ -2436,6 +2506,60 @@ function CameraStudio() {
                 <Film size={16} />
                 Open Uploads Player
               </a>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {primeResultsWindowOpen && selectedPrimeResult && (
+        <div className="prime-results-window-backdrop" role="dialog" aria-modal="true" aria-labelledby="primeResultsWindowTitle">
+          <section className="prime-results-window">
+            <div className="youtube-window-heading">
+              <div>
+                <Sparkles size={24} />
+                <h2 id="primeResultsWindowTitle">PRIME Spectral Image Results Examples</h2>
+              </div>
+              <button type="button" onClick={() => setPrimeResultsWindowOpen(false)} aria-label="Close PRIME results window">
+                <X size={20} />
+              </button>
+            </div>
+
+            <section className="prime-results-feature" aria-label="Selected PRIME result">
+              <div className="prime-results-preview-frame">
+                <img src={selectedPrimeResult.src} alt={`${selectedPrimeResult.title} preview`} />
+              </div>
+              <div className="prime-results-details">
+                <span>Selected PRIME example</span>
+                <strong>{selectedPrimeResult.title}</strong>
+                <small>{selectedPrimeResult.tone}</small>
+                <p>{selectedPrimeResult.description}</p>
+                <div className="youtube-window-actions">
+                  <a href={selectedPrimeResult.src} target="_blank" rel="noreferrer">
+                    <ExternalLink size={16} />
+                    Open image
+                  </a>
+                  <a href={selectedPrimeResult.src} download={`${selectedPrimeResult.id}.jpg`}>
+                    <Download size={16} />
+                    Download
+                  </a>
+                </div>
+              </div>
+            </section>
+
+            <div className="prime-results-grid" aria-label="PRIME spectral examples">
+              {PRIME_SPECTRAL_EXAMPLES.map((example, index) => (
+                <button
+                  key={example.id}
+                  type="button"
+                  className={selectedPrimeResult.id === example.id ? "active" : ""}
+                  onClick={() => setSelectedPrimeResultId(example.id)}
+                >
+                  <img src={example.src} alt={`${example.title} thumbnail`} loading="lazy" />
+                  <span>Example {index + 1}</span>
+                  <strong>{example.title}</strong>
+                  <small>{example.tone}</small>
+                </button>
+              ))}
             </div>
           </section>
         </div>
