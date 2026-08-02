@@ -31,8 +31,7 @@ const YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@azel222";
 const YOUTUBE_SHARED_CHANNEL_URL = "https://youtube.com/@azel222?si=Uj_ZFMax1TYTZWbJ";
 const YOUTUBE_UPLOADS_PLAYLIST_URL = `https://www.youtube.com/playlist?list=${YOUTUBE_UPLOADS_PLAYLIST_ID}`;
 const YOUTUBE_UPLOADS_PLAYER_URL = `https://www.youtube.com/embed/videoseries?list=${YOUTUBE_UPLOADS_PLAYLIST_ID}&rel=0&modestbranding=1&playsinline=1`;
-const SUPERNATURAL_DATABASE_URL =
-  "https://sites.google.com/view/official-supernatural-database/home?utm_source=ig&utm_medium=social&utm_content=link_in_bio&fbclid=PAdGRleATchEVwZG9mAmV4dG4DYWVtAjExAHNydGMGYXBwX2lkDzEyNDAyNDU3NDI4NzQxNAABp4kyShMbfla_wLLCmECwIfS0phlvjyEn6urZXfMOS_gmHda0hM77-z2hPeY0_aem_pT0EssEVQDKDRjWWvtdp0g";
+const SUPERNATURAL_DATABASE_URL = "https://sites.google.com/view/official-supernatural-database/home?igu=1";
 const YOUTUBE_RECENT_UPLOADS = [
   {
     id: "5_T2LfeRDEY",
@@ -83,7 +82,9 @@ const MP4_MIME_TYPES = [
   "video/mp4;codecs=h264",
   "video/mp4"
 ];
-const PREVIEW_CANVAS_SCALE_CAP = 1.5;
+const PREVIEW_CANVAS_SCALE_CAP = 1.25;
+const THERMAL_EFFECT_PIXEL_BUDGET = 170_000;
+let thermalWorkCanvas;
 const TRUSTED_ACCESS = [
   {
     name: "Studio Access Holder",
@@ -565,6 +566,56 @@ const EFFECT_FAMILIES = [
         name: "Pink Thermal Plate",
         color: "rgba(255, 76, 144, 0.32)",
         settings: { thermalPalette: "pink-plate", thermalBlend: 92, thermalContour: 54, heatEdge: 42, brightness: 120, contrast: 154, saturation: 212, tint: 18 }
+      },
+      {
+        name: "Lava Rainbow",
+        color: "rgba(255, 42, 16, 0.34)",
+        settings: { thermalPalette: "lava-rainbow", thermalBlend: 100, thermalContour: 72, heatEdge: 72, brightness: 116, contrast: 184, saturation: 248, posterize: 20, edgeEnhance: 28 }
+      },
+      {
+        name: "Deep Ocean Heat",
+        color: "rgba(0, 190, 255, 0.32)",
+        settings: { thermalPalette: "deep-ocean", thermalBlend: 96, thermalContour: 64, heatEdge: 58, brightness: 108, contrast: 176, saturation: 232, temperature: -26, clarity: 16 }
+      },
+      {
+        name: "Toxic Heat Trace",
+        color: "rgba(170, 255, 0, 0.32)",
+        settings: { thermalPalette: "toxic-heat", thermalBlend: 98, thermalContour: 76, heatEdge: 74, brightness: 112, contrast: 188, saturation: 250, hue: 18, scanlines: 8 }
+      },
+      {
+        name: "Amber Blue Split",
+        color: "rgba(255, 178, 36, 0.32)",
+        settings: { thermalPalette: "amber-blue", thermalBlend: 94, thermalContour: 62, heatEdge: 60, brightness: 114, contrast: 170, saturation: 218, duotone: 24 }
+      },
+      {
+        name: "Carbon Fire",
+        color: "rgba(255, 72, 18, 0.36)",
+        settings: { thermalPalette: "carbon-fire", thermalBlend: 98, thermalContour: 82, heatEdge: 86, brightness: 102, contrast: 204, saturation: 210, shadowCrush: 18, edgeGlow: 10 }
+      },
+      {
+        name: "Spectral Ice",
+        color: "rgba(94, 228, 255, 0.3)",
+        settings: { thermalPalette: "spectral-ice", thermalBlend: 94, thermalContour: 70, heatEdge: 52, brightness: 118, contrast: 164, saturation: 226, tint: -18, ultravioletWash: 12 }
+      },
+      {
+        name: "Radar Heat",
+        color: "rgba(68, 255, 122, 0.3)",
+        settings: { thermalPalette: "radar-heat", thermalBlend: 92, thermalContour: 86, heatEdge: 78, brightness: 106, contrast: 190, saturation: 206, nightScope: 18, scanlines: 16 }
+      },
+      {
+        name: "Ghost Thermal",
+        color: "rgba(226, 232, 255, 0.24)",
+        settings: { thermalPalette: "ghost-thermal", thermalBlend: 88, thermalContour: 72, heatEdge: 46, brightness: 122, contrast: 156, saturation: 120, grayscale: 16, xrayGhost: 18 }
+      },
+      {
+        name: "Copper Hot",
+        color: "rgba(255, 124, 36, 0.32)",
+        settings: { thermalPalette: "copper-hot", thermalBlend: 94, thermalContour: 66, heatEdge: 62, brightness: 112, contrast: 176, saturation: 186, sepia: 18, vibrance: 14 }
+      },
+      {
+        name: "Ultraviolet Heat",
+        color: "rgba(176, 92, 255, 0.34)",
+        settings: { thermalPalette: "ultraviolet-heat", thermalBlend: 96, thermalContour: 68, heatEdge: 64, brightness: 116, contrast: 174, saturation: 242, ultravioletWash: 22, chromaticGlow: 10 }
       }
     ],
     color: "rgba(255,76,18,0.28)",
@@ -1618,16 +1669,20 @@ function CameraStudio() {
                 <X size={20} />
               </button>
             </div>
+            <p className="database-frame-note">
+              GUI wrapper is testing the Google Sites `?igu=1` view. If Google blocks this iframe on your device, use the external button below.
+            </p>
             <div className="database-frame-shell">
               <iframe
                 title="Official Supernatural Database"
                 src={SUPERNATURAL_DATABASE_URL}
                 referrerPolicy="strict-origin-when-cross-origin"
+                sandbox="allow-forms allow-popups allow-same-origin allow-scripts allow-top-navigation-by-user-activation"
                 allow="fullscreen; clipboard-read; clipboard-write"
               />
               <div className="youtube-frame-fallback">
                 <strong>Database window</strong>
-                <span>If the Google Sites homepage blocks embedded viewing on this device, open it externally with the button below.</span>
+                <span>Using /home?igu=1. Google Sites may still block embedded viewing with X-Frame-Options on some browsers.</span>
               </div>
             </div>
             <div className="youtube-window-actions">
@@ -1883,7 +1938,38 @@ function applyAdvancedCameraPixelEffects(context, width, height, settings, effec
   const thermalAmount = clamp((thermalSignal + thermalPresetSignal) / 210, 0, 1);
   const xlsAmount = clamp(xlsSignal / 150, 0, 1);
   if (!thermalAmount && !xlsAmount) return;
+  const palette = paletteName || (xlsAmount > thermalAmount ? "xls" : "classic");
 
+  if (context.canvas && width * height > THERMAL_EFFECT_PIXEL_BUDGET) {
+    const scale = Math.sqrt(THERMAL_EFFECT_PIXEL_BUDGET / (width * height));
+    const workWidth = Math.max(1, Math.round(width * scale));
+    const workHeight = Math.max(1, Math.round(height * scale));
+    thermalWorkCanvas ||= document.createElement("canvas");
+    if (thermalWorkCanvas.width !== workWidth) thermalWorkCanvas.width = workWidth;
+    if (thermalWorkCanvas.height !== workHeight) thermalWorkCanvas.height = workHeight;
+    const workContext = thermalWorkCanvas.getContext("2d", { alpha: false, willReadFrequently: true });
+    if (!workContext) return;
+    workContext.save();
+    workContext.imageSmoothingEnabled = true;
+    workContext.imageSmoothingQuality = "high";
+    workContext.clearRect(0, 0, workWidth, workHeight);
+    workContext.drawImage(context.canvas, 0, 0, width, height, 0, 0, workWidth, workHeight);
+    workContext.restore();
+    applyAdvancedCameraPixelEffectsToContext(workContext, workWidth, workHeight, settings, { palette, thermalAmount, xlsAmount });
+    context.save();
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
+    context.clearRect(0, 0, width, height);
+    context.drawImage(thermalWorkCanvas, 0, 0, workWidth, workHeight, 0, 0, width, height);
+    context.restore();
+    return;
+  }
+
+  applyAdvancedCameraPixelEffectsToContext(context, width, height, settings, { palette, thermalAmount, xlsAmount });
+}
+
+function applyAdvancedCameraPixelEffectsToContext(context, width, height, settings, effectModel) {
+  const { palette, thermalAmount, xlsAmount } = effectModel;
   let frame;
   try {
     frame = context.getImageData(0, 0, width, height);
@@ -1895,7 +1981,6 @@ function applyAdvancedCameraPixelEffects(context, width, height, settings, effec
   const source = setting(settings, "heatEdge") || setting(settings, "thermalContour") ? new Uint8ClampedArray(data) : data;
   const edgeBoost = clamp((setting(settings, "heatEdge") + setting(settings, "thermalContour") * 0.48) / 140, 0, 1);
   const contrastPush = 1 + setting(settings, "thermalContour") / 115;
-  const palette = paletteName || (xlsAmount > thermalAmount ? "xls" : "classic");
 
   for (let index = 0; index < data.length; index += 4) {
     let r = data[index];
@@ -2020,6 +2105,87 @@ function thermalPaletteColor(value, paletteName) {
       [0.7, 255, 238, 28],
       [0.86, 255, 74, 168],
       [1, 255, 235, 242]
+    ],
+    "lava-rainbow": [
+      [0, 0, 0, 56],
+      [0.18, 0, 24, 180],
+      [0.36, 0, 214, 255],
+      [0.52, 66, 255, 42],
+      [0.66, 255, 238, 0],
+      [0.82, 255, 42, 0],
+      [1, 255, 255, 245]
+    ],
+    "deep-ocean": [
+      [0, 0, 0, 56],
+      [0.22, 0, 28, 142],
+      [0.42, 0, 110, 255],
+      [0.62, 0, 236, 255],
+      [0.78, 194, 255, 92],
+      [1, 255, 248, 176]
+    ],
+    "toxic-heat": [
+      [0, 0, 18, 42],
+      [0.26, 0, 134, 70],
+      [0.46, 92, 255, 0],
+      [0.62, 230, 255, 0],
+      [0.8, 255, 106, 0],
+      [1, 255, 255, 232]
+    ],
+    "amber-blue": [
+      [0, 0, 14, 82],
+      [0.28, 0, 108, 255],
+      [0.5, 0, 246, 255],
+      [0.68, 255, 190, 46],
+      [0.86, 255, 82, 0],
+      [1, 255, 250, 218]
+    ],
+    "carbon-fire": [
+      [0, 0, 0, 0],
+      [0.34, 22, 22, 22],
+      [0.5, 112, 0, 0],
+      [0.68, 255, 52, 0],
+      [0.86, 255, 204, 22],
+      [1, 255, 255, 238]
+    ],
+    "spectral-ice": [
+      [0, 8, 0, 96],
+      [0.24, 42, 0, 190],
+      [0.44, 0, 128, 255],
+      [0.64, 0, 255, 240],
+      [0.82, 218, 255, 255],
+      [1, 255, 255, 255]
+    ],
+    "radar-heat": [
+      [0, 0, 18, 18],
+      [0.28, 0, 108, 58],
+      [0.48, 38, 255, 80],
+      [0.64, 186, 255, 0],
+      [0.82, 255, 126, 0],
+      [1, 255, 245, 198]
+    ],
+    "ghost-thermal": [
+      [0, 16, 16, 24],
+      [0.32, 90, 96, 130],
+      [0.52, 188, 180, 232],
+      [0.7, 255, 196, 238],
+      [0.86, 255, 242, 220],
+      [1, 255, 255, 255]
+    ],
+    "copper-hot": [
+      [0, 0, 0, 16],
+      [0.28, 74, 28, 10],
+      [0.5, 188, 82, 28],
+      [0.68, 255, 132, 34],
+      [0.86, 255, 214, 124],
+      [1, 255, 255, 238]
+    ],
+    "ultraviolet-heat": [
+      [0, 0, 0, 88],
+      [0.24, 36, 0, 160],
+      [0.44, 132, 42, 255],
+      [0.62, 255, 60, 236],
+      [0.8, 255, 216, 42],
+      [1, 255, 255, 236]
     ],
     xls: [
       [0, 4, 10, 22],
@@ -2548,13 +2714,16 @@ function paintOverlay(context, width, height, effect, settings) {
     context.fillRect(0, 0, width, height);
   }
   context.globalCompositeOperation = "screen";
-  context.globalAlpha = clamp(setting(settings, "overlayStrength") / 160 + rgbw.mainIntensity * 0.08, 0.04, 0.72);
-  const linear = context.createLinearGradient(0, 0, width, height);
-  linear.addColorStop(0, rgbwCss(settings, "main", 1));
-  linear.addColorStop(0.5, rgbwCss(settings, "secondary", 1));
-  linear.addColorStop(1, rgbwCss(settings, "third", 1));
-  context.fillStyle = linear;
-  context.fillRect(0, 0, width, height);
+  const mixerAlpha = clamp(setting(settings, "overlayStrength") / 160 + rgbw.totalIntensity * 0.16, 0, 0.72);
+  if (mixerAlpha) {
+    context.globalAlpha = mixerAlpha;
+    const linear = context.createLinearGradient(0, 0, width, height);
+    linear.addColorStop(0, rgbwCss(settings, "main", 1));
+    linear.addColorStop(0.5, rgbwCss(settings, "secondary", 1));
+    linear.addColorStop(1, rgbwCss(settings, "third", 1));
+    context.fillStyle = linear;
+    context.fillRect(0, 0, width, height);
+  }
   if (setting(settings, "bloom") || setting(settings, "halation") || setting(settings, "lensFlare") || setting(settings, "edgeGlow") || setting(settings, "centerGlow") || setting(settings, "auraBloom")) {
     context.globalAlpha = clamp(
       (setting(settings, "bloom") +
@@ -2568,7 +2737,7 @@ function paintOverlay(context, width, height, effect, settings) {
       0,
       0.82
     );
-    const flare = context.createRadialGradient(width * 0.5, height * 0.14, 0, width * 0.5, height * 0.14, width * 0.58);
+    const flare = context.createRadialGradient(width * 0.5, height * 0.52, 0, width * 0.5, height * 0.52, Math.max(width, height) * 0.46);
     flare.addColorStop(0, rgbwCss(settings, "highlights", 1));
     flare.addColorStop(1, "rgba(255,255,255,0)");
     context.fillStyle = flare;
@@ -2616,8 +2785,7 @@ function paintSpecialOverlay(context, width, height, settings) {
   context.filter = `blur(${clamp(setting(settings, "halo") * 0.03 + setting(settings, "softFocus") * 0.02 + setting(settings, "bokehBloom") * 0.015, 0, 6)}px)`;
   context.globalCompositeOperation =
     setting(settings, "colorDodge") > 24 ? "color-dodge" : setting(settings, "matte") > 24 ? "soft-light" : "screen";
-  context.globalAlpha = clamp(
-    0.06 +
+  const washAlpha = clamp(
       setting(settings, "overlayStrength") / 160 +
       setting(settings, "bloom") / 240 +
       setting(settings, "infraredWash") / 320 +
@@ -2630,14 +2798,16 @@ function paintSpecialOverlay(context, width, height, settings) {
     0,
     0.94
   );
-
-  const wash = context.createLinearGradient(0, 0, width, height);
-  wash.addColorStop(0, rgbwCss(settings, "main", 1));
-  wash.addColorStop(0.34, rgbwCss(settings, "secondary", 1));
-  wash.addColorStop(0.68, rgbwCss(settings, "third", 1));
-  wash.addColorStop(1, "rgba(255,255,255,0)");
-  context.fillStyle = wash;
-  context.fillRect(0, 0, width, height);
+  if (washAlpha) {
+    context.globalAlpha = washAlpha;
+    const wash = context.createLinearGradient(0, 0, width, height);
+    wash.addColorStop(0, rgbwCss(settings, "main", 1));
+    wash.addColorStop(0.34, rgbwCss(settings, "secondary", 1));
+    wash.addColorStop(0.68, rgbwCss(settings, "third", 1));
+    wash.addColorStop(1, "rgba(255,255,255,0)");
+    context.fillStyle = wash;
+    context.fillRect(0, 0, width, height);
+  }
 
   const spectralAlpha = clamp(
     (setting(settings, "infraredWash") +
@@ -2668,22 +2838,15 @@ function paintSpecialOverlay(context, width, height, settings) {
       setting(settings, "edgeGlow") +
       setting(settings, "centerGlow") +
       setting(settings, "chromaticGlow")) /
-      360 +
-      rgbw.highlightsIntensity * 0.1,
+      360,
     0,
     0.86
   );
   if (glowAlpha) {
     context.globalCompositeOperation = "screen";
     context.globalAlpha = glowAlpha;
-    const topGlow = context.createRadialGradient(width * 0.5, height * 0.18, 0, width * 0.5, height * 0.18, width * 0.55);
-    topGlow.addColorStop(0, rgbwCss(settings, "highlights", 1));
-    topGlow.addColorStop(1, "rgba(255,255,255,0)");
-    context.fillStyle = topGlow;
-    context.fillRect(0, 0, width, height);
-
     const centerGlow = context.createRadialGradient(width * 0.5, height * 0.5, 0, width * 0.5, height * 0.5, width * 0.42);
-    centerGlow.addColorStop(0, rgbwCss(settings, "main", clamp(setting(settings, "centerGlow") / 120, 0, 0.7)));
+    centerGlow.addColorStop(0, rgbwCss(settings, "highlights", clamp(glowAlpha, 0, 0.72)));
     centerGlow.addColorStop(1, "rgba(255,255,255,0)");
     context.fillStyle = centerGlow;
     context.fillRect(0, 0, width, height);
@@ -2782,20 +2945,42 @@ function rgbwComponents(settings, groupKey) {
 }
 
 function rgbwCss(settings, groupKey, alpha = 1) {
-  const { r, g, b } = rgbwComponents(settings, groupKey);
+  const { r, g, b } = rgbwDeltaComponents(settings, groupKey);
   return `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${clamp(alpha, 0, 1)})`;
 }
 
+function rgbwDefaults(groupKey) {
+  return RGBW_MIXERS.find((group) => group.key === groupKey)?.defaults || { R: 0, G: 0, B: 0, W: 0 };
+}
+
+function rgbwDeltaComponents(settings, groupKey) {
+  const defaults = rgbwDefaults(groupKey);
+  const whiteDelta = setting(settings, `${groupKey}W`) - defaults.W;
+  const redDelta = setting(settings, `${groupKey}R`) - defaults.R;
+  const greenDelta = setting(settings, `${groupKey}G`) - defaults.G;
+  const blueDelta = setting(settings, `${groupKey}B`) - defaults.B;
+  return {
+    r: clamp(128 + redDelta + whiteDelta * 0.72, 0, 255),
+    g: clamp(128 + greenDelta + whiteDelta * 0.72, 0, 255),
+    b: clamp(128 + blueDelta + whiteDelta * 0.72, 0, 255)
+  };
+}
+
 function rgbwIntensity(settings, groupKey) {
-  const { r, g, b } = rgbwComponents(settings, groupKey);
-  return clamp((r + g + b) / (255 * 3), 0, 1);
+  const defaults = rgbwDefaults(groupKey);
+  const delta =
+    Math.abs(setting(settings, `${groupKey}R`) - defaults.R) +
+    Math.abs(setting(settings, `${groupKey}G`) - defaults.G) +
+    Math.abs(setting(settings, `${groupKey}B`) - defaults.B) +
+    Math.abs(setting(settings, `${groupKey}W`) - defaults.W);
+  return clamp(delta / (255 * 4), 0, 1);
 }
 
 function rgbwMixerInfluence(settings) {
-  const main = rgbwComponents(settings, "main");
-  const secondary = rgbwComponents(settings, "secondary");
-  const third = rgbwComponents(settings, "third");
-  const highlights = rgbwComponents(settings, "highlights");
+  const main = rgbwDeltaComponents(settings, "main");
+  const secondary = rgbwDeltaComponents(settings, "secondary");
+  const third = rgbwDeltaComponents(settings, "third");
+  const highlights = rgbwDeltaComponents(settings, "highlights");
   const mainIntensity = rgbwIntensity(settings, "main");
   const secondaryIntensity = rgbwIntensity(settings, "secondary");
   const thirdIntensity = rgbwIntensity(settings, "third");

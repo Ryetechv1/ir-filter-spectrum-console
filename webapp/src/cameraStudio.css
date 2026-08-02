@@ -1095,6 +1095,17 @@
   width: min(1100px, calc(100vw - 32px));
 }
 
+.database-frame-note {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(140, 232, 255, 0.18);
+  border-radius: 8px;
+  color: #d8e3eb;
+  background: rgba(140, 232, 255, 0.07);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .youtube-window-heading,
 .youtube-window-heading > div,
 .youtube-window-actions {
