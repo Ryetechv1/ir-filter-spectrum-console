@@ -83,7 +83,7 @@ const MP4_MIME_TYPES = [
   "video/mp4"
 ];
 const PREVIEW_CANVAS_SCALE_CAP = 1.25;
-const THERMAL_EFFECT_PIXEL_BUDGET = 170_000;
+const THERMAL_EFFECT_PIXEL_BUDGET = 112_000;
 let thermalWorkCanvas;
 const TRUSTED_ACCESS = [
   {
@@ -190,7 +190,7 @@ const EXTRA_ADJUSTMENTS = [
   ["thermalBlend", "Thermal Blend", 0, 100, "%", 0],
   ["splitTone", "Split Tone", -100, 100, "", 0],
   ["colorDodge", "Color Dodge", 0, 100, "%", 0],
-  ["overlayStrength", "Overlay Strength", 0, 100, "%", 28]
+  ["overlayStrength", "Overlay Strength", 0, 100, "%", 0]
 ];
 
 const ADDITIONAL_ADJUSTMENTS = [
@@ -616,11 +616,61 @@ const EFFECT_FAMILIES = [
         name: "Ultraviolet Heat",
         color: "rgba(176, 92, 255, 0.34)",
         settings: { thermalPalette: "ultraviolet-heat", thermalBlend: 96, thermalContour: 68, heatEdge: 64, brightness: 116, contrast: 174, saturation: 242, ultravioletWash: 22, chromaticGlow: 10 }
+      },
+      {
+        name: "Dark Field Rainbow",
+        color: "rgba(0, 88, 255, 0.28)",
+        settings: { thermalPalette: "dark-rainbow", thermalBlend: 100, thermalContour: 70, heatEdge: 68, brightness: 106, contrast: 188, saturation: 250, shadowCrush: 12, dehaze: 12 }
+      },
+      {
+        name: "Cold Room Heat",
+        color: "rgba(0, 198, 255, 0.26)",
+        settings: { thermalPalette: "cold-room", thermalBlend: 98, thermalContour: 66, heatEdge: 62, brightness: 104, contrast: 182, saturation: 242, temperature: -22, clarity: 12 }
+      },
+      {
+        name: "Nightfire Thermal",
+        color: "rgba(255, 88, 0, 0.3)",
+        settings: { thermalPalette: "nightfire", thermalBlend: 100, thermalContour: 76, heatEdge: 78, brightness: 102, contrast: 198, saturation: 236, shadowCrush: 20, localContrast: 14 }
+      },
+      {
+        name: "Cobalt Hot Trace",
+        color: "rgba(0, 122, 255, 0.28)",
+        settings: { thermalPalette: "cobalt-hot", thermalBlend: 98, thermalContour: 82, heatEdge: 76, brightness: 104, contrast: 194, saturation: 232, sharpen: 12, edgeEnhance: 16 }
+      },
+      {
+        name: "Emerald Heat Map",
+        color: "rgba(0, 255, 144, 0.28)",
+        settings: { thermalPalette: "emerald-heat", thermalBlend: 96, thermalContour: 72, heatEdge: 70, brightness: 106, contrast: 184, saturation: 238, nightScope: 8, dehaze: 10 }
+      },
+      {
+        name: "Blue Flame Thermal",
+        color: "rgba(0, 210, 255, 0.3)",
+        settings: { thermalPalette: "blue-flame", thermalBlend: 100, thermalContour: 74, heatEdge: 72, brightness: 104, contrast: 192, saturation: 250, temperature: -18, vibrance: 18 }
+      },
+      {
+        name: "Deep Sea Predator",
+        color: "rgba(0, 64, 255, 0.3)",
+        settings: { thermalPalette: "deep-sea-predator", thermalBlend: 98, thermalContour: 78, heatEdge: 80, brightness: 102, contrast: 202, saturation: 246, scanlines: 6, shadowCrush: 14 }
+      },
+      {
+        name: "Midnight Ironbow",
+        color: "rgba(255, 96, 0, 0.28)",
+        settings: { thermalPalette: "midnight-ironbow", thermalBlend: 100, thermalContour: 72, heatEdge: 66, brightness: 104, contrast: 190, saturation: 228, sepia: 4, blacks: -8 }
+      },
+      {
+        name: "Object Heat Isolate",
+        color: "rgba(255, 210, 0, 0.28)",
+        settings: { thermalPalette: "object-heat-isolate", thermalBlend: 100, thermalContour: 88, heatEdge: 84, brightness: 100, contrast: 206, saturation: 250, shadowCrush: 24, highlightRecovery: 10 }
+      },
+      {
+        name: "Lowlight Thermal Pop",
+        color: "rgba(56, 255, 238, 0.28)",
+        settings: { thermalPalette: "lowlight-pop", thermalBlend: 96, thermalContour: 68, heatEdge: 68, brightness: 102, contrast: 186, saturation: 236, ambientLift: -8, clarity: 16 }
       }
     ],
     color: "rgba(255,76,18,0.28)",
-    blendMode: "color-dodge",
-    settings: { brightness: 114, contrast: 166, saturation: 220, thermalBlend: 92, thermalContour: 60, heatEdge: 54, overlayStrength: 30 }
+    blendMode: "overlay",
+    settings: { brightness: 108, contrast: 176, saturation: 228, thermalBlend: 92, thermalContour: 60, heatEdge: 54, overlayStrength: 0 }
   },
   {
     category: "XLS Camera",
@@ -663,9 +713,9 @@ const CAMERA_EFFECTS = EFFECT_FAMILIES.flatMap((family, familyIndex) =>
         contrast: clamp((baseSettings.contrast ?? 100) + Math.round((index % 5) * 3), 20, 220),
         saturation: clamp((baseSettings.saturation ?? 100) + Math.round((index % 4) * 5), 0, 260),
         hue: clamp((baseSettings.hue ?? 0) + ((familyIndex * 17 + index * 9) % 82) - 41, -180, 180),
-        vignette: clamp((baseSettings.vignette ?? 12) + (index % 3) * 5, 0, 90),
-        grain: clamp((baseSettings.grain ?? 0) + (index % 4) * 2, 0, 80),
-        glow: clamp((baseSettings.glow ?? 0) + (index % 3) * 3, 0, 60)
+        vignette: clamp((baseSettings.vignette ?? 0) + (baseSettings.vignette == null ? 0 : (index % 3) * 5), 0, 90),
+        grain: clamp((baseSettings.grain ?? 0) + (baseSettings.grain == null ? 0 : (index % 4) * 2), 0, 80),
+        glow: clamp((baseSettings.glow ?? 0) + (baseSettings.glow == null ? 0 : (index % 3) * 3), 0, 60)
       }
     };
   })
@@ -1846,7 +1896,7 @@ function drawStudioFrame(context, width, height, video, renderState, options = {
   if (!useCanvasFilter) applyCanvasPreviewFilters(context, width, height, previewFilterCss);
   applyAdvancedCameraPixelEffects(context, width, height, manualSettings, selectedEffect);
   paintOverlay(context, width, height, selectedEffect, manualSettings);
-  paintSpecialOverlay(context, width, height, manualSettings);
+  paintSpecialOverlay(context, width, height, manualSettings, selectedEffect);
   paintCanvasGrain(context, width, height, manualSettings);
   paintCanvasVignette(context, width, height, manualSettings);
   if (options.includePreviewChrome) {
@@ -2034,7 +2084,7 @@ function thermalPaletteColor(value, paletteName) {
       [0.52, 40, 255, 76],
       [0.68, 255, 244, 0],
       [0.84, 255, 66, 0],
-      [1, 255, 255, 255]
+      [1, 255, 245, 44]
     ],
     predator: [
       [0, 0, 0, 68],
@@ -2043,7 +2093,7 @@ function thermalPaletteColor(value, paletteName) {
       [0.58, 84, 255, 0],
       [0.74, 255, 238, 0],
       [0.9, 255, 28, 0],
-      [1, 255, 255, 210]
+      [1, 255, 210, 34]
     ],
     "blue-core": [
       [0, 0, 0, 94],
@@ -2051,7 +2101,7 @@ function thermalPaletteColor(value, paletteName) {
       [0.48, 0, 222, 255],
       [0.66, 255, 236, 0],
       [0.84, 255, 67, 0],
-      [1, 255, 238, 210]
+      [1, 255, 218, 24]
     ],
     ironbow: [
       [0, 4, 0, 18],
@@ -2059,7 +2109,7 @@ function thermalPaletteColor(value, paletteName) {
       [0.42, 155, 0, 54],
       [0.62, 255, 74, 0],
       [0.8, 255, 199, 0],
-      [1, 255, 255, 230]
+      [1, 255, 222, 42]
     ],
     "white-hot": [
       [0, 0, 0, 0],
@@ -2068,9 +2118,9 @@ function thermalPaletteColor(value, paletteName) {
       [1, 255, 255, 255]
     ],
     "black-hot": [
-      [0, 255, 255, 255],
-      [0.42, 160, 160, 160],
-      [0.72, 52, 52, 52],
+      [0, 86, 96, 122],
+      [0.42, 118, 126, 142],
+      [0.72, 42, 48, 62],
       [1, 0, 0, 0]
     ],
     molten: [
@@ -2079,7 +2129,7 @@ function thermalPaletteColor(value, paletteName) {
       [0.52, 194, 0, 0],
       [0.72, 255, 111, 0],
       [0.9, 255, 228, 46],
-      [1, 255, 255, 255]
+      [1, 255, 238, 72]
     ],
     neon: [
       [0, 26, 0, 122],
@@ -2088,7 +2138,7 @@ function thermalPaletteColor(value, paletteName) {
       [0.62, 84, 255, 0],
       [0.78, 255, 238, 0],
       [0.92, 255, 0, 118],
-      [1, 255, 255, 255]
+      [1, 255, 226, 42]
     ],
     arctic: [
       [0, 4, 8, 84],
@@ -2104,7 +2154,7 @@ function thermalPaletteColor(value, paletteName) {
       [0.5, 102, 255, 167],
       [0.7, 255, 238, 28],
       [0.86, 255, 74, 168],
-      [1, 255, 235, 242]
+      [1, 255, 168, 218]
     ],
     "lava-rainbow": [
       [0, 0, 0, 56],
@@ -2113,7 +2163,7 @@ function thermalPaletteColor(value, paletteName) {
       [0.52, 66, 255, 42],
       [0.66, 255, 238, 0],
       [0.82, 255, 42, 0],
-      [1, 255, 255, 245]
+      [1, 255, 224, 36]
     ],
     "deep-ocean": [
       [0, 0, 0, 56],
@@ -2121,7 +2171,7 @@ function thermalPaletteColor(value, paletteName) {
       [0.42, 0, 110, 255],
       [0.62, 0, 236, 255],
       [0.78, 194, 255, 92],
-      [1, 255, 248, 176]
+      [1, 255, 218, 40]
     ],
     "toxic-heat": [
       [0, 0, 18, 42],
@@ -2129,7 +2179,7 @@ function thermalPaletteColor(value, paletteName) {
       [0.46, 92, 255, 0],
       [0.62, 230, 255, 0],
       [0.8, 255, 106, 0],
-      [1, 255, 255, 232]
+      [1, 255, 226, 36]
     ],
     "amber-blue": [
       [0, 0, 14, 82],
@@ -2137,7 +2187,7 @@ function thermalPaletteColor(value, paletteName) {
       [0.5, 0, 246, 255],
       [0.68, 255, 190, 46],
       [0.86, 255, 82, 0],
-      [1, 255, 250, 218]
+      [1, 255, 220, 42]
     ],
     "carbon-fire": [
       [0, 0, 0, 0],
@@ -2145,7 +2195,7 @@ function thermalPaletteColor(value, paletteName) {
       [0.5, 112, 0, 0],
       [0.68, 255, 52, 0],
       [0.86, 255, 204, 22],
-      [1, 255, 255, 238]
+      [1, 255, 226, 54]
     ],
     "spectral-ice": [
       [0, 8, 0, 96],
@@ -2153,7 +2203,7 @@ function thermalPaletteColor(value, paletteName) {
       [0.44, 0, 128, 255],
       [0.64, 0, 255, 240],
       [0.82, 218, 255, 255],
-      [1, 255, 255, 255]
+      [1, 236, 255, 214]
     ],
     "radar-heat": [
       [0, 0, 18, 18],
@@ -2161,7 +2211,7 @@ function thermalPaletteColor(value, paletteName) {
       [0.48, 38, 255, 80],
       [0.64, 186, 255, 0],
       [0.82, 255, 126, 0],
-      [1, 255, 245, 198]
+      [1, 255, 218, 44]
     ],
     "ghost-thermal": [
       [0, 16, 16, 24],
@@ -2169,7 +2219,7 @@ function thermalPaletteColor(value, paletteName) {
       [0.52, 188, 180, 232],
       [0.7, 255, 196, 238],
       [0.86, 255, 242, 220],
-      [1, 255, 255, 255]
+      [1, 240, 244, 255]
     ],
     "copper-hot": [
       [0, 0, 0, 16],
@@ -2177,7 +2227,7 @@ function thermalPaletteColor(value, paletteName) {
       [0.5, 188, 82, 28],
       [0.68, 255, 132, 34],
       [0.86, 255, 214, 124],
-      [1, 255, 255, 238]
+      [1, 255, 222, 88]
     ],
     "ultraviolet-heat": [
       [0, 0, 0, 88],
@@ -2185,7 +2235,88 @@ function thermalPaletteColor(value, paletteName) {
       [0.44, 132, 42, 255],
       [0.62, 255, 60, 236],
       [0.8, 255, 216, 42],
-      [1, 255, 255, 236]
+      [1, 255, 222, 54]
+    ],
+    "dark-rainbow": [
+      [0, 0, 0, 96],
+      [0.16, 0, 18, 150],
+      [0.34, 0, 128, 255],
+      [0.5, 0, 255, 214],
+      [0.66, 54, 255, 0],
+      [0.8, 255, 238, 0],
+      [1, 255, 42, 0]
+    ],
+    "cold-room": [
+      [0, 0, 8, 62],
+      [0.22, 0, 34, 160],
+      [0.44, 0, 160, 255],
+      [0.62, 0, 255, 230],
+      [0.78, 132, 255, 82],
+      [1, 255, 214, 34]
+    ],
+    nightfire: [
+      [0, 0, 0, 18],
+      [0.26, 0, 18, 74],
+      [0.46, 80, 0, 120],
+      [0.62, 210, 0, 34],
+      [0.8, 255, 96, 0],
+      [1, 255, 226, 44]
+    ],
+    "cobalt-hot": [
+      [0, 0, 0, 72],
+      [0.24, 0, 38, 188],
+      [0.44, 0, 156, 255],
+      [0.6, 0, 255, 236],
+      [0.76, 230, 255, 0],
+      [1, 255, 80, 0]
+    ],
+    "emerald-heat": [
+      [0, 0, 8, 42],
+      [0.24, 0, 96, 80],
+      [0.44, 0, 218, 112],
+      [0.62, 190, 255, 0],
+      [0.78, 255, 210, 0],
+      [1, 255, 66, 0]
+    ],
+    "blue-flame": [
+      [0, 0, 0, 118],
+      [0.2, 0, 54, 218],
+      [0.42, 0, 222, 255],
+      [0.6, 122, 255, 255],
+      [0.76, 255, 248, 0],
+      [1, 255, 74, 0]
+    ],
+    "deep-sea-predator": [
+      [0, 0, 4, 66],
+      [0.2, 0, 22, 128],
+      [0.4, 0, 110, 230],
+      [0.58, 0, 255, 190],
+      [0.76, 190, 255, 0],
+      [1, 255, 52, 0]
+    ],
+    "midnight-ironbow": [
+      [0, 0, 0, 26],
+      [0.24, 16, 0, 78],
+      [0.44, 110, 0, 80],
+      [0.62, 230, 30, 0],
+      [0.8, 255, 164, 0],
+      [1, 255, 226, 56]
+    ],
+    "object-heat-isolate": [
+      [0, 0, 0, 48],
+      [0.32, 0, 30, 120],
+      [0.5, 0, 148, 255],
+      [0.66, 32, 255, 72],
+      [0.82, 255, 238, 0],
+      [1, 255, 48, 0]
+    ],
+    "lowlight-pop": [
+      [0, 0, 0, 82],
+      [0.28, 0, 52, 166],
+      [0.48, 0, 208, 255],
+      [0.64, 86, 255, 60],
+      [0.82, 255, 226, 0],
+      [1, 255, 78, 0]
     ],
     xls: [
       [0, 4, 10, 22],
@@ -2202,7 +2333,7 @@ function thermalPaletteColor(value, paletteName) {
       [0.58, 22, 255, 94],
       [0.72, 255, 232, 0],
       [0.88, 255, 52, 0],
-      [1, 255, 255, 210]
+      [1, 255, 228, 48]
     ]
   }[paletteName] || [
     [0, 0, 0, 120],
@@ -2233,6 +2364,14 @@ function interpolatePalette(value, stops) {
 
 function mixChannel(a, b, amount) {
   return a * (1 - amount) + b * amount;
+}
+
+function isThermalRenderMode(settings, effect) {
+  return Boolean(settings?.thermalPalette) || effect?.category?.includes("Thermal") || setting(settings, "thermalBlend") > 0 || setting(settings, "thermalContour") > 0;
+}
+
+function thermalOverlayWeight(settings, effect) {
+  return isThermalRenderMode(settings, effect) ? 0.24 : 1;
 }
 
 function supportsCanvasContextFilter(context) {
@@ -2631,7 +2770,7 @@ function buildOverlayStyle(effect, settings) {
   const third = rgbwCss(settings, "third", clamp(0.07 + setting(settings, "splitTone") / 260 + rgbw.thirdIntensity * 0.18, 0.03, 0.66));
   const highlight = rgbwCss(settings, "highlights", clamp(0.05 + rgbw.highlightsIntensity * 0.2 + setting(settings, "lightWrap") / 240, 0.02, 0.58));
   return {
-    background: `linear-gradient(120deg, ${effect.overlayColor}, ${warm}, ${main}), linear-gradient(300deg, ${tint}, ${secondary}, transparent 62%), radial-gradient(circle at 50% 12%, ${third}, transparent 46%), radial-gradient(circle at 52% 22%, ${highlight}, transparent 32%)`,
+    background: `linear-gradient(120deg, ${effect.overlayColor}, ${warm}, ${main}), linear-gradient(300deg, ${tint}, ${secondary}, transparent 62%), linear-gradient(180deg, transparent 0%, ${third} 56%, transparent 100%), linear-gradient(90deg, transparent 0%, ${highlight} 50%, transparent 100%)`,
     mixBlendMode: effect.blendMode,
     opacity: clamp(0.14 + settings.duotone / 150 + setting(settings, "overlayStrength") / 210 + rgbw.totalIntensity * 0.18 + setting(settings, "colorLeak") / 260, 0, 0.96)
   };
@@ -2668,18 +2807,18 @@ function buildSpecialOverlayStyle(settings) {
   const split = clamp(setting(settings, "chromaticAberration") + setting(settings, "prismSplit") + setting(settings, "glitchShift") + setting(settings, "colorSeparation"), 0, 240);
   return {
     backgroundImage: `
-      radial-gradient(circle at 18% 18%, ${highlights}, transparent ${clamp(28 + setting(settings, "bloom") * 0.22, 28, 54)}%),
-      radial-gradient(circle at 84% 14%, rgba(255,255,255,${clamp(setting(settings, "lensFlare") / 110, 0, 0.66)}), transparent 24%),
+      linear-gradient(140deg, transparent 0%, ${highlights} 48%, transparent ${clamp(70 + setting(settings, "bloom") * 0.12, 70, 86)}%),
+      linear-gradient(24deg, transparent 30%, rgba(255,255,255,${clamp(setting(settings, "lensFlare") / 140, 0, 0.42)}) 50%, transparent 70%),
       linear-gradient(${88 + setting(settings, "colorizeHue") * 0.2}deg, ${main}, ${secondary}, ${third}, transparent 72%),
       linear-gradient(90deg, ${infrared}, transparent 38%, ${ultraviolet}, transparent 70%, ${thermal}),
       linear-gradient(${setting(settings, "flareStreak") * 1.8 + 24}deg, transparent 34%, ${rgbwCss(settings, "highlights", clamp(setting(settings, "flareStreak") / 140, 0, 0.62))} 48%, transparent 62%),
-      radial-gradient(circle at 50% 50%, ${rgbwCss(settings, "main", clamp(setting(settings, "centerGlow") / 160, 0, 0.58))}, transparent 36%),
+      linear-gradient(180deg, transparent 12%, ${rgbwCss(settings, "main", clamp(setting(settings, "centerGlow") / 210, 0, 0.36))} 52%, transparent 88%),
       repeating-linear-gradient(88deg, rgba(255,255,255,${scratchAlpha}) 0 1px, transparent 1px 46px),
       repeating-radial-gradient(circle at 18% 24%, rgba(255,64,96,${colorNoiseAlpha}) 0 1px, transparent 1px 9px),
       repeating-radial-gradient(circle at 82% 64%, rgba(64,196,255,${colorNoiseAlpha}) 0 1px, transparent 1px 11px),
       repeating-linear-gradient(0deg, rgba(255,255,255,${scanlineAlpha}) 0 1px, transparent 1px ${clamp(8 - setting(settings, "scanlines") / 20, 3, 8)}px),
-      radial-gradient(circle at 50% 50%, transparent ${clamp(34 - setting(settings, "tiltShift") * 0.12, 18, 34)}%, rgba(0,0,0,${clamp(setting(settings, "shadowCrush") / 150, 0, 0.68)}) 100%),
-      repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,${grainAlpha}) 0 1px, transparent 1px 5px)
+      linear-gradient(90deg, rgba(0,0,0,${clamp(setting(settings, "shadowCrush") / 210, 0, 0.42)}), transparent 28%, transparent 72%, rgba(0,0,0,${clamp(setting(settings, "shadowCrush") / 210, 0, 0.42)})),
+      repeating-linear-gradient(45deg, rgba(255,255,255,${grainAlpha}) 0 1px, transparent 1px 7px)
     `,
     mixBlendMode: setting(settings, "colorDodge") > 24 ? "color-dodge" : setting(settings, "matte") > 24 ? "soft-light" : "screen",
     opacity: clamp(
@@ -2703,8 +2842,9 @@ function buildSpecialOverlayStyle(settings) {
 
 function paintOverlay(context, width, height, effect, settings) {
   const rgbw = rgbwMixerInfluence(settings);
+  const overlayWeight = thermalOverlayWeight(settings, effect);
   context.save();
-  context.globalAlpha = clamp(0.1 + settings.duotone / 150 + rgbw.totalIntensity * 0.12 + setting(settings, "colorLeak") / 320, 0, 0.88);
+  context.globalAlpha = clamp((0.04 + settings.duotone / 150 + setting(settings, "overlayStrength") / 210 + rgbw.totalIntensity * 0.12 + setting(settings, "colorLeak") / 320) * overlayWeight, 0, 0.72);
   context.globalCompositeOperation = canvasCompositeMode(effect.blendMode);
   context.fillStyle = effect.overlayColor;
   context.fillRect(0, 0, width, height);
@@ -2714,7 +2854,7 @@ function paintOverlay(context, width, height, effect, settings) {
     context.fillRect(0, 0, width, height);
   }
   context.globalCompositeOperation = "screen";
-  const mixerAlpha = clamp(setting(settings, "overlayStrength") / 160 + rgbw.totalIntensity * 0.16, 0, 0.72);
+  const mixerAlpha = clamp((setting(settings, "overlayStrength") / 160 + rgbw.totalIntensity * 0.16) * overlayWeight, 0, 0.72);
   if (mixerAlpha) {
     context.globalAlpha = mixerAlpha;
     const linear = context.createLinearGradient(0, 0, width, height);
@@ -2726,14 +2866,15 @@ function paintOverlay(context, width, height, effect, settings) {
   }
   if (setting(settings, "bloom") || setting(settings, "halation") || setting(settings, "lensFlare") || setting(settings, "edgeGlow") || setting(settings, "centerGlow") || setting(settings, "auraBloom")) {
     context.globalAlpha = clamp(
-      (setting(settings, "bloom") +
-        setting(settings, "halation") +
-        setting(settings, "lensFlare") +
-        setting(settings, "edgeGlow") +
-        setting(settings, "centerGlow") +
-        setting(settings, "auraBloom")) /
-        330 +
-        rgbw.highlightsIntensity * 0.08,
+      ((setting(settings, "bloom") +
+          setting(settings, "halation") +
+          setting(settings, "lensFlare") +
+          setting(settings, "edgeGlow") +
+          setting(settings, "centerGlow") +
+          setting(settings, "auraBloom")) /
+          330 +
+          rgbw.highlightsIntensity * 0.08) *
+        overlayWeight,
       0,
       0.82
     );
@@ -2756,7 +2897,7 @@ function paintOverlay(context, width, height, effect, settings) {
   if (setting(settings, "nightScope") || setting(settings, "nearIrBoost") || setting(settings, "uvaFluorescence") || setting(settings, "thermalContour")) {
     context.globalCompositeOperation = "soft-light";
     context.globalAlpha = clamp(
-      (setting(settings, "nightScope") + setting(settings, "nearIrBoost") + setting(settings, "uvaFluorescence") + setting(settings, "thermalContour")) / 420,
+      (setting(settings, "nightScope") + setting(settings, "nearIrBoost") + setting(settings, "uvaFluorescence") + setting(settings, "thermalContour") * overlayWeight) / 420,
       0,
       0.58
     );
@@ -2779,8 +2920,9 @@ function paintOverlay(context, width, height, effect, settings) {
   context.restore();
 }
 
-function paintSpecialOverlay(context, width, height, settings) {
+function paintSpecialOverlay(context, width, height, settings, effect) {
   const rgbw = rgbwMixerInfluence(settings);
+  const overlayWeight = thermalOverlayWeight(settings, effect);
   context.save();
   context.filter = `blur(${clamp(setting(settings, "halo") * 0.03 + setting(settings, "softFocus") * 0.02 + setting(settings, "bokehBloom") * 0.015, 0, 6)}px)`;
   context.globalCompositeOperation =
@@ -2790,7 +2932,7 @@ function paintSpecialOverlay(context, width, height, settings) {
       setting(settings, "bloom") / 240 +
       setting(settings, "infraredWash") / 320 +
       setting(settings, "ultravioletWash") / 320 +
-      setting(settings, "thermalBlend") / 320 +
+      (setting(settings, "thermalBlend") * overlayWeight) / 320 +
       setting(settings, "colorLeak") / 360 +
       setting(settings, "auraBloom") / 320 +
       setting(settings, "mirrorGhost") / 360 +
@@ -2812,10 +2954,10 @@ function paintSpecialOverlay(context, width, height, settings) {
   const spectralAlpha = clamp(
     (setting(settings, "infraredWash") +
       setting(settings, "ultravioletWash") +
-      setting(settings, "thermalBlend") +
+      setting(settings, "thermalBlend") * overlayWeight +
       setting(settings, "uvaFluorescence") +
-      setting(settings, "thermalContour") +
-      setting(settings, "heatEdge")) /
+      setting(settings, "thermalContour") * overlayWeight +
+      setting(settings, "heatEdge") * overlayWeight) /
       520,
     0,
     0.76
@@ -2832,13 +2974,14 @@ function paintSpecialOverlay(context, width, height, settings) {
   }
 
   const glowAlpha = clamp(
-    (setting(settings, "bloom") +
-      setting(settings, "halation") +
-      setting(settings, "lensFlare") +
-      setting(settings, "edgeGlow") +
-      setting(settings, "centerGlow") +
-      setting(settings, "chromaticGlow")) /
-      360,
+    ((setting(settings, "bloom") +
+        setting(settings, "halation") +
+        setting(settings, "lensFlare") +
+        setting(settings, "edgeGlow") +
+        setting(settings, "centerGlow") +
+        setting(settings, "chromaticGlow")) /
+        360) *
+      overlayWeight,
     0,
     0.86
   );
