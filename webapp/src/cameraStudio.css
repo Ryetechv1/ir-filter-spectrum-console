@@ -724,6 +724,202 @@
   border-color: rgba(63, 208, 255, 0.42);
 }
 
+.media-compositor-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(133, 160, 184, 0.22);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.06), transparent 42%),
+    rgba(2, 5, 8, 0.46);
+}
+
+.media-compositor-actions,
+.media-layer-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.media-compositor-frame {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(133, 160, 184, 0.22);
+  border-radius: 8px;
+  background: #030508;
+  aspect-ratio: 16 / 9;
+}
+
+.media-compositor-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #030508;
+}
+
+.media-compositor-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  padding: 24px;
+  color: #aeb9c5;
+  text-align: center;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(63, 208, 255, 0.12), transparent 34%),
+    rgba(3, 5, 8, 0.86);
+}
+
+.media-compositor-placeholder strong {
+  color: #f5f8fb;
+  font-size: 18px;
+}
+
+.media-layer-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.media-layer-tabs button {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 3px 8px;
+  justify-items: start;
+  min-height: 74px;
+  padding: 10px;
+  text-align: left;
+}
+
+.media-layer-tabs button svg {
+  grid-row: span 3;
+  margin-top: 2px;
+  color: #8ce8ff;
+}
+
+.media-layer-tabs button span,
+.media-layer-tabs button strong,
+.media-layer-tabs button small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.media-layer-tabs button strong {
+  color: #f5f8fb;
+  font-size: 12px;
+}
+
+.media-layer-tabs button small {
+  color: #aeb9c5;
+  font-size: 11px;
+}
+
+.media-layer-tabs button.active {
+  border-color: #3fd0ff;
+  background: linear-gradient(180deg, rgba(63, 208, 255, 0.22), rgba(2, 5, 8, 0.54));
+}
+
+.media-layer-editor {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(133, 160, 184, 0.18);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(140, 232, 255, 0.1), transparent 36%),
+    rgba(255, 255, 255, 0.035);
+}
+
+.media-layer-editor-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.media-layer-editor-heading div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.media-layer-editor-heading strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #f5f8fb;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.media-layer-editor-heading span {
+  color: #aeb9c5;
+  font-size: 12px;
+}
+
+.media-layer-editor-heading button,
+.media-layer-actions button {
+  display: inline-flex;
+  justify-content: center;
+  gap: 6px;
+  align-items: center;
+  min-height: 34px;
+}
+
+.media-layer-select-grid,
+.media-layer-slider-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.media-layer-select-grid label,
+.media-layer-slider {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  color: #d8e3eb;
+  font-size: 12px;
+}
+
+.media-layer-select-grid select {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid rgba(133, 160, 184, 0.24);
+  border-radius: 7px;
+  color: #f5f8fb;
+  background: #070d14;
+}
+
+.media-layer-slider span {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.media-layer-slider output {
+  min-width: 52px;
+  padding: 4px 7px;
+  border: 1px solid rgba(133, 160, 184, 0.24);
+  border-radius: 5px;
+  color: #d8e3eb;
+  text-align: center;
+  background: rgba(2, 5, 8, 0.42);
+}
+
+.media-layer-slider input {
+  width: 100%;
+  accent-color: #3fd0ff;
+}
+
 .adjustments-panel {
   padding-bottom: 14px;
 }
@@ -1471,9 +1667,23 @@
   .studio-action-row,
   .recording-action-row,
   .resolution-selector,
+  .media-compositor-actions,
+  .media-layer-tabs,
+  .media-layer-select-grid,
+  .media-layer-slider-grid,
+  .media-layer-actions,
   .capture-shelf-grid,
   .camera-meta-row {
     grid-template-columns: 1fr;
+  }
+
+  .media-layer-editor-heading {
+    display: grid;
+  }
+
+  .media-layer-editor-heading button,
+  .media-layer-actions button {
+    justify-content: center;
   }
 
   .studio-action-row,

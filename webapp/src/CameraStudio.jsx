@@ -4,16 +4,22 @@ import {
   ExternalLink,
   FlipHorizontal,
   Film,
+  ImagePlus,
   KeyRound,
+  Layers,
   LockKeyhole,
   Mail,
+  Pause,
+  Play,
   RefreshCw,
+  RotateCcw,
   Search,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
   Square,
   Trash2,
+  Upload,
   Video,
   Youtube,
   Zap,
@@ -77,6 +83,33 @@ const RECORDING_RESOLUTIONS = {
   "1080p": { label: "1080P", width: 1920, height: 1080 },
   "2k": { label: "2K", width: 2560, height: 1440 }
 };
+const MEDIA_LAYER_LIMIT = 3;
+const MEDIA_COMPOSITE_WIDTH = 1920;
+const MEDIA_COMPOSITE_HEIGHT = 1080;
+const MEDIA_BLEND_MODES = [
+  ["source-over", "Normal"],
+  ["screen", "Screen"],
+  ["overlay", "Overlay"],
+  ["soft-light", "Soft Light"],
+  ["multiply", "Multiply"],
+  ["lighten", "Lighten"],
+  ["darken", "Darken"],
+  ["color-dodge", "Color Dodge"],
+  ["difference", "Difference"],
+  ["luminosity", "Luminosity"]
+];
+const MEDIA_SPLICE_MODES = [
+  ["full", "Full Frame"],
+  ["left", "Left Half"],
+  ["right", "Right Half"],
+  ["top", "Top Half"],
+  ["bottom", "Bottom Half"],
+  ["center", "Center Window"],
+  ["diagonal", "Diagonal Wipe"],
+  ["circle", "Circle Portal"],
+  ["vertical-strips", "Vertical Strips"],
+  ["lower-third", "Lower Third"]
+];
 const MP4_MIME_TYPES = [
   "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
   "video/mp4;codecs=h264",
@@ -85,6 +118,7 @@ const MP4_MIME_TYPES = [
 const PREVIEW_CANVAS_SCALE_CAP = 1.25;
 const THERMAL_EFFECT_PIXEL_BUDGET = 112_000;
 let thermalWorkCanvas;
+let mediaLayerWorkCanvas;
 const TRUSTED_ACCESS = [
   {
     name: "Studio Access Holder",
@@ -728,8 +762,12 @@ function CameraStudio() {
   const hudVideoRef = useRef(null);
   const previewCanvasRef = useRef(null);
   const hudCanvasRef = useRef(null);
+  const mediaCanvasRef = useRef(null);
+  const mediaFrameRef = useRef(null);
+  const mediaUploadInputRef = useRef(null);
   const cameraFrameRef = useRef(null);
   const streamRef = useRef(null);
+  const mediaCompositeFrameRef = useRef(0);
   const recorderRef = useRef(null);
   const recordingChunksRef = useRef([]);
   const recordingCanvasRef = useRef(null);
@@ -738,6 +776,7 @@ function CameraStudio() {
   const recordingTimerRef = useRef(null);
   const recordingStartedAtRef = useRef(0);
   const captureShelfRef = useRef([]);
+  const mediaLayersRef = useRef([]);
   const renderStateRef = useRef({
     filterCss: "",
     selectedEffect: CAMERA_EFFECTS[0],
@@ -767,6 +806,10 @@ function CameraStudio() {
   const [openAdjustmentGroups, setOpenAdjustmentGroups] = useState(() => new Set(ADJUSTMENT_GROUPS.filter((group) => group.open).map((group) => group.id)));
   const [snapshotUrl, setSnapshotUrl] = useState("");
   const [cameraHudVisible, setCameraHudVisible] = useState(false);
+  const [mediaLayers, setMediaLayers] = useState([]);
+  const [selectedMediaLayerId, setSelectedMediaLayerId] = useState("");
+  const [mediaComposerStatus, setMediaComposerStatus] = useState("Upload 1-3 local images or videos to build a separate composited edit.");
+  const [mediaSnapshotUrl, setMediaSnapshotUrl] = useState("");
 
   const selectedEffect = useMemo(
     () => CAMERA_EFFECTS.find((effect) => effect.id === selectedEffectId) || CAMERA_EFFECTS[0],
@@ -796,10 +839,18 @@ function CameraStudio() {
   );
 
   const filterCss = useMemo(() => buildFilterCss(manualSettings), [manualSettings]);
+  const selectedMediaLayer = useMemo(
+    () => mediaLayers.find((layer) => layer.id === selectedMediaLayerId) || mediaLayers[0] || null,
+    [mediaLayers, selectedMediaLayerId]
+  );
 
   useEffect(() => {
     renderStateRef.current = { filterCss, selectedEffect, manualSettings, cameraFacing };
   }, [cameraFacing, filterCss, manualSettings, selectedEffect]);
+
+  useEffect(() => {
+    mediaLayersRef.current = mediaLayers;
+  }, [mediaLayers]);
 
   useEffect(() => {
     if (!cameraActive) {
@@ -836,6 +887,34 @@ function CameraStudio() {
       }
     };
   }, [cameraActive, cameraHudVisible]);
+
+  useEffect(() => {
+    if (!mediaLayers.length) {
+      clearCameraOutputCanvas(mediaCanvasRef.current);
+      return undefined;
+    }
+    let lastDraw = 0;
+    const drawComposite = (timestamp) => {
+      const hasVideo = mediaLayers.some((layer) => layer.kind === "video");
+      if (!lastDraw || hasVideo || timestamp - lastDraw > 120) {
+        drawUploadedMediaComposite(mediaCanvasRef.current, mediaFrameRef.current, mediaLayers, {
+          filterCss,
+          selectedEffect,
+          selectedEffectId,
+          manualSettings
+        });
+        lastDraw = timestamp;
+      }
+      mediaCompositeFrameRef.current = window.requestAnimationFrame(drawComposite);
+    };
+    mediaCompositeFrameRef.current = window.requestAnimationFrame(drawComposite);
+    return () => {
+      if (mediaCompositeFrameRef.current) {
+        window.cancelAnimationFrame(mediaCompositeFrameRef.current);
+        mediaCompositeFrameRef.current = 0;
+      }
+    };
+  }, [filterCss, manualSettings, mediaLayers, selectedEffect, selectedEffectId]);
 
   useEffect(() => {
     const frame = cameraFrameRef.current;
@@ -1109,9 +1188,11 @@ function CameraStudio() {
   useEffect(
     () => () => {
       if (previewFrameRef.current) window.cancelAnimationFrame(previewFrameRef.current);
+      if (mediaCompositeFrameRef.current) window.cancelAnimationFrame(mediaCompositeFrameRef.current);
       stopRecording("Recording stopped because the studio closed.");
       stopCamera();
       captureShelfRef.current.forEach((item) => URL.revokeObjectURL(item.url));
+      mediaLayersRef.current.forEach((layer) => URL.revokeObjectURL(layer.url));
     },
     [stopCamera, stopRecording]
   );
@@ -1167,26 +1248,164 @@ function CameraStudio() {
     setSnapshotUrl("");
   }
 
+  async function handleMediaUpload(event) {
+    const files = [...(event.target.files || [])].filter((file) => file.type.startsWith("image/") || file.type.startsWith("video/"));
+    const selectedFiles = files.slice(0, MEDIA_LAYER_LIMIT);
+    event.target.value = "";
+    if (!selectedFiles.length) {
+      setMediaComposerStatus("Choose image or video files to load into the compositor.");
+      return;
+    }
+    setMediaComposerStatus("Loading local media layers...");
+    try {
+      const layers = await Promise.all(selectedFiles.map((file, index) => createMediaLayerFromFile(file, index, selectedEffectId)));
+      setMediaLayers((current) => {
+        current.forEach((layer) => URL.revokeObjectURL(layer.url));
+        return layers;
+      });
+      setSelectedMediaLayerId(layers[0]?.id || "");
+      setMediaSnapshotUrl("");
+      setMediaComposerStatus(
+        `${layers.length} local media layer${layers.length === 1 ? "" : "s"} loaded. ${files.length > MEDIA_LAYER_LIMIT ? "Only the first 3 files were used." : "Use opacity, splice, blend, geometry, and studio effects below."}`
+      );
+    } catch (error) {
+      setMediaComposerStatus(`Media import failed: ${error.message || error}`);
+    }
+  }
+
+  function updateMediaLayer(layerId, patch) {
+    setMediaLayers((current) =>
+      current.map((layer) => (layer.id === layerId ? { ...layer, ...patch } : layer))
+    );
+  }
+
+  function removeMediaLayer(layerId) {
+    setMediaLayers((current) => {
+      const removed = current.find((layer) => layer.id === layerId);
+      if (removed) URL.revokeObjectURL(removed.url);
+      const next = current.filter((layer) => layer.id !== layerId);
+      setSelectedMediaLayerId((selectedId) => (selectedId === layerId ? next[0]?.id || "" : selectedId));
+      setMediaComposerStatus(next.length ? "Layer removed from the local compositor." : "Media compositor cleared.");
+      return next;
+    });
+  }
+
+  function resetMediaLayer(layerId) {
+    updateMediaLayer(layerId, {
+      opacity: 100,
+      blendMode: "source-over",
+      spliceMode: "full",
+      offsetX: 0,
+      offsetY: 0,
+      scale: 100,
+      rotation: 0,
+      effectId: selectedEffectId
+    });
+    setMediaComposerStatus("Selected media layer reset to full-frame normal blend.");
+  }
+
+  function useCurrentStudioEffectForLayer(layerId) {
+    updateMediaLayer(layerId, { effectId: selectedEffectId });
+    setMediaComposerStatus("Selected media layer now uses the active studio preset with the current slider stack.");
+  }
+
+  async function toggleMediaLayerPlayback(layer) {
+    if (!layer || layer.kind !== "video") return;
+    try {
+      if (layer.element.paused) {
+        await layer.element.play();
+        updateMediaLayer(layer.id, { paused: false });
+      } else {
+        layer.element.pause();
+        updateMediaLayer(layer.id, { paused: true });
+      }
+    } catch (error) {
+      setMediaComposerStatus(`Video playback could not be changed: ${error.message || error}`);
+    }
+  }
+
+  function restartMediaLayerVideo(layer) {
+    if (!layer || layer.kind !== "video") return;
+    layer.element.currentTime = 0;
+    layer.element.play().catch(() => undefined);
+    updateMediaLayer(layer.id, { paused: false });
+    setMediaComposerStatus("Video layer restarted.");
+  }
+
+  async function exportMediaCompositeSnapshot() {
+    if (!mediaLayers.length) {
+      setMediaComposerStatus("Upload at least one image or video before exporting a composite.");
+      return;
+    }
+    const canvas = mediaCanvasRef.current;
+    drawUploadedMediaComposite(canvas, mediaFrameRef.current, mediaLayers, {
+      filterCss,
+      selectedEffect,
+      selectedEffectId,
+      manualSettings
+    });
+    if (!canvas?.width || !canvas?.height) {
+      setMediaComposerStatus("Composite export failed because the canvas is not ready yet.");
+      return;
+    }
+    try {
+      const exportCanvas = document.createElement("canvas");
+      exportCanvas.width = canvas.width;
+      exportCanvas.height = canvas.height;
+      const exportContext = exportCanvas.getContext("2d");
+      if (!exportContext) throw new Error("This browser could not create a compositor export canvas.");
+      exportContext.drawImage(canvas, 0, 0);
+      const blob = await canvasToPngBlob(exportCanvas);
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      setMediaSnapshotUrl(url);
+      addCaptureToShelf({
+        id: `media-composite-${Date.now()}`,
+        kind: "photo",
+        url,
+        type: "image/png",
+        extension: "png",
+        label: "Composite PNG",
+        size: blob.size,
+        createdAt: new Date().toISOString()
+      });
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `spectral-media-composite-${new Date().toISOString().replace(/[:.]/g, "-")}.png`;
+      link.click();
+      setMediaComposerStatus("Composite PNG exported exactly from the displayed compositor canvas.");
+    } catch (error) {
+      setMediaComposerStatus(`Composite export failed: ${error.message || error}`);
+    }
+  }
+
   async function captureSnapshot() {
     const video = videoRef.current;
     if (!video || !cameraActive) {
       setCameraStatus("Start the camera before taking a snapshot.");
       return;
     }
-    const previewCanvas = previewCanvasRef.current;
-    drawCameraOutputCanvas(previewCanvas, cameraFrameRef.current, video, { filterCss, selectedEffect, manualSettings, cameraFacing }, {
-      includePreviewChrome: true,
-      metaLabels: ["Local camera stream", cameraFacing === "user" ? "Front camera" : "Rear camera", selectedEffect.name]
+    const size = getRenderedCameraFrameSize(cameraFrameRef.current || previewCanvasRef.current, video.videoWidth || 1280, video.videoHeight || 720, {
+      scaleCap: PREVIEW_CANVAS_SCALE_CAP
     });
-    if (!previewCanvas?.width || !previewCanvas?.height) {
+    const canvas = document.createElement("canvas");
+    canvas.width = size.width;
+    canvas.height = size.height;
+    const context = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
+    if (!context) {
+      setCameraStatus("Snapshot failed because this browser could not create an export canvas.");
+      return;
+    }
+    drawStudioFrame(context, size.width, size.height, video, { filterCss, selectedEffect, manualSettings, cameraFacing }, {
+      forcePixelFilters: true,
+      pixelScale: size.scale,
+      cssWidth: size.cssWidth,
+      includePreviewChrome: false
+    });
+    if (!canvas.width || !canvas.height) {
       setCameraStatus("Snapshot failed because the preview canvas is not ready yet.");
       return;
     }
-    const canvas = document.createElement("canvas");
-    canvas.width = previewCanvas.width;
-    canvas.height = previewCanvas.height;
-    const context = canvas.getContext("2d");
-    context.drawImage(previewCanvas, 0, 0);
     try {
       const blob = await canvasToPngBlob(canvas);
       if (!blob) return;
@@ -1315,6 +1534,118 @@ function CameraStudio() {
     );
   }
 
+  function renderMediaLayerSlider(layer, key, label, min, max, unit = "") {
+    const value = layer[key] ?? 0;
+    return (
+      <label className="media-layer-slider" key={key}>
+        <span>
+          {label}
+          <output>{value}{unit}</output>
+        </span>
+        <input
+          id={`media-${key}`}
+          type="range"
+          min={min}
+          max={max}
+          value={value}
+          onInput={(event) => updateMediaLayer(layer.id, { [key]: Number(event.currentTarget.value) })}
+          onChange={(event) => updateMediaLayer(layer.id, { [key]: Number(event.target.value) })}
+          style={{ "--value": `${((value - min) / (max - min)) * 100}%` }}
+        />
+      </label>
+    );
+  }
+
+  function renderMediaLayerEditor() {
+    if (!selectedMediaLayer) {
+      return <p className="empty-capture-note">Select or upload a layer to edit opacity, blend, splice, position, scale, and studio effect.</p>;
+    }
+    return (
+      <section className="media-layer-editor" aria-label={`Edit ${selectedMediaLayer.name}`}>
+        <div className="media-layer-editor-heading">
+          <div>
+            <strong>{selectedMediaLayer.name}</strong>
+            <span>{selectedMediaLayer.kind === "video" ? "Video layer" : "Image layer"} • {selectedMediaLayer.type || "local file"}</span>
+          </div>
+          <button type="button" onClick={() => useCurrentStudioEffectForLayer(selectedMediaLayer.id)}>
+            <Sparkles size={14} />
+            Use Current Effect
+          </button>
+        </div>
+
+        <div className="media-layer-select-grid">
+          <label>
+            Layer effect
+            <select
+              id="media-effect-preset"
+              value={selectedMediaLayer.effectId}
+              onChange={(event) => updateMediaLayer(selectedMediaLayer.id, { effectId: event.target.value })}
+            >
+              {CAMERA_EFFECTS.map((effect) => (
+                <option key={effect.id} value={effect.id}>{effect.name} - {effect.category}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Splice / blend
+            <select
+              id="media-blend-mode"
+              value={selectedMediaLayer.blendMode}
+              onChange={(event) => updateMediaLayer(selectedMediaLayer.id, { blendMode: event.target.value })}
+            >
+              {MEDIA_BLEND_MODES.map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Splice mask
+            <select
+              id="media-splice-mode"
+              value={selectedMediaLayer.spliceMode}
+              onChange={(event) => updateMediaLayer(selectedMediaLayer.id, { spliceMode: event.target.value })}
+            >
+              {MEDIA_SPLICE_MODES.map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="media-layer-slider-grid">
+          {renderMediaLayerSlider(selectedMediaLayer, "opacity", "Opacity", 0, 100, "%")}
+          {renderMediaLayerSlider(selectedMediaLayer, "scale", "Scale", 25, 220, "%")}
+          {renderMediaLayerSlider(selectedMediaLayer, "offsetX", "Move X", -100, 100, "%")}
+          {renderMediaLayerSlider(selectedMediaLayer, "offsetY", "Move Y", -100, 100, "%")}
+          {renderMediaLayerSlider(selectedMediaLayer, "rotation", "Rotation", -180, 180, "deg")}
+        </div>
+
+        <div className="media-layer-actions">
+          {selectedMediaLayer.kind === "video" && (
+            <>
+              <button type="button" onClick={() => toggleMediaLayerPlayback(selectedMediaLayer)}>
+                {selectedMediaLayer.paused ? <Play size={14} /> : <Pause size={14} />}
+                {selectedMediaLayer.paused ? "Play Layer" : "Pause Layer"}
+              </button>
+              <button type="button" onClick={() => restartMediaLayerVideo(selectedMediaLayer)}>
+                <RotateCcw size={14} />
+                Restart Video
+              </button>
+            </>
+          )}
+          <button type="button" onClick={() => resetMediaLayer(selectedMediaLayer.id)}>
+            <RefreshCw size={14} />
+            Reset Layer
+          </button>
+          <button type="button" className="danger-action" onClick={() => removeMediaLayer(selectedMediaLayer.id)}>
+            <Trash2 size={14} />
+            Remove Layer
+          </button>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <main className="camera-studio-shell">
       <header className="camera-studio-topbar">
@@ -1369,6 +1700,7 @@ function CameraStudio() {
             <li>Four RGBW gradient mixers for Main, Secondary, Third, and Highlights color layers that now drive overlays and filter math.</li>
             <li>12 core photo controls, 10 color inversion tools, and 100 advanced sliders for exposure, color channels, glow, scanlines, IR/UVA washes, and more.</li>
             <li>Processed PNG snapshots and 1080P or 2K MP4 recordings with the studio effects applied.</li>
+            <li>Separate 1-3 layer image/video compositor with opacity, splice masks, blend modes, transforms, and clean PNG export.</li>
             <li>A local shelf for the latest 3 photos/videos, with preview, download, and remove controls.</li>
           </ul>
           <a href={`mailto:${CONTACT_EMAIL}`}><Mail size={15} /> {CONTACT_EMAIL}</a>
@@ -1548,6 +1880,73 @@ function CameraStudio() {
               </div>
             ) : (
               <p className="empty-capture-note">No local captures yet. Take a snapshot or record MP4 video to fill this shelf.</p>
+            )}
+          </section>
+
+          <section className="media-compositor-panel" aria-labelledby="mediaCompositorTitle">
+            <div className="recording-panel-heading">
+              <div>
+                <h2 id="mediaCompositorTitle">Image / Video Overlay Compositor</h2>
+                <span>Upload up to 3 local images or videos. Layers are composited with opacity, CapCut-style splice/blend modes, and the studio effect engine.</span>
+              </div>
+              <strong>{mediaLayers.length} / {MEDIA_LAYER_LIMIT}</strong>
+            </div>
+
+            <div className="media-compositor-actions">
+              <input
+                ref={mediaUploadInputRef}
+                type="file"
+                accept="image/*,video/*"
+                multiple
+                hidden
+                onChange={handleMediaUpload}
+              />
+              <button type="button" onClick={() => mediaUploadInputRef.current?.click()}>
+                <Upload size={17} />
+                Upload Media
+              </button>
+              <button type="button" className="studio-snapshot" onClick={exportMediaCompositeSnapshot} disabled={!mediaLayers.length}>
+                <Download size={17} />
+                Export Composite PNG
+              </button>
+            </div>
+
+            <div className="media-compositor-frame" ref={mediaFrameRef}>
+              <canvas ref={mediaCanvasRef} className="media-compositor-canvas" aria-label="Uploaded media composited preview" />
+              {!mediaLayers.length && (
+                <div className="media-compositor-placeholder">
+                  <ImagePlus size={36} />
+                  <strong>Upload 1-3 local images or videos</strong>
+                  <span>Every upload can be blended, spliced, transformed, and filtered before export.</span>
+                </div>
+              )}
+            </div>
+
+            {mediaLayers.length > 0 && (
+              <div className="media-layer-tabs" aria-label="Uploaded media layers">
+                {mediaLayers.map((layer, index) => (
+                  <button
+                    key={layer.id}
+                    type="button"
+                    className={layer.id === selectedMediaLayer?.id ? "active" : ""}
+                    onClick={() => setSelectedMediaLayerId(layer.id)}
+                  >
+                    <Layers size={15} />
+                    <span>Layer {index + 1}</span>
+                    <strong>{layer.name}</strong>
+                    <small>{layer.kind === "video" ? "Video" : "Image"} • {layer.opacity}%</small>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {renderMediaLayerEditor()}
+
+            <p className="studio-status">{mediaComposerStatus}</p>
+            {mediaSnapshotUrl && (
+              <a className="snapshot-review" href={mediaSnapshotUrl} target="_blank" rel="noreferrer">
+                Open last local composite snapshot
+              </a>
             )}
           </section>
         </section>
@@ -1766,6 +2165,207 @@ function supportedMp4MimeType() {
   return MP4_MIME_TYPES.find((type) => MediaRecorder.isTypeSupported(type)) || "";
 }
 
+function createMediaLayerFromFile(file, index, effectId) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const kind = file.type.startsWith("video/") ? "video" : "image";
+    const id = `media-layer-${Date.now()}-${index}-${Math.random().toString(16).slice(2)}`;
+    const cleanupAndReject = (error) => {
+      URL.revokeObjectURL(url);
+      reject(error);
+    };
+    const baseLayer = {
+      id,
+      name: file.name || `${kind} ${index + 1}`,
+      kind,
+      type: file.type || (kind === "video" ? "video" : "image"),
+      url,
+      size: file.size,
+      opacity: index === 0 ? 100 : 64,
+      blendMode: index === 0 ? "source-over" : index === 1 ? "screen" : "overlay",
+      spliceMode: "full",
+      offsetX: 0,
+      offsetY: 0,
+      scale: 100,
+      rotation: 0,
+      effectId,
+      paused: false,
+      createdAt: new Date().toISOString()
+    };
+
+    if (kind === "video") {
+      const video = document.createElement("video");
+      video.src = url;
+      video.muted = true;
+      video.loop = true;
+      video.playsInline = true;
+      video.preload = "auto";
+      video.onloadedmetadata = () => {
+        video.play().catch(() => undefined);
+        resolve({
+          ...baseLayer,
+          element: video,
+          width: video.videoWidth || MEDIA_COMPOSITE_WIDTH,
+          height: video.videoHeight || MEDIA_COMPOSITE_HEIGHT,
+          duration: video.duration || 0
+        });
+      };
+      video.onerror = () => cleanupAndReject(new Error(`Could not load video layer: ${file.name}`));
+      return;
+    }
+
+    const image = new Image();
+    image.decoding = "async";
+    image.onload = () => {
+      resolve({
+        ...baseLayer,
+        element: image,
+        width: image.naturalWidth || MEDIA_COMPOSITE_WIDTH,
+        height: image.naturalHeight || MEDIA_COMPOSITE_HEIGHT
+      });
+    };
+    image.onerror = () => cleanupAndReject(new Error(`Could not load image layer: ${file.name}`));
+    image.src = url;
+  });
+}
+
+function drawUploadedMediaComposite(canvas, frameElement, layers, renderState) {
+  if (!canvas) return false;
+  const size = getRenderedCameraFrameSize(frameElement || canvas, MEDIA_COMPOSITE_WIDTH, MEDIA_COMPOSITE_HEIGHT, {
+    scaleCap: PREVIEW_CANVAS_SCALE_CAP
+  });
+  if (!size.width || !size.height) return false;
+  if (canvas.width !== size.width) canvas.width = size.width;
+  if (canvas.height !== size.height) canvas.height = size.height;
+  const context = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
+  if (!context) return false;
+  context.save();
+  context.globalAlpha = 1;
+  context.globalCompositeOperation = "source-over";
+  context.filter = "none";
+  context.fillStyle = "#030508";
+  context.fillRect(0, 0, size.width, size.height);
+  context.restore();
+
+  const drawableLayers = layers.filter((layer) => layer?.element && isDrawableMediaSource(layer.element));
+  drawableLayers.forEach((layer) => {
+    drawMediaLayer(context, size.width, size.height, layer, renderState);
+  });
+  return true;
+}
+
+function drawMediaLayer(context, width, height, layer, renderState) {
+  const source = layer.element;
+  if (!isDrawableMediaSource(source)) return;
+  mediaLayerWorkCanvas ||= document.createElement("canvas");
+  if (mediaLayerWorkCanvas.width !== width) mediaLayerWorkCanvas.width = width;
+  if (mediaLayerWorkCanvas.height !== height) mediaLayerWorkCanvas.height = height;
+  const layerContext = mediaLayerWorkCanvas.getContext("2d", { alpha: false, willReadFrequently: true });
+  if (!layerContext) return;
+  const layerEffect = CAMERA_EFFECTS.find((effect) => effect.id === layer.effectId) || renderState.selectedEffect || CAMERA_EFFECTS[0];
+  const layerSettings = mediaLayerSettings(layerEffect, renderState.manualSettings);
+  drawStudioFrame(layerContext, width, height, source, {
+    filterCss: buildFilterCss(layerSettings),
+    selectedEffect: layerEffect,
+    manualSettings: layerSettings,
+    cameraFacing: "environment"
+  }, {
+    forcePixelFilters: true,
+    includePreviewChrome: false,
+    pixelScale: 1,
+    cssWidth: width
+  });
+
+  const offsetX = (setting(layer, "offsetX") / 100) * width * 0.5;
+  const offsetY = (setting(layer, "offsetY") / 100) * height * 0.5;
+  const scale = clamp(setting(layer, "scale", 100), 25, 220) / 100;
+  const rotation = (setting(layer, "rotation") * Math.PI) / 180;
+
+  context.save();
+  applyMediaSpliceClip(context, width, height, layer.spliceMode);
+  context.globalAlpha = clamp(setting(layer, "opacity", 100) / 100, 0, 1);
+  context.globalCompositeOperation = canvasCompositeMode(layer.blendMode);
+  context.translate(width / 2 + offsetX, height / 2 + offsetY);
+  context.rotate(rotation);
+  context.drawImage(mediaLayerWorkCanvas, -width * scale / 2, -height * scale / 2, width * scale, height * scale);
+  context.restore();
+}
+
+function mediaLayerSettings(effect, manualSettings) {
+  const globalKeys = [
+    "brightness",
+    "contrast",
+    "exposure",
+    "saturation",
+    "hue",
+    "temperature",
+    "tint",
+    "blur",
+    "vignette",
+    "grain",
+    "duotone",
+    "glow",
+    "sepia",
+    "grayscale",
+    "invert"
+  ];
+  return {
+    ...DEFAULT_SETTINGS,
+    ...effect.settings,
+    ...Object.fromEntries([...STACKED_SETTING_KEYS].map((key) => [key, manualSettings[key] ?? DEFAULT_SETTINGS[key] ?? 0])),
+    ...Object.fromEntries(globalKeys.map((key) => [key, manualSettings[key] ?? effect.settings[key] ?? DEFAULT_SETTINGS[key] ?? 0]))
+  };
+}
+
+function applyMediaSpliceClip(context, width, height, mode = "full") {
+  context.beginPath();
+  if (mode === "left") context.rect(0, 0, width / 2, height);
+  else if (mode === "right") context.rect(width / 2, 0, width / 2, height);
+  else if (mode === "top") context.rect(0, 0, width, height / 2);
+  else if (mode === "bottom") context.rect(0, height / 2, width, height / 2);
+  else if (mode === "center") context.rect(width * 0.16, height * 0.16, width * 0.68, height * 0.68);
+  else if (mode === "diagonal") {
+    context.moveTo(0, 0);
+    context.lineTo(width, 0);
+    context.lineTo(width, height * 0.72);
+    context.lineTo(0, height);
+    context.closePath();
+  } else if (mode === "circle") {
+    context.arc(width / 2, height / 2, Math.min(width, height) * 0.36, 0, Math.PI * 2);
+  } else if (mode === "vertical-strips") {
+    const stripWidth = width / 9;
+    for (let x = 0; x < width; x += stripWidth * 2) context.rect(x, 0, stripWidth, height);
+  } else if (mode === "lower-third") {
+    context.rect(0, height * 0.58, width, height * 0.42);
+  } else {
+    context.rect(0, 0, width, height);
+  }
+  context.clip();
+}
+
+function isDrawableMediaSource(source) {
+  if (!source) return false;
+  if (typeof HTMLVideoElement !== "undefined" && source instanceof HTMLVideoElement) return source.readyState >= 2 && source.videoWidth > 0 && source.videoHeight > 0;
+  if (typeof HTMLImageElement !== "undefined" && source instanceof HTMLImageElement) return source.complete && source.naturalWidth > 0 && source.naturalHeight > 0;
+  return false;
+}
+
+function mediaSourceSize(source, fallbackWidth, fallbackHeight) {
+  if (typeof HTMLVideoElement !== "undefined" && source instanceof HTMLVideoElement) {
+    return {
+      width: source.videoWidth || fallbackWidth,
+      height: source.videoHeight || fallbackHeight
+    };
+  }
+  if (typeof HTMLImageElement !== "undefined" && source instanceof HTMLImageElement) {
+    return {
+      width: source.naturalWidth || fallbackWidth,
+      height: source.naturalHeight || fallbackHeight
+    };
+  }
+  return { width: fallbackWidth, height: fallbackHeight };
+}
+
 function drawCameraOutputCanvas(canvas, frameElement, video, renderState, options = {}) {
   if (!canvas || !video) return false;
   const fallbackWidth = video.videoWidth || 1280;
@@ -1859,7 +2459,7 @@ function getRenderedCameraFrameSize(frameElement, fallbackWidth, fallbackHeight,
   };
 }
 
-function drawStudioFrame(context, width, height, video, renderState, options = {}) {
+function drawStudioFrame(context, width, height, mediaSource, renderState, options = {}) {
   const { filterCss, selectedEffect, manualSettings, cameraFacing } = renderState;
   const previewFilterCss = filterCss || buildFilterCss(manualSettings);
   const useCanvasFilter = !options.forcePixelFilters && supportsCanvasContextFilter(context);
@@ -1869,9 +2469,8 @@ function drawStudioFrame(context, width, height, video, renderState, options = {
   context.globalCompositeOperation = "source-over";
   context.fillStyle = "#030508";
   context.fillRect(0, 0, width, height);
-  if (video?.readyState >= 2) {
-    const sourceWidth = video.videoWidth || width;
-    const sourceHeight = video.videoHeight || height;
+  if (isDrawableMediaSource(mediaSource)) {
+    const { width: sourceWidth, height: sourceHeight } = mediaSourceSize(mediaSource, width, height);
     const sourceRatio = sourceWidth / sourceHeight;
     const targetRatio = width / height;
     let sx = 0;
@@ -1890,7 +2489,7 @@ function drawStudioFrame(context, width, height, video, renderState, options = {
       context.translate(width, 0);
       context.scale(-1, 1);
     }
-    context.drawImage(video, sx, sy, sw, sh, 0, 0, width, height);
+    context.drawImage(mediaSource, sx, sy, sw, sh, 0, 0, width, height);
   }
   context.restore();
   if (!useCanvasFilter) applyCanvasPreviewFilters(context, width, height, previewFilterCss);
@@ -3175,7 +3774,19 @@ function captureDownloadName(item) {
 }
 
 function canvasCompositeMode(mode) {
-  if (mode === "screen" || mode === "overlay" || mode === "soft-light" || mode === "color-dodge") return mode;
+  if (
+    mode === "screen" ||
+    mode === "overlay" ||
+    mode === "soft-light" ||
+    mode === "multiply" ||
+    mode === "lighten" ||
+    mode === "darken" ||
+    mode === "color-dodge" ||
+    mode === "difference" ||
+    mode === "luminosity"
+  ) {
+    return mode;
+  }
   return "source-over";
 }
 
