@@ -986,7 +986,20 @@ function CameraStudio() {
     canvas.width = snapshotSize.width;
     canvas.height = snapshotSize.height;
     const context = canvas.getContext("2d");
-    drawStudioFrame(context, snapshotSize.width, snapshotSize.height, video, { filterCss, selectedEffect, manualSettings, cameraFacing });
+    drawStudioFrame(
+      context,
+      snapshotSize.width,
+      snapshotSize.height,
+      video,
+      { filterCss, selectedEffect, manualSettings, cameraFacing },
+      {
+        includePreviewChrome: true,
+        forcePixelFilters: true,
+        pixelScale: snapshotSize.scale,
+        cssWidth: snapshotSize.cssWidth,
+        metaLabels: ["Local camera stream", cameraFacing === "user" ? "Front camera" : "Rear camera", selectedEffect.name]
+      }
+    );
     canvas.toBlob((blob) => {
       if (!blob) return;
       const url = URL.createObjectURL(blob);
@@ -1523,22 +1536,28 @@ function getRenderedCameraFrameSize(frameElement, fallbackWidth, fallbackHeight)
   if (!frameElement?.getBoundingClientRect) {
     return {
       width: Math.max(1, Math.round(fallbackWidth || 1280)),
-      height: Math.max(1, Math.round(fallbackHeight || 720))
+      height: Math.max(1, Math.round(fallbackHeight || 720)),
+      scale: 1,
+      cssWidth: Math.max(1, Math.round(fallbackWidth || 1280))
     };
   }
   const rect = frameElement.getBoundingClientRect();
   const deviceScale = clamp(window.devicePixelRatio || 1, 1, 2);
   const width = Math.round(rect.width * deviceScale);
   const height = Math.round(rect.height * deviceScale);
-  if (width > 0 && height > 0) return { width, height };
+  if (width > 0 && height > 0) return { width, height, scale: deviceScale, cssWidth: rect.width };
   return {
     width: Math.max(1, Math.round(fallbackWidth || 1280)),
-    height: Math.max(1, Math.round(fallbackHeight || 720))
+    height: Math.max(1, Math.round(fallbackHeight || 720)),
+    scale: 1,
+    cssWidth: Math.max(1, Math.round(fallbackWidth || 1280))
   };
 }
 
-function drawStudioFrame(context, width, height, video, renderState) {
+function drawStudioFrame(context, width, height, video, renderState, options = {}) {
   const { filterCss, selectedEffect, manualSettings, cameraFacing } = renderState;
+  const previewFilterCss = filterCss || buildFilterCss(manualSettings);
+  const useCanvasFilter = !options.forcePixelFilters && supportsCanvasContextFilter(context);
   context.save();
   context.filter = "none";
   context.globalAlpha = 1;
@@ -1561,7 +1580,7 @@ function drawStudioFrame(context, width, height, video, renderState) {
       sh = sourceWidth / targetRatio;
       sy = (sourceHeight - sh) / 2;
     }
-    context.filter = filterCss || buildFilterCss(manualSettings);
+    if (useCanvasFilter) context.filter = previewFilterCss;
     if (cameraFacing === "user") {
       context.translate(width, 0);
       context.scale(-1, 1);
@@ -1569,10 +1588,309 @@ function drawStudioFrame(context, width, height, video, renderState) {
     context.drawImage(video, sx, sy, sw, sh, 0, 0, width, height);
   }
   context.restore();
+  if (!useCanvasFilter) applyCanvasPreviewFilters(context, width, height, previewFilterCss);
   paintOverlay(context, width, height, selectedEffect, manualSettings);
   paintSpecialOverlay(context, width, height, manualSettings);
   paintCanvasGrain(context, width, height, manualSettings);
   paintCanvasVignette(context, width, height, manualSettings);
+  if (options.includePreviewChrome) {
+    paintPreviewChrome(context, width, height, {
+      scale: options.pixelScale || 1,
+      cssWidth: options.cssWidth || width,
+      labels: options.metaLabels || []
+    });
+  }
+}
+
+function applyCanvasPreviewFilters(context, width, height, filterCss) {
+  const model = parseFilterCss(filterCss);
+  if (!filterModelChangesPixels(model)) return;
+  let frame;
+  try {
+    frame = context.getImageData(0, 0, width, height);
+  } catch {
+    return;
+  }
+  const data = frame.data;
+  if (model.blur > 0.35) applyBoxBlur(data, width, height, Math.min(20, Math.round(model.blur)));
+  for (let index = 0; index < data.length; index += 4) {
+    let r = data[index];
+    let g = data[index + 1];
+    let b = data[index + 2];
+
+    if (model.sepia) {
+      const amount = model.sepia;
+      const nr = r * (1 - 0.607 * amount) + g * (0.769 * amount) + b * (0.189 * amount);
+      const ng = r * (0.349 * amount) + g * (1 - 0.314 * amount) + b * (0.168 * amount);
+      const nb = r * (0.272 * amount) + g * (0.534 * amount) + b * (1 - 0.869 * amount);
+      r = nr;
+      g = ng;
+      b = nb;
+    }
+
+    if (model.grayscale) {
+      const amount = model.grayscale;
+      const luminance = r * 0.2126 + g * 0.7152 + b * 0.0722;
+      r = r * (1 - amount) + luminance * amount;
+      g = g * (1 - amount) + luminance * amount;
+      b = b * (1 - amount) + luminance * amount;
+    }
+
+    if (model.invert) {
+      const amount = model.invert;
+      r = r * (1 - amount) + (255 - r) * amount;
+      g = g * (1 - amount) + (255 - g) * amount;
+      b = b * (1 - amount) + (255 - b) * amount;
+    }
+
+    if (model.hue) {
+      [r, g, b] = rotateHue(r, g, b, model.hue);
+    }
+
+    if (model.saturate !== 1) {
+      const amount = model.saturate;
+      const luminance = r * 0.2126 + g * 0.7152 + b * 0.0722;
+      r = luminance + (r - luminance) * amount;
+      g = luminance + (g - luminance) * amount;
+      b = luminance + (b - luminance) * amount;
+    }
+
+    if (model.brightness !== 1) {
+      r *= model.brightness;
+      g *= model.brightness;
+      b *= model.brightness;
+    }
+
+    if (model.contrast !== 1) {
+      r = (r - 128) * model.contrast + 128;
+      g = (g - 128) * model.contrast + 128;
+      b = (b - 128) * model.contrast + 128;
+    }
+
+    data[index] = clamp(r, 0, 255);
+    data[index + 1] = clamp(g, 0, 255);
+    data[index + 2] = clamp(b, 0, 255);
+  }
+  context.putImageData(frame, 0, 0);
+}
+
+function supportsCanvasContextFilter(context) {
+  return context && "filter" in context;
+}
+
+function parseFilterCss(filterCss = "") {
+  const model = {
+    blur: 0,
+    sepia: 0,
+    grayscale: 0,
+    invert: 0,
+    hue: 0,
+    saturate: 1,
+    brightness: 1,
+    contrast: 1
+  };
+  const matcher = /([a-z-]+)\(([^)]*)\)/gi;
+  for (const match of filterCss.matchAll(matcher)) {
+    const name = match[1];
+    const raw = match[2].trim();
+    if (name === "blur") model.blur = parseCssNumber(raw);
+    if (name === "sepia") model.sepia = parseCssAmount(raw, 1);
+    if (name === "grayscale") model.grayscale = parseCssAmount(raw, 1);
+    if (name === "invert") model.invert = parseCssAmount(raw, 1);
+    if (name === "hue-rotate") model.hue = parseCssAngle(raw);
+    if (name === "saturate") model.saturate = parseCssAmount(raw, 100);
+    if (name === "brightness") model.brightness = parseCssAmount(raw, 100);
+    if (name === "contrast") model.contrast = parseCssAmount(raw, 100);
+  }
+  return model;
+}
+
+function parseCssNumber(value) {
+  const parsed = Number.parseFloat(String(value).replace(/px|deg|rad|turn|%/g, ""));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function parseCssAmount(value, percentBase) {
+  const text = String(value).trim();
+  const parsed = Number.parseFloat(text);
+  if (!Number.isFinite(parsed)) return percentBase === 100 ? 1 : 0;
+  if (text.includes("%")) return parsed / 100;
+  return percentBase === 100 && parsed > 4 ? parsed / 100 : parsed;
+}
+
+function parseCssAngle(value) {
+  const text = String(value).trim();
+  const parsed = Number.parseFloat(text);
+  if (!Number.isFinite(parsed)) return 0;
+  if (text.endsWith("turn")) return parsed * 360;
+  if (text.endsWith("rad")) return (parsed * 180) / Math.PI;
+  return parsed;
+}
+
+function filterModelChangesPixels(model) {
+  return (
+    model.blur > 0.35 ||
+    model.sepia > 0 ||
+    model.grayscale > 0 ||
+    model.invert > 0 ||
+    Math.abs(model.hue) > 0.01 ||
+    Math.abs(model.saturate - 1) > 0.001 ||
+    Math.abs(model.brightness - 1) > 0.001 ||
+    Math.abs(model.contrast - 1) > 0.001
+  );
+}
+
+function rotateHue(r, g, b, degrees) {
+  const angle = (degrees * Math.PI) / 180;
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  return [
+    r * (0.213 + cos * 0.787 - sin * 0.213) + g * (0.715 - cos * 0.715 - sin * 0.715) + b * (0.072 - cos * 0.072 + sin * 0.928),
+    r * (0.213 - cos * 0.213 + sin * 0.143) + g * (0.715 + cos * 0.285 + sin * 0.14) + b * (0.072 - cos * 0.072 - sin * 0.283),
+    r * (0.213 - cos * 0.213 - sin * 0.787) + g * (0.715 - cos * 0.715 + sin * 0.715) + b * (0.072 + cos * 0.928 + sin * 0.072)
+  ];
+}
+
+function applyBoxBlur(data, width, height, radius) {
+  if (radius <= 0) return;
+  const temp = new Uint8ClampedArray(data.length);
+  const channels = 4;
+  const windowSize = radius * 2 + 1;
+  for (let y = 0; y < height; y += 1) {
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    let a = 0;
+    for (let x = -radius; x <= radius; x += 1) {
+      const clampedX = clamp(x, 0, width - 1);
+      const offset = (y * width + clampedX) * channels;
+      r += data[offset];
+      g += data[offset + 1];
+      b += data[offset + 2];
+      a += data[offset + 3];
+    }
+    for (let x = 0; x < width; x += 1) {
+      const offset = (y * width + x) * channels;
+      temp[offset] = r / windowSize;
+      temp[offset + 1] = g / windowSize;
+      temp[offset + 2] = b / windowSize;
+      temp[offset + 3] = a / windowSize;
+      const removeX = clamp(x - radius, 0, width - 1);
+      const addX = clamp(x + radius + 1, 0, width - 1);
+      const removeOffset = (y * width + removeX) * channels;
+      const addOffset = (y * width + addX) * channels;
+      r += data[addOffset] - data[removeOffset];
+      g += data[addOffset + 1] - data[removeOffset + 1];
+      b += data[addOffset + 2] - data[removeOffset + 2];
+      a += data[addOffset + 3] - data[removeOffset + 3];
+    }
+  }
+  for (let x = 0; x < width; x += 1) {
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    let a = 0;
+    for (let y = -radius; y <= radius; y += 1) {
+      const clampedY = clamp(y, 0, height - 1);
+      const offset = (clampedY * width + x) * channels;
+      r += temp[offset];
+      g += temp[offset + 1];
+      b += temp[offset + 2];
+      a += temp[offset + 3];
+    }
+    for (let y = 0; y < height; y += 1) {
+      const offset = (y * width + x) * channels;
+      data[offset] = r / windowSize;
+      data[offset + 1] = g / windowSize;
+      data[offset + 2] = b / windowSize;
+      data[offset + 3] = a / windowSize;
+      const removeY = clamp(y - radius, 0, height - 1);
+      const addY = clamp(y + radius + 1, 0, height - 1);
+      const removeOffset = (removeY * width + x) * channels;
+      const addOffset = (addY * width + x) * channels;
+      r += temp[addOffset] - temp[removeOffset];
+      g += temp[addOffset + 1] - temp[removeOffset + 1];
+      b += temp[addOffset + 2] - temp[removeOffset + 2];
+      a += temp[addOffset + 3] - temp[removeOffset + 3];
+    }
+  }
+}
+
+function paintPreviewChrome(context, width, height, options = {}) {
+  const scale = options.scale || 1;
+  const compact = (options.cssWidth || width) < 720;
+  const cornerInset = 26 * scale;
+  const cornerLength = Math.min(width, height) * 0.16;
+  const cornerStroke = Math.max(2, 2 * scale);
+
+  context.save();
+  context.globalCompositeOperation = "source-over";
+  context.globalAlpha = 1;
+  context.strokeStyle = "rgba(245,248,251,0.82)";
+  context.lineWidth = cornerStroke;
+  drawCornerLines(context, cornerInset, cornerInset, cornerLength, cornerStroke, "top-left");
+  drawCornerLines(context, width - cornerInset, cornerInset, cornerLength, cornerStroke, "top-right");
+  drawCornerLines(context, cornerInset, height - cornerInset, cornerLength, cornerStroke, "bottom-left");
+  drawCornerLines(context, width - cornerInset, height - cornerInset, cornerLength, cornerStroke, "bottom-right");
+
+  const badgeX = 42 * scale;
+  const badgeY = 45 * scale;
+  context.fillStyle = "#69df5c";
+  context.shadowColor = "rgba(105,223,92,0.7)";
+  context.shadowBlur = 14 * scale;
+  context.beginPath();
+  context.arc(badgeX, badgeY - 5 * scale, 4.5 * scale, 0, Math.PI * 2);
+  context.fill();
+  context.shadowBlur = 0;
+  context.fillStyle = "#f5f8fb";
+  context.font = `800 ${Math.max(13, 15 * scale)}px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+  context.textBaseline = "middle";
+  context.fillText("LIVE", badgeX + 17 * scale, badgeY - 5 * scale);
+
+  const labels = options.labels?.length ? options.labels : ["Local camera stream"];
+  const metaHeight = (compact ? 96 : 45) * scale;
+  const metaTop = height - metaHeight;
+  context.fillStyle = "rgba(2,5,8,0.72)";
+  context.fillRect(0, metaTop, width, metaHeight);
+  context.strokeStyle = "rgba(133,160,184,0.26)";
+  context.lineWidth = Math.max(1, scale);
+  context.beginPath();
+  context.moveTo(0, metaTop + 0.5 * scale);
+  context.lineTo(width, metaTop + 0.5 * scale);
+  context.stroke();
+  context.fillStyle = "#d8e3eb";
+  context.font = `500 ${Math.max(13, 13 * scale)}px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+  if (compact) {
+    const left = 16 * scale;
+    labels.slice(0, 3).forEach((label, index) => {
+      context.fillText(label, left, metaTop + (21 + index * 28) * scale);
+    });
+  } else {
+    const left = 16 * scale;
+    const center = width / 2;
+    const right = width - 16 * scale;
+    context.textAlign = "left";
+    context.fillText(labels[0] || "", left, metaTop + metaHeight / 2);
+    context.textAlign = "center";
+    context.fillText(labels[1] || "", center, metaTop + metaHeight / 2);
+    context.textAlign = "right";
+    context.fillText(labels[2] || "", right, metaTop + metaHeight / 2);
+    context.textAlign = "left";
+  }
+  context.strokeStyle = "rgba(133,160,184,0.24)";
+  context.strokeRect(0.5 * scale, 0.5 * scale, width - scale, height - scale);
+  context.restore();
+}
+
+function drawCornerLines(context, x, y, length, stroke, corner) {
+  const horizontal = corner.includes("right") ? -length : length;
+  const vertical = corner.includes("bottom") ? -length : length;
+  context.beginPath();
+  context.moveTo(x, y);
+  context.lineTo(x + horizontal, y);
+  context.moveTo(x, y);
+  context.lineTo(x, y + vertical);
+  context.stroke();
 }
 
 function buildFilterCss(settings, options = {}) {
