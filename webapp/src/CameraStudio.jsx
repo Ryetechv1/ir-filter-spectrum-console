@@ -555,6 +555,7 @@ const CATEGORIES = ["All Presets", "Favorites", ...EFFECT_FAMILIES.map((family) 
 
 function CameraStudio() {
   const videoRef = useRef(null);
+  const hudVideoRef = useRef(null);
   const cameraFrameRef = useRef(null);
   const streamRef = useRef(null);
   const recorderRef = useRef(null);
@@ -591,6 +592,7 @@ function CameraStudio() {
   const [manualSettings, setManualSettings] = useState(CAMERA_EFFECTS[0].settings);
   const [openAdjustmentGroups, setOpenAdjustmentGroups] = useState(() => new Set(ADJUSTMENT_GROUPS.filter((group) => group.open).map((group) => group.id)));
   const [snapshotUrl, setSnapshotUrl] = useState("");
+  const [cameraHudVisible, setCameraHudVisible] = useState(false);
 
   const selectedEffect = useMemo(
     () => CAMERA_EFFECTS.find((effect) => effect.id === selectedEffectId) || CAMERA_EFFECTS[0],
@@ -622,6 +624,14 @@ function CameraStudio() {
   const filterCss = useMemo(() => buildFilterCss(manualSettings), [manualSettings]);
   const overlayStyle = useMemo(() => buildOverlayStyle(selectedEffect, manualSettings), [manualSettings, selectedEffect]);
   const specialOverlayStyle = useMemo(() => buildSpecialOverlayStyle(manualSettings), [manualSettings]);
+  const grainOpacity = useMemo(
+    () => clamp((manualSettings.grain + setting(manualSettings, "filmGrainSize") + setting(manualSettings, "noiseMono") + setting(manualSettings, "dust")) / 260, 0, 0.72),
+    [manualSettings]
+  );
+  const vignetteOpacity = useMemo(
+    () => clamp((manualSettings.vignette + setting(manualSettings, "shadowDepth") * 0.24 + setting(manualSettings, "negativeDepth") * 0.18) / 100, 0, 0.96),
+    [manualSettings]
+  );
   const videoStyle = useMemo(
     () => ({
       filter: filterCss,
@@ -633,6 +643,43 @@ function CameraStudio() {
   useEffect(() => {
     renderStateRef.current = { filterCss, selectedEffect, manualSettings, cameraFacing };
   }, [cameraFacing, filterCss, manualSettings, selectedEffect]);
+
+  useEffect(() => {
+    const frame = cameraFrameRef.current;
+    if (!frame) return undefined;
+    const syncHudVisibility = () => {
+      const rect = frame.getBoundingClientRect();
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 1;
+      const visibleHeight = Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0);
+      const visibilityRatio = clamp(visibleHeight / Math.max(rect.height, 1), 0, 1);
+      setCameraHudVisible(window.scrollY > 80 && visibilityRatio < 0.68);
+    };
+    const observer =
+      typeof IntersectionObserver === "function"
+        ? new IntersectionObserver(syncHudVisibility, { threshold: [0, 0.2, 0.5, 0.68, 0.85, 1] })
+        : null;
+    observer?.observe(frame);
+    syncHudVisibility();
+    window.addEventListener("scroll", syncHudVisibility, { passive: true });
+    window.addEventListener("resize", syncHudVisibility);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("scroll", syncHudVisibility);
+      window.removeEventListener("resize", syncHudVisibility);
+    };
+  }, []);
+
+  useEffect(() => {
+    const hudVideo = hudVideoRef.current;
+    if (!hudVideo) return;
+    const stream = cameraActive ? streamRef.current : null;
+    if (hudVideo.srcObject !== stream) hudVideo.srcObject = stream;
+    if (stream) {
+      hudVideo.play().catch(() => {
+        // Browsers can briefly reject autoplay while the HUD mounts; the main video remains authoritative.
+      });
+    }
+  }, [cameraActive, cameraHudVisible, cameraFacing]);
 
   const updateTorchCapability = useCallback((stream) => {
     const videoTrack = stream?.getVideoTracks?.()[0];
@@ -648,6 +695,10 @@ function CameraStudio() {
     if (videoRef.current) {
       videoRef.current.srcObject = stream;
       await videoRef.current.play();
+    }
+    if (hudVideoRef.current) {
+      hudVideoRef.current.srcObject = stream;
+      await Promise.resolve(hudVideoRef.current.play()).catch(() => undefined);
     }
     updateTorchCapability(stream);
     setCameraFacing(nextFacing);
@@ -683,6 +734,7 @@ function CameraStudio() {
       streamRef.current = null;
     }
     if (videoRef.current) videoRef.current.srcObject = null;
+    if (hudVideoRef.current) hudVideoRef.current.srcObject = null;
     setTorchActive(false);
     setTorchSupported(false);
     setCameraActive(false);
@@ -957,6 +1009,10 @@ function CameraStudio() {
     }, "image/png");
   }
 
+  function scrollToCameraFrame() {
+    cameraFrameRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
   function renderAdjustmentSlider(control, className = "") {
     if (!control) return null;
     const [key, label, min, max, unit] = control;
@@ -1161,8 +1217,8 @@ function CameraStudio() {
             <video ref={videoRef} className={cameraFacing === "user" ? "is-mirrored" : ""} autoPlay playsInline muted style={videoStyle} />
             <div className="studio-color-overlay" style={overlayStyle} />
             <div className="studio-special-overlay" style={specialOverlayStyle} />
-            <div className="studio-grain" style={{ opacity: clamp((manualSettings.grain + setting(manualSettings, "filmGrainSize") + setting(manualSettings, "noiseMono") + setting(manualSettings, "dust")) / 260, 0, 0.72) }} />
-            <div className="studio-vignette" style={{ opacity: clamp((manualSettings.vignette + setting(manualSettings, "shadowDepth") * 0.24 + setting(manualSettings, "negativeDepth") * 0.18) / 100, 0, 0.96) }} />
+            <div className="studio-grain" style={{ opacity: grainOpacity }} />
+            <div className="studio-vignette" style={{ opacity: vignetteOpacity }} />
             {!cameraActive && (
               <div className="camera-placeholder">
                 <LockKeyhole size={40} />
@@ -1435,6 +1491,24 @@ function CameraStudio() {
             </div>
           </section>
         </div>
+      )}
+
+      {cameraActive && cameraHudVisible && (
+        <button className="camera-floating-hud" type="button" onClick={scrollToCameraFrame} aria-label="Return to full camera preview">
+          <div className="camera-floating-hud-frame">
+            <video ref={hudVideoRef} className={cameraFacing === "user" ? "is-mirrored" : ""} autoPlay playsInline muted style={videoStyle} />
+            <div className="studio-color-overlay" style={overlayStyle} />
+            <div className="studio-special-overlay" style={specialOverlayStyle} />
+            <div className="studio-grain" style={{ opacity: grainOpacity }} />
+            <div className="studio-vignette" style={{ opacity: vignetteOpacity }} />
+            <div className="camera-corners" aria-hidden="true" />
+            <div className="camera-live-badge">Live</div>
+            <div className="camera-floating-hud-label">
+              <span>{cameraFacing === "user" ? "Front" : "Rear"}</span>
+              <strong>{selectedEffect.name}</strong>
+            </div>
+          </div>
+        </button>
       )}
     </main>
   );
