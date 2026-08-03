@@ -31,6 +31,7 @@ import {
   setLights as sendLights,
   streamUrl
 } from "./deviceApi.js";
+import AccentThemePicker from "./AccentThemePicker.jsx";
 import CameraStudio from "./CameraStudio.jsx";
 import { DEFAULT_PROTOTYPE_ID, PROTOTYPES, getPrototype } from "./prototypes.js";
 
@@ -424,7 +425,12 @@ function App() {
   }, []);
 
   if (isCameraStudioRoute()) {
-    return <CameraStudio />;
+    return (
+      <>
+        <AccentThemePicker />
+        <CameraStudio />
+      </>
+    );
   }
 
   const [address, setAddress] = useState(loadSavedAddress);
@@ -861,6 +867,7 @@ function App() {
 
   return (
     <div className="app-shell">
+      <AccentThemePicker />
       <header className="topbar">
         <div className="brand">
           <div className="brand-mark">
