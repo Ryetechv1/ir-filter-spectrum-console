@@ -833,8 +833,13 @@ const CATEGORY_COUNTS = new Map(
     return [category, CAMERA_EFFECTS.reduce((count, effect) => count + (effect.category === category ? 1 : 0), 0)];
   })
 );
+const EFFECT_PRESET_GROUPS = EFFECT_FAMILIES.map((family) => ({
+  category: family.category,
+  effects: CAMERA_EFFECTS.filter((effect) => effect.category === family.category)
+}));
 
 const EQUATION_DEFAULT_VALUE = "SP3CTR4L-37";
+const EQUATION_STYLE_AUTO = "auto";
 const EQUATION_TARGETS = [
   ["A", "A - Value pipeline"],
   ["B", "B - Fetch data"],
@@ -887,46 +892,44 @@ const EQUATION_MUTATION_KEYS = [
   "spectralInvert",
   "thermalInvert"
 ];
+const EQUATION_STYLE_CATEGORY_KEYS = new Map([
+  ["Clean Studio", ["ambientLift", "highlightRecovery", "whiteBalance", "skinSmooth"]],
+  ["IR Simulations", ["infraredWash", "nearIrBoost", "grayscale", "negativeDepth", "xrayGhost"]],
+  ["UVA / Fluorescence", ["ultravioletWash", "uvaFluorescence", "mineralPop", "auraBloom", "chromaticGlow"]],
+  ["Cinematic", ["vignette", "grain", "matte", "halation", "shadowCrush"]],
+  ["Cyber Neon", ["glow", "bloom", "chromaticGlow", "colorSeparation", "prismSplit"]],
+  ["Black & White", ["grayscale", "contrast", "grain", "threshold", "clarity"]],
+  ["Duotone", ["duotone", "splitTone", "tint", "colorHarmony", "colorDodge"]],
+  ["Retro Film", ["sepia", "grain", "dust", "scratches", "matte", "halation"]],
+  ["Night Vision", ["nightScope", "nearIrBoost", "glow", "scanlines", "negativeDepth"]],
+  ["Thermal Looks", ["thermalBlend", "thermalContour", "heatEdge", "edgeEnhance", "localContrast"]],
+  ["Thermal Variations", ["thermalBlend", "thermalContour", "heatEdge", "edgeEnhance", "shadowCrush", "localContrast"]],
+  ["XLS Camera", ["thermalBlend", "thermalContour", "heatEdge", "xrayGhost", "nearIrBoost", "ultravioletWash", "infraredWash"]],
+  ["Exposure Tools", ["exposure", "highlightRecovery", "ambientLift", "shadowDepth", "localContrast"]],
+  ["Color Lab", ["hue", "tint", "vibrance", "colorSeparation", "colorHarmony", "colorizeStrength"]]
+]);
+const EQUATION_CORE_STYLE_KEYS = ["brightness", "contrast", "exposure", "saturation", "hue", "temperature", "tint", "glow"];
+const EQUATION_THERMAL_RESET_KEYS = ["thermalBlend", "thermalContour", "heatEdge", "thermalInvert"];
 
-function createEquationModel(value, baseEffect = CAMERA_EFFECTS[0], baseSettings = DEFAULT_SETTINGS, runId = 0, targetKey = "X") {
+function createEquationModel(value, baseEffect = CAMERA_EFFECTS[0], baseSettings = DEFAULT_SETTINGS, runId = 0, targetKey = "X", styleEffect = baseEffect) {
   const X = String(value || "").trim() || EQUATION_DEFAULT_VALUE;
   const runSeed = Number.isFinite(Number(runId)) ? Number(runId) : 0;
   const target = EQUATION_TARGET_KEYS.has(targetKey) ? targetKey : "X";
-  const seed = seededHash(`${target}:${X}|${baseEffect.id || "effect"}|run:${runSeed}|spectral-equation`);
+  const selectedStyle = styleEffect || baseEffect || CAMERA_EFFECTS[0];
+  const styleSettings = { ...DEFAULT_SETTINGS, ...(selectedStyle.settings || {}) };
+  const isThermalStyle =
+    Boolean(styleSettings.thermalPalette) ||
+    selectedStyle.category?.includes("Thermal") ||
+    selectedStyle.category === "XLS Camera";
+  const seed = seededHash(`${target}:${X}|${baseEffect.id || "effect"}|style:${selectedStyle.id || "auto"}|run:${runSeed}|spectral-equation`);
   const rand = seededRandom(seed);
-  const palette = EQUATION_THERMAL_PALETTES[Math.floor(rand() * EQUATION_THERMAL_PALETTES.length)] || "classic";
-  const blendMode = MEDIA_BLEND_MODES[Math.floor(rand() * MEDIA_BLEND_MODES.length)]?.[0] || "screen";
+  const palette =
+    styleSettings.thermalPalette ||
+    (isThermalStyle ? EQUATION_THERMAL_PALETTES[Math.floor(rand() * EQUATION_THERMAL_PALETTES.length)] || "classic" : "");
+  const blendMode = selectedStyle.blendMode || MEDIA_BLEND_MODES[Math.floor(rand() * MEDIA_BLEND_MODES.length)]?.[0] || "screen";
   const primary = [randomInt(rand, 38, 255), randomInt(rand, 42, 255), randomInt(rand, 46, 255)];
   const secondary = [randomInt(rand, 0, 255), randomInt(rand, 0, 255), randomInt(rand, 0, 255)];
-  const targetSettings = {
-    brightness: randomInt(rand, 88, 138),
-    contrast: randomInt(rand, 146, 220),
-    exposure: randomInt(rand, -34, 34),
-    saturation: randomInt(rand, 185, 300),
-    hue: randomInt(rand, -120, 120),
-    temperature: randomInt(rand, -48, 48),
-    tint: randomInt(rand, -48, 48),
-    glow: randomInt(rand, 2, 22),
-    thermalPalette: palette,
-    thermalBlend: randomInt(rand, 78, 100),
-    thermalContour: randomInt(rand, 62, 100),
-    heatEdge: randomInt(rand, 54, 100),
-    edgeEnhance: randomInt(rand, 18, 72),
-    clarity: randomInt(rand, 8, 56),
-    dehaze: randomInt(rand, 4, 48),
-    vibrance: randomInt(rand, 18, 76),
-    localContrast: randomInt(rand, 10, 64),
-    highlightRecovery: randomInt(rand, 4, 44),
-    shadowDepth: randomInt(rand, 8, 64),
-    colorSeparation: randomInt(rand, 8, 64),
-    chromaticGlow: randomInt(rand, 0, 26),
-    nearIrBoost: randomInt(rand, 0, 42),
-    ultravioletWash: randomInt(rand, 0, 38),
-    infraredWash: randomInt(rand, 0, 42),
-    classicInvert: randomInt(rand, 0, 28),
-    spectralInvert: randomInt(rand, 0, 42),
-    thermalInvert: randomInt(rand, 0, 38)
-  };
+  const targetSettings = createEquationStyleSettings(rand, selectedStyle, styleSettings, isThermalStyle, palette);
   RGBW_MIXERS.forEach((group, groupIndex) => {
     RGBW_CHANNELS.forEach((channel, channelIndex) => {
       const key = `${group.key}${channel.key}`;
@@ -939,19 +942,20 @@ function createEquationModel(value, baseEffect = CAMERA_EFFECTS[0], baseSettings
   const outputNumber = Math.round(
     (W % 100000) * 0.37 +
       setting(baseSettings, "contrast", 100) * 11 +
-      setting(baseSettings, "thermalBlend") * 19 +
-      targetSettings.thermalContour * 23
+      setting(styleSettings, "saturation", 100) * 7 +
+      setting(targetSettings, "glow") * 19 +
+      setting(targetSettings, isThermalStyle ? "thermalContour" : "colorSeparation") * 23
   );
   const effectName = `Equation Z-${String(outputNumber).slice(-5)}`;
   const overlayColor = `rgba(${primary[0]}, ${primary[1]}, ${primary[2]}, 0.36)`;
   const rows = {
     A: `pipeline:${X} run:${runSeed}`,
-    B: `hash:${W.toString(16).toUpperCase()} palette:${palette}`,
+    B: `hash:${W.toString(16).toUpperCase()} style:${selectedStyle.name}`,
     C: `${EQUATION_MUTATION_KEYS.length} controls + RGBW matrix`,
     W: String(W),
     X,
     Y: String(outputNumber),
-    Z: `${effectName} / ${palette}`
+    Z: `${effectName} / ${selectedStyle.name}`
   };
   if (target !== "X") {
     rows[target] =
@@ -970,29 +974,76 @@ function createEquationModel(value, baseEffect = CAMERA_EFFECTS[0], baseSettings
   return {
     ...rows,
     targetKey: target,
+    styleEffectId: selectedStyle.id,
+    styleEffectName: selectedStyle.name,
+    styleCategory: selectedStyle.category,
+    basePresetSettings: styleSettings,
     settings: targetSettings,
     effect: {
       id: "equation-generated-filter",
-      name: effectName,
-      category: "Algorithmic Equation",
-      overlayColor,
+      name: `${effectName} · ${selectedStyle.name}`,
+      category: `Algorithmic Equation / ${selectedStyle.category}`,
+      overlayColor: selectedStyle.overlayColor || overlayColor,
       blendMode,
       favorite: false,
-      settings: { ...DEFAULT_SETTINGS, ...targetSettings }
+      settings: { ...DEFAULT_SETTINGS, ...styleSettings, ...targetSettings }
     },
-    summary: `${target} target returns a layered ${palette} pseudo-thermal render from ${baseEffect.name}, mixed with ${blendMode} overlay math and the current slider stack.`
+    summary: `${target} target returns a ${selectedStyle.category} / ${selectedStyle.name} generated render from ${X}, mixed with ${blendMode} blend math and the current slider stack.`
   };
+}
+
+function createEquationStyleSettings(rand, selectedStyle, styleSettings, isThermalStyle, palette) {
+  const targetSettings = {};
+  const styleKeys = new Set([
+    ...EQUATION_CORE_STYLE_KEYS,
+    ...(EQUATION_STYLE_CATEGORY_KEYS.get(selectedStyle.category) || [])
+  ]);
+  Object.entries(styleSettings).forEach(([key, value]) => {
+    if (typeof value === "number" && value !== (DEFAULT_SETTINGS[key] ?? 0)) styleKeys.add(key);
+  });
+
+  styleKeys.forEach((key) => {
+    if (key === "thermalPalette") return;
+    targetSettings[key] = equationStyleJitter(key, styleSettings, rand);
+  });
+
+  if (isThermalStyle) {
+    targetSettings.thermalPalette = palette;
+    targetSettings.thermalBlend = equationStyleJitter("thermalBlend", { ...styleSettings, thermalBlend: styleSettings.thermalBlend || 86 }, rand, 0.12, 72, 100);
+    targetSettings.thermalContour = equationStyleJitter("thermalContour", { ...styleSettings, thermalContour: styleSettings.thermalContour || 68 }, rand, 0.16, 46, 100);
+    targetSettings.heatEdge = equationStyleJitter("heatEdge", { ...styleSettings, heatEdge: styleSettings.heatEdge || 58 }, rand, 0.18, 36, 100);
+  } else {
+    targetSettings.thermalPalette = "";
+    EQUATION_THERMAL_RESET_KEYS.forEach((key) => {
+      targetSettings[key] = 0;
+    });
+  }
+
+  return targetSettings;
+}
+
+function equationStyleJitter(key, sourceSettings, rand, spreadRatio = 0.11, minOverride, maxOverride) {
+  const range = settingRange(key);
+  const min = Number.isFinite(minOverride) ? Math.max(range.min, minOverride) : range.min;
+  const max = Number.isFinite(maxOverride) ? Math.min(range.max, maxOverride) : range.max;
+  const base = Number(sourceSettings[key] ?? DEFAULT_SETTINGS[key] ?? 0);
+  const spread = Math.max(1, Math.round((max - min) * spreadRatio));
+  return Math.round(clamp(base + randomInt(rand, -spread, spread), min, max));
 }
 
 function applyEquationSettings(baseSettings = DEFAULT_SETTINGS, equationModel) {
   if (!equationModel?.settings) return baseSettings;
-  const next = { ...baseSettings, thermalPalette: equationModel.settings.thermalPalette };
+  const next = { ...DEFAULT_SETTINGS, ...baseSettings, ...(equationModel.basePresetSettings || {}) };
+  if (equationModel.settings.thermalPalette) next.thermalPalette = equationModel.settings.thermalPalette;
+  else delete next.thermalPalette;
   Object.entries(equationModel.settings).forEach(([key, target]) => {
     if (key === "thermalPalette") return;
+    if (!Number.isFinite(Number(target))) return;
     const base = Number(baseSettings[key] ?? DEFAULT_SETTINGS[key] ?? 0);
     const range = settingRange(key);
-    const blend = STACKED_SETTING_KEYS.has(key) ? 0.72 : 0.68;
-    next[key] = Math.round(clamp(base * (1 - blend) + Number(target) * blend, range.min, range.max));
+    const source = Number(next[key] ?? base);
+    const blend = STACKED_SETTING_KEYS.has(key) ? 0.72 : EQUATION_THERMAL_RESET_KEYS.includes(key) ? 0.94 : 0.68;
+    next[key] = Math.round(clamp(source * (1 - blend) + Number(target) * blend, range.min, range.max));
   });
   return next;
 }
@@ -1093,6 +1144,7 @@ function CameraStudio() {
   const [mediaSnapshotUrl, setMediaSnapshotUrl] = useState("");
   const [equationValue, setEquationValue] = useState(EQUATION_DEFAULT_VALUE);
   const [equationTargetKey, setEquationTargetKey] = useState("X");
+  const [equationStyleEffectId, setEquationStyleEffectId] = useState(EQUATION_STYLE_AUTO);
   const [equationRunId, setEquationRunId] = useState(0);
   const [equationLiveEnabled, setEquationLiveEnabled] = useState(false);
   const [equationMediaEnabled, setEquationMediaEnabled] = useState(false);
@@ -1101,6 +1153,10 @@ function CameraStudio() {
   const selectedEffect = useMemo(
     () => CAMERA_EFFECT_LOOKUP.get(selectedEffectId) || CAMERA_EFFECTS[0],
     [selectedEffectId]
+  );
+  const equationStyleEffect = useMemo(
+    () => (equationStyleEffectId === EQUATION_STYLE_AUTO ? selectedEffect : CAMERA_EFFECT_LOOKUP.get(equationStyleEffectId) || selectedEffect),
+    [equationStyleEffectId, selectedEffect]
   );
 
   const visibleEffects = useMemo(() => {
@@ -1131,8 +1187,8 @@ function CameraStudio() {
   );
 
   const equationModel = useMemo(
-    () => createEquationModel(equationValue, selectedEffect, manualSettings, equationRunId, equationTargetKey),
-    [equationRunId, equationTargetKey, equationValue, manualSettings, selectedEffect]
+    () => createEquationModel(equationValue, selectedEffect, manualSettings, equationRunId, equationTargetKey, equationStyleEffect),
+    [equationRunId, equationStyleEffect, equationTargetKey, equationValue, manualSettings, selectedEffect]
   );
   const liveManualSettings = useMemo(
     () => (equationLiveEnabled ? applyEquationSettings(manualSettings, equationModel) : manualSettings),
@@ -1637,9 +1693,18 @@ function CameraStudio() {
     setManualSettings(CAMERA_EFFECTS[0].settings);
     setSnapshotUrl("");
     setEquationTargetKey("X");
+    setEquationStyleEffectId(EQUATION_STYLE_AUTO);
     setEquationRunId(0);
     setEquationLiveEnabled(false);
     setEquationMediaEnabled(false);
+  }
+
+  function updateEquationStyle(nextStyleId) {
+    const styleId = nextStyleId === EQUATION_STYLE_AUTO || CAMERA_EFFECT_LOOKUP.has(nextStyleId) ? nextStyleId : EQUATION_STYLE_AUTO;
+    setEquationStyleEffectId(styleId);
+    setEquationRunId((current) => current + 1);
+    const styleName = styleId === EQUATION_STYLE_AUTO ? `Auto - active preset (${selectedEffect.name})` : CAMERA_EFFECT_LOOKUP.get(styleId)?.name || selectedEffect.name;
+    setCameraStatus(`Generated value style set to ${styleName}. Press Generate Value to build from that preset.`);
   }
 
   function updateEquationTarget(nextTarget) {
@@ -1662,7 +1727,7 @@ function CameraStudio() {
     setEquationRunId((current) => current + 1);
     setEquationLiveEnabled(true);
     if (mediaLayersRef.current.length) setEquationMediaEnabled(true);
-    setCameraStatus(`Generated and applied a new ${equationTargetKey}-targeted equation filter to the live feed.`);
+    setCameraStatus(`Generated and applied a new ${equationTargetKey}-targeted ${equationStyleEffect.name} equation filter to the live feed.`);
   }
 
   async function handleMediaUpload(event) {
@@ -1937,6 +2002,25 @@ function CameraStudio() {
         </div>
 
         <div className="equation-engine-controls">
+          <label className="equation-style-select">
+            Generated value style
+            <select
+              value={equationStyleEffectId}
+              onChange={(event) => updateEquationStyle(event.target.value)}
+              aria-label="Generated value effect preset style"
+            >
+              <option value={EQUATION_STYLE_AUTO}>Auto - active preset ({selectedEffect.name})</option>
+              {EFFECT_PRESET_GROUPS.map((group) => (
+                <optgroup key={group.category} label={group.category}>
+                  {group.effects.map((effect) => (
+                    <option key={effect.id} value={effect.id}>
+                      {effect.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </label>
           <label className="equation-target-select">
             Target value
             <select
