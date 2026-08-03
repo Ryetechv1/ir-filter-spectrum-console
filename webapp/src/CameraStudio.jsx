@@ -878,9 +878,10 @@ const EQUATION_MUTATION_KEYS = [
   "thermalInvert"
 ];
 
-function createEquationModel(value, baseEffect = CAMERA_EFFECTS[0], baseSettings = DEFAULT_SETTINGS) {
+function createEquationModel(value, baseEffect = CAMERA_EFFECTS[0], baseSettings = DEFAULT_SETTINGS, runId = 0) {
   const X = String(value || "").trim() || EQUATION_DEFAULT_VALUE;
-  const seed = seededHash(`${X}|${baseEffect.id || "effect"}|spectral-equation`);
+  const runSeed = Number.isFinite(Number(runId)) ? Number(runId) : 0;
+  const seed = seededHash(`${X}|${baseEffect.id || "effect"}|run:${runSeed}|spectral-equation`);
   const rand = seededRandom(seed);
   const palette = EQUATION_THERMAL_PALETTES[Math.floor(rand() * EQUATION_THERMAL_PALETTES.length)] || "classic";
   const blendMode = MEDIA_BLEND_MODES[Math.floor(rand() * MEDIA_BLEND_MODES.length)]?.[0] || "screen";
@@ -933,7 +934,7 @@ function createEquationModel(value, baseEffect = CAMERA_EFFECTS[0], baseSettings
   const effectName = `Equation Z-${String(outputNumber).slice(-5)}`;
   const overlayColor = `rgba(${primary[0]}, ${primary[1]}, ${primary[2]}, 0.36)`;
   return {
-    A: `pipeline:${X}`,
+    A: `pipeline:${X} run:${runSeed}`,
     B: `hash:${W.toString(16).toUpperCase()} palette:${palette}`,
     C: `${EQUATION_MUTATION_KEYS.length} controls + RGBW matrix`,
     W: String(W),
@@ -1062,6 +1063,7 @@ function CameraStudio() {
   const [mediaComposerStatus, setMediaComposerStatus] = useState("Upload 1-3 local images or videos to build a separate composited edit.");
   const [mediaSnapshotUrl, setMediaSnapshotUrl] = useState("");
   const [equationValue, setEquationValue] = useState(EQUATION_DEFAULT_VALUE);
+  const [equationRunId, setEquationRunId] = useState(0);
   const [equationLiveEnabled, setEquationLiveEnabled] = useState(false);
   const [equationMediaEnabled, setEquationMediaEnabled] = useState(false);
   const deferredSearch = useDeferredValue(search);
@@ -1099,8 +1101,8 @@ function CameraStudio() {
   );
 
   const equationModel = useMemo(
-    () => createEquationModel(equationValue, selectedEffect, manualSettings),
-    [equationValue, manualSettings, selectedEffect]
+    () => createEquationModel(equationValue, selectedEffect, manualSettings, equationRunId),
+    [equationRunId, equationValue, manualSettings, selectedEffect]
   );
   const liveManualSettings = useMemo(
     () => (equationLiveEnabled ? applyEquationSettings(manualSettings, equationModel) : manualSettings),
@@ -1604,6 +1606,7 @@ function CameraStudio() {
     setSelectedEffectId(CAMERA_EFFECTS[0].id);
     setManualSettings(CAMERA_EFFECTS[0].settings);
     setSnapshotUrl("");
+    setEquationRunId(0);
     setEquationLiveEnabled(false);
     setEquationMediaEnabled(false);
   }
@@ -1618,7 +1621,10 @@ function CameraStudio() {
     }
     const nextValue = `A-${bytes[0].toString(36).toUpperCase()}-${bytes[1].toString(36).toUpperCase()}`;
     setEquationValue(nextValue);
-    setCameraStatus("Generated a new deterministic A to Z equation filter value.");
+    setEquationRunId((current) => current + 1);
+    setEquationLiveEnabled(true);
+    if (mediaLayersRef.current.length) setEquationMediaEnabled(true);
+    setCameraStatus("Generated and applied a new A to Z equation filter to the live feed.");
   }
 
   async function handleMediaUpload(event) {
