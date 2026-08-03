@@ -394,12 +394,11 @@
   border: 1px solid rgba(var(--studio-accent-rgb), 0.44);
   border-radius: 12px;
   color: #f5f8fb;
-  background: rgba(2, 5, 8, 0.82);
+  background: transparent;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.46), 0 0 32px rgba(var(--studio-accent-rgb), 0.14);
   cursor: pointer;
   overflow: hidden;
   text-align: left;
-  backdrop-filter: blur(18px);
 }
 
 .camera-floating-hud:hover,
@@ -422,57 +421,6 @@
   height: 100%;
   min-height: 0;
   display: block;
-}
-
-.camera-floating-hud .camera-corners {
-  inset: 14px;
-}
-
-.camera-floating-hud .camera-corners::before,
-.camera-floating-hud .camera-corners::after {
-  border-width: 1px;
-}
-
-.camera-floating-hud .camera-live-badge {
-  top: 14px;
-  left: 16px;
-  gap: 6px;
-  font-size: 11px;
-  letter-spacing: 0.08em;
-}
-
-.camera-floating-hud .camera-live-badge::before {
-  width: 7px;
-  height: 7px;
-}
-
-.camera-floating-hud-label {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  display: grid;
-  gap: 2px;
-  padding: 10px 12px;
-  border-top: 1px solid rgba(133, 160, 184, 0.24);
-  background: rgba(2, 5, 8, 0.7);
-  backdrop-filter: blur(12px);
-}
-
-.camera-floating-hud-label span {
-  color: #aeb9c5;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.camera-floating-hud-label strong {
-  min-width: 0;
-  overflow: hidden;
-  color: #f5f8fb;
-  font-size: 13px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .camera-corners::before,
@@ -1925,15 +1873,6 @@
 
   .camera-floating-hud-frame {
     aspect-ratio: 4 / 3;
-  }
-
-  .camera-floating-hud .camera-corners {
-    inset: 10px;
-  }
-
-  .camera-floating-hud .camera-live-badge {
-    top: 10px;
-    left: 12px;
   }
 
   .effect-preset-grid,

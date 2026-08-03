@@ -1252,8 +1252,7 @@ function CameraStudio() {
           });
           if (cameraHudVisible) {
             drawCameraOutputCanvas(hudCanvasRef.current, null, source, renderState, {
-              includePreviewChrome: true,
-              metaLabels: [cameraLabel, renderState.cameraFacing === "user" ? "Front camera" : "Rear camera", renderState.selectedEffect.name],
+              includePreviewChrome: false,
               scaleCap: HUD_CANVAS_SCALE_CAP,
               pixelBudget: HUD_THERMAL_EFFECT_PIXEL_BUDGET
             });
@@ -2804,10 +2803,6 @@ function CameraStudio() {
           <div className="camera-floating-hud-frame">
             <video ref={hudVideoRef} className="camera-source-video" autoPlay playsInline muted aria-hidden="true" />
             <canvas ref={hudCanvasRef} className="camera-output-canvas" aria-hidden="true" />
-            <div className="camera-floating-hud-label">
-              <span>{cameraFacing === "user" ? "Front" : "Rear"}</span>
-              <strong>{liveSelectedEffect.name}</strong>
-            </div>
           </div>
         </button>
       )}
