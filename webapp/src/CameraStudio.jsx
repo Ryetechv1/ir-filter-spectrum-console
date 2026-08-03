@@ -186,7 +186,6 @@ const MP4_MIME_TYPES = [
 const PREVIEW_CANVAS_SCALE_CAP = 0.85;
 const HUD_CANVAS_SCALE_CAP = 0.48;
 const MEDIA_CANVAS_SCALE_CAP = 0.78;
-const EXPORT_CANVAS_SCALE_CAP = 1.25;
 const THERMAL_EFFECT_PIXEL_BUDGET = 95_000;
 const HUD_THERMAL_EFFECT_PIXEL_BUDGET = 42_000;
 const MEDIA_THERMAL_EFFECT_PIXEL_BUDGET = 72_000;
@@ -2172,36 +2171,50 @@ function CameraStudio() {
     }
   }
 
-  async function captureSnapshot() {
+  function refreshCameraPreviewForSnapshot() {
     const source = currentCameraRenderSource();
-    if (!source || !cameraActive) {
+    if (!source || !cameraActive || !isDrawableMediaSource(source)) return null;
+    const renderState = renderStateRef.current || {
+      filterCss,
+      selectedEffect: liveSelectedEffect,
+      manualSettings: liveManualSettings,
+      cameraFacing,
+      smartFaceWeighting
+    };
+    const cameraLabel = cameraFeedPausedRef.current ? "Paused still frame" : "Local camera stream";
+    const drawn = drawCameraOutputCanvas(previewCanvasRef.current, cameraFrameRef.current, source, renderState, {
+      includePreviewChrome: true,
+      metaLabels: [
+        cameraLabel,
+        renderState.cameraFacing === "user" ? "Front camera" : "Rear camera",
+        renderState.selectedEffect?.name || liveSelectedEffect.name
+      ],
+      scaleCap: PREVIEW_CANVAS_SCALE_CAP,
+      pixelBudget: THERMAL_EFFECT_PIXEL_BUDGET
+    });
+    return drawn ? previewCanvasRef.current : null;
+  }
+
+  async function captureSnapshot() {
+    if (!cameraActive) {
       setCameraStatus("Start the camera before taking a snapshot.");
       return;
     }
-    const sourceSize = mediaSourceSize(source, 1280, 720);
-    const size = getRenderedCameraFrameSize(cameraFrameRef.current || previewCanvasRef.current, sourceSize.width, sourceSize.height, {
-      scaleCap: EXPORT_CANVAS_SCALE_CAP
-    });
+    const previewCanvas = refreshCameraPreviewForSnapshot();
+    if (!previewCanvas?.width || !previewCanvas?.height) {
+      setCameraStatus("Snapshot failed because the preview canvas is not ready yet.");
+      return;
+    }
     const canvas = document.createElement("canvas");
-    canvas.width = size.width;
-    canvas.height = size.height;
-    const context = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
+    canvas.width = previewCanvas.width;
+    canvas.height = previewCanvas.height;
+    const context = canvas.getContext("2d", { alpha: false });
     if (!context) {
       setCameraStatus("Snapshot failed because this browser could not create an export canvas.");
       return;
     }
-    drawStudioFrame(context, size.width, size.height, source, { filterCss, selectedEffect: liveSelectedEffect, manualSettings: liveManualSettings, cameraFacing, smartFaceWeighting }, {
-      forcePixelFilters: false,
-      pixelScale: size.scale,
-      cssWidth: size.cssWidth,
-      includePreviewChrome: false,
-      includeWatermark: true,
-      pixelBudget: THERMAL_EFFECT_PIXEL_BUDGET
-    });
-    if (!canvas.width || !canvas.height) {
-      setCameraStatus("Snapshot failed because the preview canvas is not ready yet.");
-      return;
-    }
+    context.drawImage(previewCanvas, 0, 0);
+    paintRightsWatermark(context, canvas.width, canvas.height);
     try {
       const blob = await canvasToPngBlob(canvas);
       if (!blob) return;
@@ -2221,7 +2234,7 @@ function CameraStudio() {
       link.href = url;
       link.download = `spectral-imaging-studio-${new Date().toISOString().replace(/[:.]/g, "-")}.png`;
       link.click();
-      setCameraStatus("Snapshot downloaded locally.");
+      setCameraStatus("Snapshot downloaded from the exact displayed preview canvas.");
     } catch (error) {
       setCameraStatus(`Snapshot export failed: ${error.message || error}`);
     }
