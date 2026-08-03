@@ -134,6 +134,13 @@ const PRIME_SPECTRAL_EXAMPLES = [
     tone: "Dark multicolor noise trace",
     src: studioAssetUrl("assets/prime-spectral-examples/prime-spectral-08.jpg"),
     description: "Black-field spectral noise study with red region boxes and multicolor particulate highlights."
+  },
+  {
+    id: "prime-09",
+    title: "example generation from app-Pause Feed Edit, X3 filter effects-importer to overlay feature, exported, duplicated, imported again-both, and changed splice of 2nd then final export",
+    tone: "Layered pause-feed overlay export",
+    src: studioAssetUrl("assets/prime-spectral-examples/prime-spectral-09.jpg"),
+    description: "App-generated composite created from a paused feed edit, three stacked filter passes, overlay import, duplicate reimport, and second-layer splice adjustment before final export."
   }
 ];
 const CONTACT_EMAIL = "alola99990@gmail.com";

@@ -2002,6 +2002,7 @@
   color: #f5f8fb;
   font-size: 22px;
   line-height: 1.08;
+  overflow-wrap: anywhere;
 }
 
 .prime-results-details small,
@@ -2056,6 +2057,7 @@
   color: #f5f8fb;
   font-size: 13px;
   line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .youtube-window-actions a,
