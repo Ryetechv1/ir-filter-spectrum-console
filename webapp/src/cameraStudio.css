@@ -179,6 +179,26 @@
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.34);
 }
 
+.studio-panel,
+.studio-intro-box,
+.camera-frame,
+.media-layer-editor,
+.capture-card,
+.prime-results-window,
+.youtube-window,
+.database-window {
+  contain: layout paint style;
+}
+
+.effect-preset-grid button,
+.adjustment-dropdown,
+.capture-card,
+.prime-results-grid button,
+.youtube-upload-grid button {
+  content-visibility: auto;
+  contain-intrinsic-size: 180px;
+}
+
 .studio-panel-heading {
   display: flex;
   justify-content: space-between;

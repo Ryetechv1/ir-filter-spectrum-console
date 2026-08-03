@@ -25,7 +25,7 @@ import {
   Zap,
   X
 } from "lucide-react";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import "./cameraStudio.css";
 
 const STUDIO_UNLOCK_KEY = "ir-filter-camera-studio-unlocked";
@@ -174,8 +174,18 @@ const MP4_MIME_TYPES = [
   "video/mp4;codecs=h264",
   "video/mp4"
 ];
-const PREVIEW_CANVAS_SCALE_CAP = 1.25;
-const THERMAL_EFFECT_PIXEL_BUDGET = 180_000;
+const PREVIEW_CANVAS_SCALE_CAP = 0.85;
+const HUD_CANVAS_SCALE_CAP = 0.48;
+const MEDIA_CANVAS_SCALE_CAP = 0.78;
+const EXPORT_CANVAS_SCALE_CAP = 1.25;
+const THERMAL_EFFECT_PIXEL_BUDGET = 95_000;
+const HUD_THERMAL_EFFECT_PIXEL_BUDGET = 42_000;
+const MEDIA_THERMAL_EFFECT_PIXEL_BUDGET = 72_000;
+const CAMERA_LIGHT_FRAME_INTERVAL_MS = 68;
+const CAMERA_HEAVY_FRAME_INTERVAL_MS = 106;
+const CAMERA_HUD_FRAME_INTERVAL_MS = 134;
+const MEDIA_VIDEO_FRAME_INTERVAL_MS = 96;
+const RECORDING_FRAME_INTERVAL_MS = 50;
 let thermalWorkCanvas;
 let mediaLayerWorkCanvas;
 const TRUSTED_ACCESS = [
@@ -814,7 +824,15 @@ const CAMERA_EFFECTS = EFFECT_FAMILIES.flatMap((family, familyIndex) =>
   })
 );
 
+const CAMERA_EFFECT_LOOKUP = new Map(CAMERA_EFFECTS.map((effect) => [effect.id, effect]));
 const CATEGORIES = ["All Presets", "Favorites", ...EFFECT_FAMILIES.map((family) => family.category)];
+const CATEGORY_COUNTS = new Map(
+  CATEGORIES.map((category) => {
+    if (category === "All Presets") return [category, CAMERA_EFFECTS.length];
+    if (category === "Favorites") return [category, CAMERA_EFFECTS.filter((effect) => effect.favorite).length];
+    return [category, CAMERA_EFFECTS.reduce((count, effect) => count + (effect.category === category ? 1 : 0), 0)];
+  })
+);
 
 const EQUATION_DEFAULT_VALUE = "SP3CTR4L-37";
 const EQUATION_THERMAL_PALETTES = [
@@ -999,8 +1017,10 @@ function CameraStudio() {
   const recordingCanvasRef = useRef(null);
   const recordingFrameRef = useRef(0);
   const previewFrameRef = useRef(0);
+  const renderVersionRef = useRef(0);
   const pausedFrameCanvasRef = useRef(null);
   const cameraFeedPausedRef = useRef(false);
+  const cameraHudVisibleRef = useRef(false);
   const recordingTimerRef = useRef(null);
   const recordingStartedAtRef = useRef(0);
   const captureShelfRef = useRef([]);
@@ -1044,14 +1064,15 @@ function CameraStudio() {
   const [equationValue, setEquationValue] = useState(EQUATION_DEFAULT_VALUE);
   const [equationLiveEnabled, setEquationLiveEnabled] = useState(false);
   const [equationMediaEnabled, setEquationMediaEnabled] = useState(false);
+  const deferredSearch = useDeferredValue(search);
 
   const selectedEffect = useMemo(
-    () => CAMERA_EFFECTS.find((effect) => effect.id === selectedEffectId) || CAMERA_EFFECTS[0],
+    () => CAMERA_EFFECT_LOOKUP.get(selectedEffectId) || CAMERA_EFFECTS[0],
     [selectedEffectId]
   );
 
   const visibleEffects = useMemo(() => {
-    const query = search.trim().toLowerCase();
+    const query = deferredSearch.trim().toLowerCase();
     return CAMERA_EFFECTS.filter((effect) => {
       const categoryMatch =
         selectedCategory === "All Presets" ||
@@ -1060,7 +1081,7 @@ function CameraStudio() {
       const queryMatch = !query || `${effect.name} ${effect.category}`.toLowerCase().includes(query);
       return categoryMatch && queryMatch;
     });
-  }, [search, selectedCategory]);
+  }, [deferredSearch, selectedCategory]);
 
   const youtubePlayerUrl = useMemo(() => {
     if (!selectedYoutubeVideoId) return YOUTUBE_UPLOADS_PLAYER_URL;
@@ -1099,6 +1120,7 @@ function CameraStudio() {
   );
 
   useEffect(() => {
+    renderVersionRef.current += 1;
     renderStateRef.current = { filterCss, selectedEffect: liveSelectedEffect, manualSettings: liveManualSettings, cameraFacing };
   }, [cameraFacing, filterCss, liveManualSettings, liveSelectedEffect]);
 
@@ -1117,23 +1139,38 @@ function CameraStudio() {
       return undefined;
     }
     let lastDraw = 0;
+    let lastPausedVersion = -1;
     const drawPreview = (timestamp) => {
+      if (document.visibilityState === "hidden") {
+        previewFrameRef.current = window.requestAnimationFrame(drawPreview);
+        return;
+      }
       const video = videoRef.current;
       const renderState = renderStateRef.current;
       const source = cameraFeedPausedRef.current && pausedFrameCanvasRef.current ? pausedFrameCanvasRef.current : video;
       if (isDrawableMediaSource(source)) {
-        if (!lastDraw || timestamp - lastDraw > 58) {
+        const renderVersion = renderVersionRef.current;
+        const pausedAndUnchanged = cameraFeedPausedRef.current && renderVersion === lastPausedVersion;
+        const frameInterval = cameraHudVisible
+          ? CAMERA_HUD_FRAME_INTERVAL_MS
+          : cameraFrameInterval(renderState.manualSettings, renderState.selectedEffect);
+        if (!pausedAndUnchanged && (!lastDraw || timestamp - lastDraw > frameInterval)) {
           const cameraLabel = cameraFeedPausedRef.current ? "Paused still frame" : "Local camera stream";
           drawCameraOutputCanvas(previewCanvasRef.current, cameraFrameRef.current, source, renderState, {
             includePreviewChrome: true,
-            metaLabels: [cameraLabel, renderState.cameraFacing === "user" ? "Front camera" : "Rear camera", renderState.selectedEffect.name]
+            metaLabels: [cameraLabel, renderState.cameraFacing === "user" ? "Front camera" : "Rear camera", renderState.selectedEffect.name],
+            scaleCap: PREVIEW_CANVAS_SCALE_CAP,
+            pixelBudget: THERMAL_EFFECT_PIXEL_BUDGET
           });
           if (cameraHudVisible) {
             drawCameraOutputCanvas(hudCanvasRef.current, null, source, renderState, {
               includePreviewChrome: true,
-              metaLabels: [cameraLabel, renderState.cameraFacing === "user" ? "Front camera" : "Rear camera", renderState.selectedEffect.name]
+              metaLabels: [cameraLabel, renderState.cameraFacing === "user" ? "Front camera" : "Rear camera", renderState.selectedEffect.name],
+              scaleCap: HUD_CANVAS_SCALE_CAP,
+              pixelBudget: HUD_THERMAL_EFFECT_PIXEL_BUDGET
             });
           }
+          lastPausedVersion = renderVersion;
           lastDraw = timestamp;
         }
       }
@@ -1154,9 +1191,13 @@ function CameraStudio() {
       return undefined;
     }
     let lastDraw = 0;
+    const hasVideo = mediaLayers.some((layer) => layer.kind === "video");
     const drawComposite = (timestamp) => {
-      const hasVideo = mediaLayers.some((layer) => layer.kind === "video");
-      if (!lastDraw || hasVideo || timestamp - lastDraw > 120) {
+      if (document.visibilityState === "hidden") {
+        if (hasVideo) mediaCompositeFrameRef.current = window.requestAnimationFrame(drawComposite);
+        return;
+      }
+      if (!lastDraw || !hasVideo || timestamp - lastDraw > MEDIA_VIDEO_FRAME_INTERVAL_MS) {
         drawUploadedMediaComposite(mediaCanvasRef.current, mediaFrameRef.current, mediaLayers, {
           filterCss: mediaFilterCss,
           selectedEffect: mediaSelectedEffect,
@@ -1165,7 +1206,7 @@ function CameraStudio() {
         });
         lastDraw = timestamp;
       }
-      mediaCompositeFrameRef.current = window.requestAnimationFrame(drawComposite);
+      if (hasVideo) mediaCompositeFrameRef.current = window.requestAnimationFrame(drawComposite);
     };
     mediaCompositeFrameRef.current = window.requestAnimationFrame(drawComposite);
     return () => {
@@ -1184,7 +1225,11 @@ function CameraStudio() {
       const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 1;
       const visibleHeight = Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0);
       const visibilityRatio = clamp(visibleHeight / Math.max(rect.height, 1), 0, 1);
-      setCameraHudVisible(window.scrollY > 80 && visibilityRatio < 0.68);
+      const nextVisible = window.scrollY > 80 && visibilityRatio < 0.68;
+      if (cameraHudVisibleRef.current !== nextVisible) {
+        cameraHudVisibleRef.current = nextVisible;
+        setCameraHudVisible(nextVisible);
+      }
     };
     const observer =
       typeof IntersectionObserver === "function"
@@ -1426,7 +1471,7 @@ function CameraStudio() {
     canvas.height = resolution.height;
     recordingCanvasRef.current = canvas;
     const context = canvas.getContext("2d", { alpha: false });
-    const stream = canvas.captureStream(30);
+    const stream = canvas.captureStream(24);
     const recorder = new MediaRecorder(stream, {
       mimeType,
       videoBitsPerSecond: recordingResolution === "2k" ? 14000000 : 8000000
@@ -1469,10 +1514,19 @@ function CameraStudio() {
       setCameraStatus(blob.size ? "MP4 recording saved to the local capture shelf." : "Recording stopped without saved video data.");
     };
 
-    const drawFrame = () => {
+    let lastRecordingDraw = 0;
+    const drawFrame = (timestamp = 0) => {
       const source = currentCameraRenderSource();
       const renderState = renderStateRef.current;
-      if (isDrawableMediaSource(source)) drawStudioFrame(context, resolution.width, resolution.height, source, renderState);
+      if (!lastRecordingDraw || timestamp - lastRecordingDraw >= RECORDING_FRAME_INTERVAL_MS) {
+        if (isDrawableMediaSource(source)) {
+          drawStudioFrame(context, resolution.width, resolution.height, source, renderState, {
+            forcePixelFilters: false,
+            pixelBudget: THERMAL_EFFECT_PIXEL_BUDGET
+          });
+        }
+        lastRecordingDraw = timestamp;
+      }
       recordingFrameRef.current = window.requestAnimationFrame(drawFrame);
     };
     drawFrame();
@@ -1706,7 +1760,7 @@ function CameraStudio() {
     }
     const sourceSize = mediaSourceSize(source, 1280, 720);
     const size = getRenderedCameraFrameSize(cameraFrameRef.current || previewCanvasRef.current, sourceSize.width, sourceSize.height, {
-      scaleCap: PREVIEW_CANVAS_SCALE_CAP
+      scaleCap: EXPORT_CANVAS_SCALE_CAP
     });
     const canvas = document.createElement("canvas");
     canvas.width = size.width;
@@ -1717,10 +1771,11 @@ function CameraStudio() {
       return;
     }
     drawStudioFrame(context, size.width, size.height, source, { filterCss, selectedEffect: liveSelectedEffect, manualSettings: liveManualSettings, cameraFacing }, {
-      forcePixelFilters: true,
+      forcePixelFilters: false,
       pixelScale: size.scale,
       cssWidth: size.cssWidth,
-      includePreviewChrome: false
+      includePreviewChrome: false,
+      pixelBudget: THERMAL_EFFECT_PIXEL_BUDGET
     });
     if (!canvas.width || !canvas.height) {
       setCameraStatus("Snapshot failed because the preview canvas is not ready yet.");
@@ -1771,7 +1826,6 @@ function CameraStudio() {
           min={min}
           max={max}
           value={value}
-          onInput={(event) => updateSetting(key, event.currentTarget.value)}
           onChange={(event) => updateSetting(key, event.target.value)}
           style={{ "--value": `${((value - min) / (max - min)) * 100}%` }}
         />
@@ -1803,7 +1857,6 @@ function CameraStudio() {
                     min={channel.min}
                     max={channel.max}
                     value={value}
-                    onInput={(event) => updateSetting(settingKey, event.currentTarget.value)}
                     onChange={(event) => updateSetting(settingKey, event.target.value)}
                     style={{
                       "--value": `${(value / channel.max) * 100}%`,
@@ -1894,11 +1947,12 @@ function CameraStudio() {
       group.type === "rgbw"
         ? RGBW_MIXERS.length * RGBW_CHANNELS.length
         : group.controls.length;
+    const isOpen = openAdjustmentGroups.has(group.id);
     return (
       <details
         key={group.id}
         className="adjustment-dropdown"
-        open={openAdjustmentGroups.has(group.id)}
+        open={isOpen}
         onToggle={(event) => setAdjustmentGroupOpen(group.id, event.currentTarget.open)}
       >
         <summary>
@@ -1908,18 +1962,19 @@ function CameraStudio() {
           </span>
           <em>{count}</em>
         </summary>
-        {group.type === "rgbw" ? (
-          renderRgbwMixerGroup()
-        ) : (
-          <div className="adjustment-list">
-            {group.controls.map((controlKey) =>
-              renderAdjustmentSlider(
-                Array.isArray(controlKey) ? controlKey : ADJUSTMENT_LOOKUP.get(controlKey),
-                group.controlClassName
-              )
-            )}
-          </div>
-        )}
+        {isOpen &&
+          (group.type === "rgbw" ? (
+            renderRgbwMixerGroup()
+          ) : (
+            <div className="adjustment-list">
+              {group.controls.map((controlKey) =>
+                renderAdjustmentSlider(
+                  Array.isArray(controlKey) ? controlKey : ADJUSTMENT_LOOKUP.get(controlKey),
+                  group.controlClassName
+                )
+              )}
+            </div>
+          ))}
       </details>
     );
   }
@@ -1938,7 +1993,6 @@ function CameraStudio() {
           min={min}
           max={max}
           value={value}
-          onInput={(event) => updateMediaLayer(layer.id, { [key]: Number(event.currentTarget.value) })}
           onChange={(event) => updateMediaLayer(layer.id, { [key]: Number(event.target.value) })}
           style={{ "--value": `${((value - min) / (max - min)) * 100}%` }}
         />
@@ -2691,12 +2745,12 @@ function createMediaLayerFromFile(file, index, effectId) {
 function drawUploadedMediaComposite(canvas, frameElement, layers, renderState) {
   if (!canvas) return false;
   const size = getRenderedCameraFrameSize(frameElement || canvas, MEDIA_COMPOSITE_WIDTH, MEDIA_COMPOSITE_HEIGHT, {
-    scaleCap: PREVIEW_CANVAS_SCALE_CAP
+    scaleCap: MEDIA_CANVAS_SCALE_CAP
   });
   if (!size.width || !size.height) return false;
   if (canvas.width !== size.width) canvas.width = size.width;
   if (canvas.height !== size.height) canvas.height = size.height;
-  const context = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
+  const context = canvas.getContext("2d", { alpha: false });
   if (!context) return false;
   context.save();
   context.globalAlpha = 1;
@@ -2719,9 +2773,9 @@ function drawMediaLayer(context, width, height, layer, renderState) {
   mediaLayerWorkCanvas ||= document.createElement("canvas");
   if (mediaLayerWorkCanvas.width !== width) mediaLayerWorkCanvas.width = width;
   if (mediaLayerWorkCanvas.height !== height) mediaLayerWorkCanvas.height = height;
-  const layerContext = mediaLayerWorkCanvas.getContext("2d", { alpha: false, willReadFrequently: true });
+  const layerContext = mediaLayerWorkCanvas.getContext("2d", { alpha: false });
   if (!layerContext) return;
-  const layerEffect = CAMERA_EFFECTS.find((effect) => effect.id === layer.effectId) || renderState.selectedEffect || CAMERA_EFFECTS[0];
+  const layerEffect = CAMERA_EFFECT_LOOKUP.get(layer.effectId) || renderState.selectedEffect || CAMERA_EFFECTS[0];
   const layerSettings = mediaLayerSettings(layerEffect, renderState.manualSettings);
   drawStudioFrame(layerContext, width, height, source, {
     filterCss: buildFilterCss(layerSettings),
@@ -2729,10 +2783,11 @@ function drawMediaLayer(context, width, height, layer, renderState) {
     manualSettings: layerSettings,
     cameraFacing: "environment"
   }, {
-    forcePixelFilters: true,
+    forcePixelFilters: false,
     includePreviewChrome: false,
     pixelScale: 1,
-    cssWidth: width
+    cssWidth: width,
+    pixelBudget: MEDIA_THERMAL_EFFECT_PIXEL_BUDGET
   });
 
   const offsetX = (setting(layer, "offsetX") / 100) * width * 0.5;
@@ -2840,19 +2895,20 @@ function drawCameraOutputCanvas(canvas, frameElement, source, renderState, optio
   const fallbackWidth = sourceSize.width || 1280;
   const fallbackHeight = sourceSize.height || 720;
   const size = getRenderedCameraFrameSize(frameElement || canvas, fallbackWidth, fallbackHeight, {
-    scaleCap: PREVIEW_CANVAS_SCALE_CAP
+    scaleCap: options.scaleCap ?? PREVIEW_CANVAS_SCALE_CAP
   });
   if (!size.width || !size.height) return false;
   if (canvas.width !== size.width) canvas.width = size.width;
   if (canvas.height !== size.height) canvas.height = size.height;
-  const context = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
+  const context = canvas.getContext("2d", { alpha: false });
   if (!context) return false;
   drawStudioFrame(context, size.width, size.height, source, renderState, {
     includePreviewChrome: options.includePreviewChrome,
-    forcePixelFilters: true,
+    forcePixelFilters: options.forcePixelFilters === true,
     pixelScale: size.scale,
     cssWidth: size.cssWidth,
-    metaLabels: options.metaLabels
+    metaLabels: options.metaLabels,
+    pixelBudget: options.pixelBudget
   });
   return true;
 }
@@ -2962,7 +3018,7 @@ function drawStudioFrame(context, width, height, mediaSource, renderState, optio
   }
   context.restore();
   if (!useCanvasFilter) applyCanvasPreviewFilters(context, width, height, previewFilterCss);
-  applyAdvancedCameraPixelEffects(context, width, height, manualSettings, selectedEffect);
+  applyAdvancedCameraPixelEffects(context, width, height, manualSettings, selectedEffect, options);
   paintOverlay(context, width, height, selectedEffect, manualSettings);
   paintSpecialOverlay(context, width, height, manualSettings, selectedEffect);
   paintCanvasGrain(context, width, height, manualSettings);
@@ -3048,18 +3104,36 @@ function applyCanvasPreviewFilters(context, width, height, filterCss) {
   context.putImageData(frame, 0, 0);
 }
 
-function applyAdvancedCameraPixelEffects(context, width, height, settings, effect) {
+function cameraFrameInterval(settings, effect) {
+  return hasAdvancedCameraPixelEffects(settings, effect) ? CAMERA_HEAVY_FRAME_INTERVAL_MS : CAMERA_LIGHT_FRAME_INTERVAL_MS;
+}
+
+function advancedCameraPixelModel(settings, effect) {
   const paletteName = settings?.thermalPalette || "";
   const thermalSignal = setting(settings, "thermalBlend") + setting(settings, "thermalContour") * 0.75 + setting(settings, "heatEdge") * 0.68;
   const thermalPresetSignal = paletteName || effect?.category?.includes("Thermal") ? 54 : 0;
   const xlsSignal = setting(settings, "xrayGhost") + (paletteName === "xls" || effect?.category === "XLS Camera" ? 72 : 0);
   const thermalAmount = clamp((thermalSignal + thermalPresetSignal) / 210, 0, 1);
   const xlsAmount = clamp(xlsSignal / 150, 0, 1);
-  if (!thermalAmount && !xlsAmount) return;
-  const palette = paletteName || (xlsAmount > thermalAmount ? "xls" : "classic");
+  return {
+    palette: paletteName || (xlsAmount > thermalAmount ? "xls" : "classic"),
+    thermalAmount,
+    xlsAmount
+  };
+}
 
-  if (context.canvas && width * height > THERMAL_EFFECT_PIXEL_BUDGET) {
-    const scale = Math.sqrt(THERMAL_EFFECT_PIXEL_BUDGET / (width * height));
+function hasAdvancedCameraPixelEffects(settings, effect) {
+  const model = advancedCameraPixelModel(settings, effect);
+  return Boolean(model.thermalAmount || model.xlsAmount);
+}
+
+function applyAdvancedCameraPixelEffects(context, width, height, settings, effect, options = {}) {
+  const { palette, thermalAmount, xlsAmount } = advancedCameraPixelModel(settings, effect);
+  if (!thermalAmount && !xlsAmount) return;
+  const pixelBudget = options.pixelBudget || THERMAL_EFFECT_PIXEL_BUDGET;
+
+  if (context.canvas && width * height > pixelBudget) {
+    const scale = Math.sqrt(pixelBudget / (width * height));
     const workWidth = Math.max(1, Math.round(width * scale));
     const workHeight = Math.max(1, Math.round(height * scale));
     thermalWorkCanvas ||= document.createElement("canvas");
@@ -4316,9 +4390,7 @@ async function sha256(value) {
 }
 
 function countCategory(category) {
-  if (category === "All Presets") return CAMERA_EFFECTS.length;
-  if (category === "Favorites") return CAMERA_EFFECTS.filter((effect) => effect.favorite).length;
-  return CAMERA_EFFECTS.filter((effect) => effect.category === category).length;
+  return CATEGORY_COUNTS.get(category) || 0;
 }
 
 function closeStudioWindow() {
