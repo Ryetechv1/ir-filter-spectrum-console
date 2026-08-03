@@ -203,6 +203,7 @@ const SMART_FACE_PIXEL_BUDGET = 58_000;
 const SMART_FACE_FOREGROUND_LABEL = "Foreground smart facial recognition";
 const SMART_FACE_BACKGROUND_LABEL = "Background smart facial recognition";
 const SMART_WOLF_RECOGNITION_LABEL = "Smart wolf recognition";
+const SMART_DARK_EDGE_LABEL = "Smart darker edge amplifier";
 const SMART_FACE_MESH_PROFILE = {
   eyeY: 0.38,
   eyeOffsetX: 0.22,
@@ -223,6 +224,7 @@ let thermalWorkCanvas;
 let pixelateWorkCanvas;
 let mediaLayerWorkCanvas;
 let smartFaceWorkCanvas;
+let smartDarkEdgeWorkCanvas;
 const TRUSTED_ACCESS = [
   {
     name: "Studio Access Holder",
@@ -339,6 +341,19 @@ const FINISH_ADJUSTMENTS = [
   ["sepia", "Sepia", 0, 100, "%", 0],
   ["grayscale", "Grayscale", 0, 100, "%", 0],
   ["invert", "Base Invert", 0, 100, "%", 0]
+];
+
+const SMART_DARK_EDGE_ADJUSTMENTS = [
+  ["darkEdgeAmount", "Edge Darken", 0, 100, "%", 64],
+  ["darkEdgeSensitivity", "Edge Sensitivity", 0, 100, "%", 58],
+  ["darkEdgeSpread", "Edge Spread", 0, 100, "%", 36],
+  ["darkEdgeContrast", "Edge Contrast", 0, 100, "%", 62],
+  ["darkEdgeShadowDepth", "Shadow Depth", 0, 100, "%", 48],
+  ["darkEdgeBlackClamp", "Black Clamp", 0, 100, "%", 42],
+  ["darkEdgeDetailAmplify", "Detail Amplify", 0, 100, "%", 50],
+  ["darkEdgeHaloCut", "Halo Cut", 0, 100, "%", 40],
+  ["darkEdgeThermalBind", "Thermal Bind", 0, 100, "%", 54],
+  ["darkEdgeMicroGrain", "Dark Micro Grain", 0, 100, "%", 24]
 ];
 
 const EXTRA_ADJUSTMENTS = [
@@ -466,6 +481,7 @@ const DEFAULT_SETTINGS = {
   grayscale: 0,
   invert: 0,
   ...Object.fromEntries(INVERSION_ADJUSTMENTS.map(([key, , , , , initial = 0]) => [key, initial])),
+  ...Object.fromEntries(SMART_DARK_EDGE_ADJUSTMENTS.map(([key, , , , , initial = 0]) => [key, initial])),
   ...Object.fromEntries(ADVANCED_ADJUSTMENTS.map(([key, , , , , initial = 0]) => [key, initial])),
   ...Object.fromEntries(
     RGBW_MIXERS.flatMap((group) =>
@@ -476,6 +492,7 @@ const DEFAULT_SETTINGS = {
 
 const STACKED_SETTING_KEYS = new Set([
   ...INVERSION_ADJUSTMENTS.map(([key]) => key),
+  ...SMART_DARK_EDGE_ADJUSTMENTS.map(([key]) => key),
   ...RGBW_MIXERS.flatMap((group) => RGBW_CHANNELS.map((channel) => `${group.key}${channel.key}`))
 ]);
 
@@ -501,6 +518,13 @@ const ADJUSTMENT_GROUPS = [
     controls: INVERSION_ADJUSTMENTS,
     controlClassName: "inversion-adjustment",
     open: true
+  },
+  {
+    id: "smart-dark-edge",
+    title: "Smart Dark Edge Engine",
+    description: "Toggleable local darker-edge pass with 10 controls for edge darkening, black clamp, shadow depth, halo cleanup, and thermal binding.",
+    type: "smart-dark-edge",
+    controls: SMART_DARK_EDGE_ADJUSTMENTS
   },
   {
     id: "tone",
@@ -642,7 +666,12 @@ const ADJUSTMENT_GROUPS = [
   }
 ];
 
-const ADJUSTMENT_LOOKUP = new Map([...CORE_ADJUSTMENTS, ...FINISH_ADJUSTMENTS, ...INVERSION_ADJUSTMENTS, ...ADVANCED_ADJUSTMENTS].map((control) => [control[0], control]));
+const ADJUSTMENT_LOOKUP = new Map(
+  [...CORE_ADJUSTMENTS, ...FINISH_ADJUSTMENTS, ...INVERSION_ADJUSTMENTS, ...SMART_DARK_EDGE_ADJUSTMENTS, ...ADVANCED_ADJUSTMENTS].map((control) => [
+    control[0],
+    control
+  ])
+);
 
 const EFFECT_FAMILIES = [
   {
@@ -1092,7 +1121,8 @@ const EQUATION_MUTATION_KEYS = [
   "greenInvert",
   "blueInvert",
   "shadowInvert",
-  "highlightInvert"
+  "highlightInvert",
+  ...SMART_DARK_EDGE_ADJUSTMENTS.map(([key]) => key)
 ];
 const EQUATION_STYLE_CATEGORY_KEYS = new Map([
   ["Clean Studio", ["ambientLift", "highlightRecovery", "whiteBalance", "skinSmooth"]],
@@ -1105,11 +1135,12 @@ const EQUATION_STYLE_CATEGORY_KEYS = new Map([
   ["Retro Film", ["sepia", "grain", "dust", "scratches", "matte", "halation"]],
   ["Night Vision", ["nightScope", "nearIrBoost", "glow", "scanlines", "negativeDepth"]],
   ["Color Inversion Matrix", ["classicInvert", "lumaInvert", "channelInvert", "spectralInvert", "thermalInvert", "redInvert", "greenInvert", "blueInvert", "shadowInvert", "highlightInvert", "invert", "colorSeparation"]],
-  ["Thermal Looks", ["thermalBlend", "thermalContour", "heatEdge", "edgeEnhance", "localContrast"]],
-  ["Thermal Variations", ["thermalBlend", "thermalContour", "heatEdge", "edgeEnhance", "shadowCrush", "localContrast"]],
+  ["Thermal Looks", ["thermalBlend", "thermalContour", "heatEdge", "edgeEnhance", "localContrast", "darkEdgeThermalBind", "darkEdgeBlackClamp"]],
+  ["Thermal Variations", ["thermalBlend", "thermalContour", "heatEdge", "edgeEnhance", "shadowCrush", "localContrast", "darkEdgeAmount", "darkEdgeShadowDepth"]],
   ["XLS Camera", ["thermalBlend", "thermalContour", "heatEdge", "xrayGhost", "nearIrBoost", "ultravioletWash", "infraredWash"]],
   ["Exposure Tools", ["exposure", "highlightRecovery", "ambientLift", "shadowDepth", "localContrast"]],
-  ["Color Lab", ["hue", "tint", "vibrance", "colorSeparation", "colorHarmony", "colorizeStrength"]]
+  ["Color Lab", ["hue", "tint", "vibrance", "colorSeparation", "colorHarmony", "colorizeStrength"]],
+  ["Detail, Texture & Noise", ["clarity", "dehaze", "edgeEnhance", "localContrast", "darkEdgeAmount", "darkEdgeDetailAmplify", "darkEdgeContrast"]]
 ]);
 const EQUATION_CORE_STYLE_KEYS = ["brightness", "contrast", "exposure", "saturation", "hue", "temperature", "tint", "glow"];
 const EQUATION_THERMAL_RESET_KEYS = ["thermalBlend", "thermalContour", "heatEdge", "thermalInvert"];
@@ -1408,7 +1439,8 @@ function CameraStudio() {
     selectedEffect: CAMERA_EFFECTS[0],
     manualSettings: CAMERA_EFFECTS[0].settings,
     cameraFacing: "user",
-    smartFaceWeighting: { foreground: false, background: false, wolf: false }
+    smartFaceWeighting: { foreground: false, background: false, wolf: false },
+    smartDarkEdgeEnabled: false
   });
   const [authorized, setAuthorized] = useState(() => window.sessionStorage.getItem(STUDIO_UNLOCK_KEY) === "true");
   const [accessCode, setAccessCode] = useState("");
@@ -1436,6 +1468,7 @@ function CameraStudio() {
   const [liveAdjustmentsEnabled, setLiveAdjustmentsEnabled] = useState(true);
   const [overlayAdjustmentsEnabled, setOverlayAdjustmentsEnabled] = useState(true);
   const [smartFaceWeighting, setSmartFaceWeighting] = useState({ foreground: false, background: false, wolf: false });
+  const [smartDarkEdgeEnabled, setSmartDarkEdgeEnabled] = useState(false);
   const [openAdjustmentGroups, setOpenAdjustmentGroups] = useState(() => new Set(ADJUSTMENT_GROUPS.filter((group) => group.open).map((group) => group.id)));
   const [snapshotUrl, setSnapshotUrl] = useState("");
   const [cameraHudVisible, setCameraHudVisible] = useState(false);
@@ -1523,8 +1556,8 @@ function CameraStudio() {
 
   useEffect(() => {
     renderVersionRef.current += 1;
-    renderStateRef.current = { filterCss, selectedEffect: liveSelectedEffect, manualSettings: liveManualSettings, cameraFacing, smartFaceWeighting };
-  }, [cameraFacing, filterCss, liveManualSettings, liveSelectedEffect, smartFaceWeighting]);
+    renderStateRef.current = { filterCss, selectedEffect: liveSelectedEffect, manualSettings: liveManualSettings, cameraFacing, smartFaceWeighting, smartDarkEdgeEnabled };
+  }, [cameraFacing, filterCss, liveManualSettings, liveSelectedEffect, smartDarkEdgeEnabled, smartFaceWeighting]);
 
   useEffect(() => {
     cameraFeedPausedRef.current = cameraFeedPaused;
@@ -1555,7 +1588,7 @@ function CameraStudio() {
         const pausedAndUnchanged = cameraFeedPausedRef.current && renderVersion === lastPausedVersion;
         const frameInterval = cameraHudVisible
           ? CAMERA_HUD_FRAME_INTERVAL_MS
-          : cameraFrameInterval(renderState.manualSettings, renderState.selectedEffect);
+          : cameraFrameInterval(renderState.manualSettings, renderState.selectedEffect, renderState.smartDarkEdgeEnabled);
         if (!pausedAndUnchanged && (!lastDraw || timestamp - lastDraw > frameInterval)) {
           const cameraLabel = cameraFeedPausedRef.current ? "Paused still frame" : "Local camera stream";
           drawCameraOutputCanvas(previewCanvasRef.current, cameraFrameRef.current, source, renderState, {
@@ -1605,7 +1638,8 @@ function CameraStudio() {
           selectedEffectId,
           manualSettings: mediaManualSettings,
           overlayAdjustmentsEnabled,
-          smartFaceWeighting
+          smartFaceWeighting,
+          smartDarkEdgeEnabled
         });
         lastDraw = timestamp;
       }
@@ -1618,7 +1652,7 @@ function CameraStudio() {
         mediaCompositeFrameRef.current = 0;
       }
     };
-  }, [mediaFilterCss, mediaManualSettings, mediaLayers, mediaSelectedEffect, overlayAdjustmentsEnabled, selectedEffectId, smartFaceWeighting]);
+  }, [mediaFilterCss, mediaManualSettings, mediaLayers, mediaSelectedEffect, overlayAdjustmentsEnabled, selectedEffectId, smartDarkEdgeEnabled, smartFaceWeighting]);
 
   useEffect(() => {
     const frame = cameraFrameRef.current;
@@ -2015,6 +2049,7 @@ function CameraStudio() {
     setLiveAdjustmentsEnabled(true);
     setOverlayAdjustmentsEnabled(true);
     setSmartFaceWeighting({ foreground: false, background: false, wolf: false });
+    setSmartDarkEdgeEnabled(false);
   }
 
   function updateEquationStyle(nextStyleId) {
@@ -2144,7 +2179,8 @@ function CameraStudio() {
       selectedEffectId,
       manualSettings: mediaManualSettings,
       overlayAdjustmentsEnabled,
-      smartFaceWeighting
+      smartFaceWeighting,
+      smartDarkEdgeEnabled
     });
     if (!canvas?.width || !canvas?.height) {
       setMediaComposerStatus("Composite export failed because the canvas is not ready yet.");
@@ -2190,7 +2226,8 @@ function CameraStudio() {
       selectedEffect: liveSelectedEffect,
       manualSettings: liveManualSettings,
       cameraFacing,
-      smartFaceWeighting
+      smartFaceWeighting,
+      smartDarkEdgeEnabled
     };
     const cameraLabel = cameraFeedPausedRef.current ? "Paused still frame" : "Local camera stream";
     const drawn = drawCameraOutputCanvas(previewCanvasRef.current, cameraFrameRef.current, source, renderState, {
@@ -2446,19 +2483,47 @@ function CameraStudio() {
           <em>{count}</em>
         </summary>
         {isOpen &&
-          (group.type === "rgbw" ? (
-            renderRgbwMixerGroup()
-          ) : (
-            <div className="adjustment-list">
-              {group.controls.map((controlKey) =>
-                renderAdjustmentSlider(
-                  Array.isArray(controlKey) ? controlKey : ADJUSTMENT_LOOKUP.get(controlKey),
-                  group.controlClassName
-                )
-              )}
-            </div>
-          ))}
+          (group.type === "rgbw"
+            ? renderRgbwMixerGroup()
+            : group.type === "smart-dark-edge"
+              ? renderSmartDarkEdgeGroup(group)
+              : (
+                <div className="adjustment-list">
+                  {group.controls.map((controlKey) =>
+                    renderAdjustmentSlider(
+                      Array.isArray(controlKey) ? controlKey : ADJUSTMENT_LOOKUP.get(controlKey),
+                      group.controlClassName
+                    )
+                  )}
+                </div>
+              ))}
       </details>
+    );
+  }
+
+  function renderSmartDarkEdgeGroup(group) {
+    return (
+      <div className="smart-dark-edge-group">
+        <button
+          type="button"
+          className={smartDarkEdgeEnabled ? "adjustment-scope-toggle active" : "adjustment-scope-toggle"}
+          aria-pressed={smartDarkEdgeEnabled}
+          onClick={() => setSmartDarkEdgeEnabled((enabled) => !enabled)}
+        >
+          <ShieldCheck size={15} />
+          <span>
+            <strong>{SMART_DARK_EDGE_LABEL}</strong>
+            <small>
+              {smartDarkEdgeEnabled
+                ? "Dark edge pass is active on live camera, HUD, snapshots, and overlay exports."
+                : "Off: edge darkening is bypassed while slider values remain ready."}
+            </small>
+          </span>
+        </button>
+        <div className="adjustment-list smart-dark-edge-list">
+          {group.controls.map((control) => renderAdjustmentSlider(control, "smart-dark-edge-adjustment"))}
+        </div>
+      </div>
     );
   }
 
@@ -2672,7 +2737,7 @@ function CameraStudio() {
           <ul>
             <li>{CAMERA_EFFECTS.length} local visual presets for IR-style, UVA-style, full-spectrum thermal, XLS, cinematic, monochrome, duotone, retro, and color-lab looks.</li>
             <li>Four RGBW gradient mixers for Main, Secondary, Third, and Highlights color layers that drive overlays, filter math, and the selected app accent aesthetic.</li>
-            <li>Grouped adjustment dropdowns with 12 core photo controls, 10 color inversion tools, 100 advanced sliders, equation-generated filter names/descriptions, live/overlay adjustment toggles, and optional non-identifying local smart face-region weighting.</li>
+            <li>Grouped adjustment dropdowns with 12 core photo controls, 10 color inversion tools, 10 smart darker-edge controls, 100 advanced sliders, equation-generated filter names/descriptions, live/overlay adjustment toggles, and optional non-identifying local smart face/wolf-region weighting.</li>
             <li>Processed PNG snapshots and 1080P or 2K MP4 recordings with local camera effects applied.</li>
             <li>Separate 1-3 layer image/video compositor with opacity, splice masks, blend modes, transforms, full adjustment-stack support, and clean PNG export.</li>
             <li>Rights-reserved white watermarks are added to exported generated images at the top-left and bottom-right corners.</li>
@@ -3383,7 +3448,8 @@ function drawMediaLayer(context, width, height, layer, renderState) {
     selectedEffect: layerEffect,
     manualSettings: layerSettings,
     cameraFacing: "environment",
-    smartFaceWeighting: renderState.smartFaceWeighting
+    smartFaceWeighting: renderState.smartFaceWeighting,
+    smartDarkEdgeEnabled: renderState.smartDarkEdgeEnabled
   }, {
     forcePixelFilters: false,
     includePreviewChrome: false,
@@ -3603,6 +3669,7 @@ function drawStudioFrame(context, width, height, mediaSource, renderState, optio
   if (!useCanvasFilter) applyCanvasPreviewFilters(context, width, height, previewFilterCss);
   applyAdvancedCameraPixelEffects(context, width, height, manualSettings, selectedEffect, options);
   applySmartFaceWeighting(context, width, height, manualSettings, selectedEffect, renderState.smartFaceWeighting, options);
+  applySmartDarkEdgeAmplifier(context, width, height, manualSettings, selectedEffect, renderState.smartDarkEdgeEnabled, options);
   paintOverlay(context, width, height, selectedEffect, manualSettings);
   paintSpecialOverlay(context, width, height, manualSettings, selectedEffect);
   paintCanvasGrain(context, width, height, manualSettings);
@@ -3712,8 +3779,8 @@ function applyCanvasPreviewFilters(context, width, height, filterCss) {
   context.putImageData(frame, 0, 0);
 }
 
-function cameraFrameInterval(settings, effect) {
-  return hasAdvancedCameraPixelEffects(settings, effect) ? CAMERA_HEAVY_FRAME_INTERVAL_MS : CAMERA_LIGHT_FRAME_INTERVAL_MS;
+function cameraFrameInterval(settings, effect, smartDarkEdgeEnabled = false) {
+  return hasAdvancedCameraPixelEffects(settings, effect, smartDarkEdgeEnabled) ? CAMERA_HEAVY_FRAME_INTERVAL_MS : CAMERA_LIGHT_FRAME_INTERVAL_MS;
 }
 
 function advancedCameraPixelModel(settings, effect) {
@@ -3745,7 +3812,7 @@ function advancedCameraPixelModel(settings, effect) {
   };
 }
 
-function hasAdvancedCameraPixelEffects(settings, effect) {
+function hasAdvancedCameraPixelEffects(settings, effect, smartDarkEdgeEnabled = false) {
   const model = advancedCameraPixelModel(settings, effect);
   return Boolean(
     model.thermalAmount ||
@@ -3753,7 +3820,8 @@ function hasAdvancedCameraPixelEffects(settings, effect) {
       model.posterizeAmount ||
       model.pixelateAmount ||
       model.noiseReductionAmount ||
-      model.colorBalanceAmount
+      model.colorBalanceAmount ||
+      smartDarkEdgeEnabled
   );
 }
 
@@ -3910,6 +3978,134 @@ function applyAdvancedCameraPixelEffectsToContext(context, width, height, settin
     data[index + 2] = clamp(b, 0, 255);
   }
   context.putImageData(frame, 0, 0);
+}
+
+function applySmartDarkEdgeAmplifier(context, width, height, settings, effect, enabled = false, options = {}) {
+  if (!enabled || !context.canvas || !width || !height) return;
+  const intensity = smartDarkEdgeSignal(settings, effect);
+  if (intensity <= 0.01) return;
+  const pixelBudget = Math.min(options.pixelBudget || SMART_FACE_PIXEL_BUDGET, SMART_FACE_PIXEL_BUDGET);
+  if (width * height > pixelBudget) {
+    const scale = Math.sqrt(pixelBudget / (width * height));
+    const workWidth = Math.max(1, Math.round(width * scale));
+    const workHeight = Math.max(1, Math.round(height * scale));
+    smartDarkEdgeWorkCanvas ||= document.createElement("canvas");
+    if (smartDarkEdgeWorkCanvas.width !== workWidth) smartDarkEdgeWorkCanvas.width = workWidth;
+    if (smartDarkEdgeWorkCanvas.height !== workHeight) smartDarkEdgeWorkCanvas.height = workHeight;
+    const workContext = smartDarkEdgeWorkCanvas.getContext("2d", { alpha: false, willReadFrequently: true });
+    if (!workContext) return;
+    workContext.save();
+    workContext.imageSmoothingEnabled = true;
+    workContext.imageSmoothingQuality = "high";
+    workContext.clearRect(0, 0, workWidth, workHeight);
+    workContext.drawImage(context.canvas, 0, 0, width, height, 0, 0, workWidth, workHeight);
+    workContext.restore();
+    applySmartDarkEdgeAmplifierToContext(workContext, workWidth, workHeight, settings, effect, intensity);
+    context.save();
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
+    context.clearRect(0, 0, width, height);
+    context.drawImage(smartDarkEdgeWorkCanvas, 0, 0, workWidth, workHeight, 0, 0, width, height);
+    context.restore();
+    return;
+  }
+  applySmartDarkEdgeAmplifierToContext(context, width, height, settings, effect, intensity);
+}
+
+function applySmartDarkEdgeAmplifierToContext(context, width, height, settings, effect, intensity) {
+  let frame;
+  try {
+    frame = context.getImageData(0, 0, width, height);
+  } catch {
+    return;
+  }
+  const data = frame.data;
+  const source = new Uint8ClampedArray(data);
+  const amount = clamp(setting(settings, "darkEdgeAmount") / 100, 0, 1);
+  const sensitivity = clamp(0.72 + setting(settings, "darkEdgeSensitivity") / 72, 0.72, 2.12);
+  const spread = clamp(setting(settings, "darkEdgeSpread") / 100, 0, 1);
+  const edgeContrast = clamp(setting(settings, "darkEdgeContrast") / 100, 0, 1);
+  const shadowDepth = clamp(setting(settings, "darkEdgeShadowDepth") / 100, 0, 1);
+  const blackClamp = clamp(setting(settings, "darkEdgeBlackClamp") / 100, 0, 1);
+  const detailAmplify = clamp(setting(settings, "darkEdgeDetailAmplify") / 100, 0, 1);
+  const haloCut = clamp(setting(settings, "darkEdgeHaloCut") / 100, 0, 1);
+  const thermalBind = clamp(setting(settings, "darkEdgeThermalBind") / 100, 0, 1);
+  const microGrain = clamp(setting(settings, "darkEdgeMicroGrain") / 100, 0, 1);
+  const threshold = clamp(0.3 - setting(settings, "darkEdgeSensitivity") / 420, 0.06, 0.34);
+  const thermalLike = isThermalEffect(settings, effect);
+  const lumaAt = (pixelIndex) =>
+    (source[pixelIndex] * 0.2126 + source[pixelIndex + 1] * 0.7152 + source[pixelIndex + 2] * 0.0722) / 255;
+
+  for (let index = 0; index < data.length; index += 4) {
+    const pixel = index / 4;
+    const x = pixel % width;
+    const y = Math.floor(pixel / width);
+    const luma = lumaAt(index);
+    const left = x > 0 ? lumaAt(index - 4) : luma;
+    const right = x < width - 1 ? lumaAt(index + 4) : luma;
+    const up = y > 0 ? lumaAt(index - width * 4) : luma;
+    const down = y < height - 1 ? lumaAt(index + width * 4) : luma;
+    const twoLeft = x > 1 ? lumaAt(index - 8) : left;
+    const twoRight = x < width - 2 ? lumaAt(index + 8) : right;
+    const twoUp = y > 1 ? lumaAt(index - width * 8) : up;
+    const twoDown = y < height - 2 ? lumaAt(index + width * 8) : down;
+    const localAverage = (luma * 2 + left + right + up + down + (twoLeft + twoRight + twoUp + twoDown) * spread) / (6 + 4 * spread);
+    const gradientEdge = clamp(Math.abs(right - left) + Math.abs(down - up), 0, 1);
+    const wideEdge = clamp(Math.abs(twoRight - twoLeft) + Math.abs(twoDown - twoUp), 0, 1);
+    const localDetail = clamp(Math.abs(luma - localAverage) * (2.3 + detailAmplify * 2.2) + gradientEdge * (1.05 + spread) + wideEdge * spread * 0.7, 0, 1);
+    const edgeMask = clamp((gradientEdge * 1.2 + wideEdge * spread * 0.72 + localDetail * 0.52 - threshold) * sensitivity, 0, 1);
+    const shadowMask = clamp((0.62 - luma) * (0.72 + shadowDepth), 0, 1);
+    const brightHaloMask = clamp((luma - localAverage) * 2.2 + (luma - 0.68) * 0.8, 0, 1);
+    const darken = clamp(
+      edgeMask * amount * (0.48 + edgeContrast * 0.34 + shadowDepth * 0.28) +
+        edgeMask * shadowMask * (0.32 + blackClamp * 0.44) +
+        brightHaloMask * haloCut * 0.26,
+      0,
+      0.94
+    );
+    const contrastPush = 1 + edgeMask * edgeContrast * 1.12 * intensity;
+    let r = data[index];
+    let g = data[index + 1];
+    let b = data[index + 2];
+    const y709 = r * 0.2126 + g * 0.7152 + b * 0.0722;
+    r = y709 + (r - y709) * contrastPush;
+    g = y709 + (g - y709) * contrastPush;
+    b = y709 + (b - y709) * contrastPush;
+    const channelDarken = darken * (0.74 + blackClamp * 0.34) * intensity;
+    r *= 1 - channelDarken;
+    g *= 1 - channelDarken * (0.94 + shadowDepth * 0.08);
+    b *= 1 - channelDarken * (0.9 + shadowDepth * 0.14);
+    if (thermalLike && thermalBind) {
+      const thermalShadow = thermalPaletteColor(clamp(0.06 + edgeMask * 0.18 + shadowMask * 0.08, 0, 0.36), "black-hot");
+      const bindAlpha = clamp(edgeMask * thermalBind * 0.42, 0, 0.42);
+      r = mixChannel(r, thermalShadow[0], bindAlpha);
+      g = mixChannel(g, thermalShadow[1], bindAlpha);
+      b = mixChannel(b, thermalShadow[2], bindAlpha);
+    }
+    if (microGrain && edgeMask) {
+      const grainSeed = (((x + 1) * 73856093) ^ ((y + 1) * 19349663)) >>> 0;
+      const grain = ((grainSeed & 255) / 255 - 0.5) * 44 * microGrain * edgeMask * intensity;
+      r += grain;
+      g += grain * 0.88;
+      b += grain * 0.76;
+    }
+    data[index] = clamp(r, 0, 255);
+    data[index + 1] = clamp(g, 0, 255);
+    data[index + 2] = clamp(b, 0, 255);
+  }
+  context.putImageData(frame, 0, 0);
+}
+
+function smartDarkEdgeSignal(settings = {}, effect = {}) {
+  const sliderSignal = SMART_DARK_EDGE_ADJUSTMENTS.reduce((total, [key]) => total + setting(settings, key), 0) / (SMART_DARK_EDGE_ADJUSTMENTS.length * 100);
+  const effectSignal =
+    setting(settings, "edgeEnhance") * 0.0025 +
+    setting(settings, "clarity") * 0.0016 +
+    setting(settings, "dehaze") * 0.0016 +
+    setting(settings, "thermalContour") * 0.002 +
+    setting(settings, "heatEdge") * 0.002;
+  const presetSignal = effect?.category?.includes("Thermal") || effect?.category === "XLS Camera" ? 0.12 : 0;
+  return clamp(sliderSignal * 1.15 + effectSignal + presetSignal, 0, 1.45);
 }
 
 function applySmartFaceWeighting(context, width, height, settings, effect, weighting = {}, options = {}) {
@@ -4493,6 +4689,7 @@ function smartFaceEffectEnergy(settings = {}, effect = {}, model = {}) {
     setting(settings, "glow") * 0.6 +
     setting(settings, "bloom") * 0.6 +
     setting(settings, "colorSeparation") * 0.7 +
+    SMART_DARK_EDGE_ADJUSTMENTS.reduce((total, [key]) => total + setting(settings, key) * 0.12, 0) +
     INVERSION_ADJUSTMENTS.reduce((total, [key]) => total + setting(settings, key) * 0.24, 0);
   const presetEnergy = effect?.category?.includes("Thermal") || effect?.category === "XLS Camera" ? 44 : 16;
   return clamp(0.46 + (sliderEnergy + presetEnergy + model.thermalAmount * 70 + model.xlsAmount * 44) / 260, 0.48, 1.22);

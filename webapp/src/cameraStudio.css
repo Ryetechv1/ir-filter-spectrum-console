@@ -1336,6 +1336,25 @@
   gap: 8px;
 }
 
+.smart-dark-edge-group {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.smart-dark-edge-group > .adjustment-scope-toggle {
+  min-height: 64px;
+}
+
+.smart-dark-edge-list {
+  max-height: 560px;
+  padding: 0 4px 4px;
+}
+
+.smart-dark-edge-adjustment span svg {
+  color: var(--studio-accent-strong);
+}
+
 .adjustment-dropdown-stack {
   display: grid;
   gap: 10px;
