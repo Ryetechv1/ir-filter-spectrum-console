@@ -202,11 +202,22 @@ const SMART_FACE_ANALYSIS_WIDTH = 72;
 const SMART_FACE_PIXEL_BUDGET = 58_000;
 const SMART_FACE_FOREGROUND_LABEL = "Foreground smart facial recognition";
 const SMART_FACE_BACKGROUND_LABEL = "Background smart facial recognition";
+const SMART_WOLF_RECOGNITION_LABEL = "Smart wolf recognition";
 const SMART_FACE_MESH_PROFILE = {
   eyeY: 0.38,
   eyeOffsetX: 0.22,
   muzzleY: 0.66,
   noseY: 0.76
+};
+const SMART_WOLF_MESH_PROFILE = {
+  earY: 0.08,
+  earHeight: 0.28,
+  earOffsetX: 0.31,
+  eyeY: 0.39,
+  eyeOffsetX: 0.22,
+  muzzleY: 0.66,
+  noseY: 0.78,
+  ridgeY: 0.5
 };
 let thermalWorkCanvas;
 let pixelateWorkCanvas;
@@ -1397,7 +1408,7 @@ function CameraStudio() {
     selectedEffect: CAMERA_EFFECTS[0],
     manualSettings: CAMERA_EFFECTS[0].settings,
     cameraFacing: "user",
-    smartFaceWeighting: { foreground: false, background: false }
+    smartFaceWeighting: { foreground: false, background: false, wolf: false }
   });
   const [authorized, setAuthorized] = useState(() => window.sessionStorage.getItem(STUDIO_UNLOCK_KEY) === "true");
   const [accessCode, setAccessCode] = useState("");
@@ -1424,7 +1435,7 @@ function CameraStudio() {
   const [manualSettings, setManualSettings] = useState(CAMERA_EFFECTS[0].settings);
   const [liveAdjustmentsEnabled, setLiveAdjustmentsEnabled] = useState(true);
   const [overlayAdjustmentsEnabled, setOverlayAdjustmentsEnabled] = useState(true);
-  const [smartFaceWeighting, setSmartFaceWeighting] = useState({ foreground: false, background: false });
+  const [smartFaceWeighting, setSmartFaceWeighting] = useState({ foreground: false, background: false, wolf: false });
   const [openAdjustmentGroups, setOpenAdjustmentGroups] = useState(() => new Set(ADJUSTMENT_GROUPS.filter((group) => group.open).map((group) => group.id)));
   const [snapshotUrl, setSnapshotUrl] = useState("");
   const [cameraHudVisible, setCameraHudVisible] = useState(false);
@@ -2003,7 +2014,7 @@ function CameraStudio() {
     setEquationMediaEnabled(false);
     setLiveAdjustmentsEnabled(true);
     setOverlayAdjustmentsEnabled(true);
-    setSmartFaceWeighting({ foreground: false, background: false });
+    setSmartFaceWeighting({ foreground: false, background: false, wolf: false });
   }
 
   function updateEquationStyle(nextStyleId) {
@@ -2967,7 +2978,8 @@ function CameraStudio() {
             <p className="smart-face-disclaimer">
               Disclaimer: this is not biometric identification, person matching, face login, or biometric storage. It only uses local
               frame geometry such as symmetry, edges, oval/eye/muzzle-like regions, and tonal depth. Foreground mapping targets near face-like
-              regions; background mapping is experimental wolf facial mapping for effect-weight experimentation.
+              regions; background mapping is experimental wolf facial mapping for effect-weight experimentation. Smart wolf recognition adds
+              invisible paired-ear, eye-symmetry, muzzle/snout, ridge, contour-edge, and depth-field cues for stronger local effect weighting.
             </p>
             <div className="smart-face-toggle-grid">
               <button
@@ -2992,6 +3004,18 @@ function CameraStudio() {
                 <span>
                   <strong>{SMART_FACE_BACKGROUND_LABEL}</strong>
                   <small>{smartFaceWeighting.background ? "Background face-like patterns and inverse field depth are weighted." : "Off: background is unchanged."}</small>
+                </span>
+              </button>
+              <button
+                type="button"
+                className={smartFaceWeighting.wolf ? "adjustment-scope-toggle active" : "adjustment-scope-toggle"}
+                aria-pressed={smartFaceWeighting.wolf}
+                onClick={() => setSmartFaceWeighting((current) => ({ ...current, wolf: !current.wolf }))}
+              >
+                <ShieldCheck size={15} />
+                <span>
+                  <strong>{SMART_WOLF_RECOGNITION_LABEL}</strong>
+                  <small>{smartFaceWeighting.wolf ? "Wolf mesh cues drive stronger spectral weighting." : "Off: wolf mesh weighting is unchanged."}</small>
                 </span>
               </button>
             </div>
@@ -3891,7 +3915,8 @@ function applyAdvancedCameraPixelEffectsToContext(context, width, height, settin
 function applySmartFaceWeighting(context, width, height, settings, effect, weighting = {}, options = {}) {
   const foregroundEnabled = Boolean(weighting.foreground);
   const backgroundEnabled = Boolean(weighting.background);
-  if (!foregroundEnabled && !backgroundEnabled) return;
+  const wolfEnabled = Boolean(weighting.wolf);
+  if (!foregroundEnabled && !backgroundEnabled && !wolfEnabled) return;
   if (!context.canvas || !width || !height) return;
 
   const pixelBudget = Math.min(options.pixelBudget || SMART_FACE_PIXEL_BUDGET, SMART_FACE_PIXEL_BUDGET);
@@ -3936,6 +3961,9 @@ function applySmartFaceWeightingToContext(context, width, height, settings, effe
   const backgroundCandidate = weighting.background
     ? findSmartFaceCandidate(analysis, "background", foregroundCandidate) || fallbackSmartFaceBox(width, height, "background")
     : null;
+  const wolfCandidate = weighting.wolf
+    ? findSmartWolfCandidate(analysis, foregroundCandidate, backgroundCandidate) || fallbackSmartWolfBox(width, height)
+    : null;
   const model = advancedCameraPixelModel(settings, effect);
   const palette = settings?.thermalPalette || (model.xlsAmount > model.thermalAmount ? "xls" : "full-range-rgb");
   const energy = smartFaceEffectEnergy(settings, effect, model);
@@ -3955,7 +3983,8 @@ function applySmartFaceWeightingToContext(context, width, height, settings, effe
     const localDetail = clamp(localEdge * 1.9 + Math.abs(luma - (left + right + up + down) / 4) * 2.4, 0, 1);
     const foregroundMask = foregroundCandidate ? smartFaceOvalMask(x, y, foregroundCandidate) * foregroundCandidate.confidence : 0;
     const backgroundMask = backgroundCandidate ? smartBackgroundFaceMask(x, y, backgroundCandidate, foregroundCandidate, width, height) * backgroundCandidate.confidence : 0;
-    if (!foregroundMask && !backgroundMask) continue;
+    const wolfMask = wolfCandidate ? smartWolfMeshMask(x, y, wolfCandidate) * wolfCandidate.confidence : 0;
+    if (!foregroundMask && !backgroundMask && !wolfMask) continue;
 
     let r = data[index];
     let g = data[index + 1];
@@ -3973,6 +4002,29 @@ function applySmartFaceWeightingToContext(context, width, height, settings, effe
       r = (r - 128) * fieldContrast + 128 - bgAmount * 10;
       g = (g - 128) * fieldContrast + 128 - bgAmount * 8;
       b = (b - 128) * fieldContrast + 128 + bgAmount * 8;
+    }
+
+    if (wolfMask) {
+      const wolfAmount = clamp(wolfMask * energy * 1.04, 0, 0.96);
+      const wolfDepth = clamp(luma * 0.36 + localDetail * 1.06 + localEdge * 0.9, 0, 1);
+      const wolfPalette = palette === "full-range-rgb" ? "inverted-red-rgb" : thermalHotPalette(palette);
+      const [wr, wg, wb] = thermalPaletteColor(wolfDepth, wolfPalette);
+      const ridge = smartWolfRidgeMask(x, y, wolfCandidate);
+      const muzzle = smartWolfMuzzleMask(x, y, wolfCandidate);
+      const ears = smartWolfEarMask(x, y, wolfCandidate, "left") + smartWolfEarMask(x, y, wolfCandidate, "right");
+      const contourBoost = clamp(localEdge * 96 + ridge * 58 + muzzle * 42 + ears * 36, 0, 170) * wolfAmount;
+      const wolfContrast = 1 + wolfAmount * 0.72;
+      r = (r - 128) * wolfContrast + 128;
+      g = (g - 128) * (1 + wolfAmount * 0.52) + 128;
+      b = (b - 128) * (1 + wolfAmount * 0.46) + 128;
+      r = mixChannel(r + contourBoost, wr, wolfAmount * 0.46);
+      g = mixChannel(g + contourBoost * 0.62, wg, wolfAmount * 0.38);
+      b = mixChannel(b + contourBoost * 0.4, wb, wolfAmount * 0.36);
+      if (ridge || muzzle) {
+        r += ridge * 34 * wolfAmount + muzzle * 20 * wolfAmount;
+        g += ridge * 22 * wolfAmount;
+        b += muzzle * 16 * wolfAmount;
+      }
     }
 
     if (foregroundMask) {
@@ -4205,6 +4257,145 @@ function fallbackSmartFaceBox(width, height, mode) {
   };
 }
 
+function findSmartWolfCandidate(analysis, foregroundBox = null, backgroundBox = null) {
+  const { cols, rows } = analysis;
+  let best = null;
+  const widthRatios = [0.34, 0.42, 0.5, 0.58, 0.68];
+  const aspectRatios = [1.0, 1.16, 1.32, 1.48];
+  widthRatios.forEach((widthRatio) => {
+    const candidateWidth = Math.max(12, Math.round(cols * widthRatio));
+    aspectRatios.forEach((aspect) => {
+      const candidateHeight = Math.max(12, Math.round(candidateWidth * aspect));
+      const stepX = Math.max(2, Math.round(candidateWidth / 5));
+      const stepY = Math.max(2, Math.round(candidateHeight / 5));
+      for (let y = 0; y <= rows - candidateHeight - 1; y += stepY) {
+        for (let x = 0; x <= cols - candidateWidth - 1; x += stepX) {
+          const box = { x, y, width: candidateWidth, height: candidateHeight };
+          const score = smartWolfCandidateScore(analysis, box, foregroundBox, backgroundBox);
+          if (!best || score > best.score) best = { ...box, score };
+        }
+      }
+    });
+  });
+  if (!best || best.score < 0.34) return null;
+  return gridWolfBoxToPixels(best, analysis);
+}
+
+function smartWolfCandidateScore(analysis, box, foregroundBox = null, backgroundBox = null) {
+  const { cols, rows, luma, edges } = analysis;
+  const sample = (x, y) => {
+    const sx = clamp(Math.round(x), 0, cols - 1);
+    const sy = clamp(Math.round(y), 0, rows - 1);
+    return luma[sy * cols + sx] || 0;
+  };
+  const edge = (x, y) => {
+    const sx = clamp(Math.round(x), 0, cols - 1);
+    const sy = clamp(Math.round(y), 0, rows - 1);
+    return edges[sy * cols + sx] || 0;
+  };
+  const mean = smartRegionAverage(analysis, box, "luma");
+  const texture = smartRegionAverage(analysis, box, "edges");
+  const centerX = box.x + box.width * 0.5;
+  const topY = box.y + box.height * SMART_WOLF_MESH_PROFILE.earY;
+  const leftEar = smartRegionAverage(
+    analysis,
+    {
+      x: box.x + box.width * 0.05,
+      y: topY,
+      width: box.width * 0.26,
+      height: box.height * SMART_WOLF_MESH_PROFILE.earHeight
+    },
+    "edges"
+  );
+  const rightEar = smartRegionAverage(
+    analysis,
+    {
+      x: box.x + box.width * 0.69,
+      y: topY,
+      width: box.width * 0.26,
+      height: box.height * SMART_WOLF_MESH_PROFILE.earHeight
+    },
+    "edges"
+  );
+  const earBalance = clamp(1 - Math.abs(leftEar - rightEar) * 2.8, 0, 1);
+  const earScore = clamp((leftEar + rightEar) * 1.9 + earBalance * 0.34, 0, 1);
+  let symmetryTotal = 0;
+  let symmetryCount = 0;
+  for (let yStep = 1; yStep <= 8; yStep += 1) {
+    const py = box.y + (box.height * yStep) / 9;
+    for (let xStep = 1; xStep <= 4; xStep += 1) {
+      const px = (box.width * xStep) / 10;
+      symmetryTotal += Math.abs(sample(box.x + px, py) - sample(box.x + box.width - px, py));
+      symmetryCount += 1;
+    }
+  }
+  const symmetry = clamp(1 - (symmetryTotal / Math.max(1, symmetryCount)) * 2.55, 0, 1);
+  const eyeY = box.y + box.height * SMART_WOLF_MESH_PROFILE.eyeY;
+  const eyeOffset = box.width * SMART_WOLF_MESH_PROFILE.eyeOffsetX;
+  const leftEye = sample(centerX - eyeOffset, eyeY);
+  const rightEye = sample(centerX + eyeOffset, eyeY);
+  const eyeScore = clamp(
+    (edge(centerX - eyeOffset, eyeY) + edge(centerX + eyeOffset, eyeY)) * 0.62 + Math.abs(mean - (leftEye + rightEye) / 2) * 2.6,
+    0,
+    1
+  );
+  const muzzleBox = {
+    x: box.x + box.width * 0.34,
+    y: box.y + box.height * (SMART_WOLF_MESH_PROFILE.muzzleY - 0.1),
+    width: box.width * 0.32,
+    height: box.height * 0.28
+  };
+  const muzzleTexture = smartRegionAverage(analysis, muzzleBox, "edges");
+  const noseDark = clamp((mean - sample(centerX, box.y + box.height * SMART_WOLF_MESH_PROFILE.noseY)) * 4.2, 0, 1);
+  const ridge = clamp(
+    edge(centerX, box.y + box.height * 0.22) + edge(centerX, box.y + box.height * 0.5) + edge(centerX, box.y + box.height * 0.72),
+    0,
+    1
+  );
+  const aspect = clamp(1 - Math.abs(box.height / Math.max(1, box.width) - 1.22) / 0.72, 0, 1);
+  const centerPreference = clamp(1 - Math.hypot(centerX / cols - 0.5, (box.y + box.height * 0.48) / rows - 0.5) * 1.25, 0, 1);
+  const foregroundClear = foregroundBox?.gridBox ? 1 - smartBoxOverlapRatio(box, foregroundBox.gridBox) * 0.24 : 1;
+  const backgroundAffinity = backgroundBox?.gridBox ? clamp(0.72 + smartBoxOverlapRatio(box, backgroundBox.gridBox) * 0.28, 0.72, 1) : 0.86;
+  return (
+    earScore * 0.22 +
+    symmetry * 0.19 +
+    eyeScore * 0.17 +
+    clamp(muzzleTexture * 1.95 + noseDark * 0.62, 0, 1) * 0.18 +
+    ridge * 0.1 +
+    clamp(texture * 2.25, 0, 1) * 0.08 +
+    aspect * 0.03 +
+    centerPreference * 0.03
+  ) * foregroundClear * backgroundAffinity;
+}
+
+function gridWolfBoxToPixels(box, analysis) {
+  const x = (box.x / analysis.cols) * analysis.width;
+  const y = (box.y / analysis.rows) * analysis.height;
+  const width = (box.width / analysis.cols) * analysis.width;
+  const height = (box.height / analysis.rows) * analysis.height;
+  return {
+    x,
+    y,
+    width,
+    height,
+    confidence: clamp(box.score, 0.42, 0.96),
+    gridBox: box,
+    mode: "wolf"
+  };
+}
+
+function fallbackSmartWolfBox(width, height) {
+  return {
+    x: width * 0.12,
+    y: height * 0.03,
+    width: width * 0.76,
+    height: height * 0.84,
+    confidence: 0.36,
+    gridBox: null,
+    mode: "wolf"
+  };
+}
+
 function smartFaceOvalMask(x, y, box) {
   if (!box) return 0;
   const rx = Math.max(1, box.width * 0.5);
@@ -4221,6 +4412,72 @@ function smartBackgroundFaceMask(x, y, backgroundBox, foregroundBox, width, heig
   const foregroundClear = foregroundBox ? 1 - smartFaceOvalMask(x, y, foregroundBox) * 0.86 : 1;
   const edgeField = clamp(Math.min(x, width - x, y, height - y) / Math.max(1, Math.min(width, height) * 0.18), 0, 1);
   return clamp(Math.max(boxMask, 0.28) * foregroundClear * edgeField, 0, 1);
+}
+
+function smartWolfMeshMask(x, y, box) {
+  return clamp(
+    smartWolfHeadMask(x, y, box) * 0.82 +
+      smartWolfEarMask(x, y, box, "left") * 0.74 +
+      smartWolfEarMask(x, y, box, "right") * 0.74 +
+      smartWolfMuzzleMask(x, y, box) * 0.86 +
+      smartWolfRidgeMask(x, y, box) * 0.44,
+    0,
+    1
+  );
+}
+
+function smartWolfHeadMask(x, y, box) {
+  if (!box) return 0;
+  const rx = Math.max(1, box.width * 0.36);
+  const ry = Math.max(1, box.height * 0.43);
+  const cx = box.x + box.width * 0.5;
+  const cy = box.y + box.height * 0.49;
+  const normalized = ((x - cx) * (x - cx)) / (rx * rx) + ((y - cy) * (y - cy)) / (ry * ry);
+  if (normalized >= 1) return 0;
+  return Math.pow(1 - normalized, 0.62);
+}
+
+function smartWolfEarMask(x, y, box, side) {
+  if (!box) return 0;
+  const left = side === "left";
+  const baseY = box.y + box.height * 0.32;
+  const tipY = box.y + box.height * 0.02;
+  const baseOuterX = box.x + box.width * (left ? 0.1 : 0.9);
+  const baseInnerX = box.x + box.width * (left ? 0.34 : 0.66);
+  const tipX = box.x + box.width * (left ? 0.18 : 0.82);
+  return smartWolfTriangleMask(x, y, tipX, tipY, baseOuterX, baseY, baseInnerX, baseY);
+}
+
+function smartWolfMuzzleMask(x, y, box) {
+  if (!box) return 0;
+  const rx = Math.max(1, box.width * 0.18);
+  const ry = Math.max(1, box.height * 0.22);
+  const cx = box.x + box.width * 0.5;
+  const cy = box.y + box.height * 0.7;
+  const normalized = ((x - cx) * (x - cx)) / (rx * rx) + ((y - cy) * (y - cy)) / (ry * ry);
+  if (normalized >= 1) return 0;
+  return Math.pow(1 - normalized, 0.54);
+}
+
+function smartWolfRidgeMask(x, y, box) {
+  if (!box) return 0;
+  const cx = box.x + box.width * 0.5;
+  const y1 = box.y + box.height * 0.12;
+  const y2 = box.y + box.height * 0.82;
+  if (y < y1 || y > y2) return 0;
+  const distance = Math.abs(x - cx) / Math.max(1, box.width * 0.055);
+  const verticalFalloff = clamp(1 - Math.abs((y - (y1 + y2) / 2) / ((y2 - y1) / 2)) * 0.25, 0.72, 1);
+  return clamp(1 - distance, 0, 1) * verticalFalloff;
+}
+
+function smartWolfTriangleMask(x, y, x1, y1, x2, y2, x3, y3) {
+  const denominator = (y2 - y3) * (x1 - x3) + (x3 - x2) * (y1 - y3);
+  if (!denominator) return 0;
+  const a = ((y2 - y3) * (x - x3) + (x3 - x2) * (y - y3)) / denominator;
+  const b = ((y3 - y1) * (x - x3) + (x1 - x3) * (y - y3)) / denominator;
+  const c = 1 - a - b;
+  if (a < 0 || b < 0 || c < 0) return 0;
+  return Math.pow(Math.min(a, b, c) * 3, 0.55);
 }
 
 function smartFaceEffectEnergy(settings = {}, effect = {}, model = {}) {
