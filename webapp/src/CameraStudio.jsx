@@ -229,7 +229,7 @@ let smartDarkEdgeWorkCanvas;
 const TRUSTED_ACCESS = [
   {
     name: "Studio Access Holder",
-    sha256: "183d71611e8b55c363ced595d93c8e1ca88a4237b2bf233718273c1fd5c9d994"
+    sha256: "eb9267d3ffe321f965b3b198c28f874043e8246afb0ecf294c382ed9c501851d"
   }
 ];
 
@@ -3802,13 +3802,21 @@ function drawStudioFrame(context, width, height, mediaSource, renderState, optio
   }
   context.restore();
   if (!useCanvasFilter) applyCanvasPreviewFilters(context, width, height, previewFilterCss);
-  applyAdvancedCameraPixelEffects(context, width, height, manualSettings, selectedEffect, options);
-  applySmartFaceWeighting(context, width, height, manualSettings, selectedEffect, renderState.smartFaceWeighting, options);
-  applySmartDarkEdgeAmplifier(context, width, height, manualSettings, selectedEffect, renderState.smartDarkEdgeEnabled, options);
-  paintOverlay(context, width, height, selectedEffect, manualSettings);
-  paintSpecialOverlay(context, width, height, manualSettings, selectedEffect);
-  paintCanvasGrain(context, width, height, manualSettings);
-  paintCanvasVignette(context, width, height, manualSettings);
+  const recognitionSettings = buildInvisibleSmartRecognitionSettings(
+    context,
+    width,
+    height,
+    manualSettings,
+    selectedEffect,
+    renderState.smartFaceWeighting,
+    options
+  );
+  applyAdvancedCameraPixelEffects(context, width, height, recognitionSettings, selectedEffect, options);
+  applySmartDarkEdgeAmplifier(context, width, height, recognitionSettings, selectedEffect, renderState.smartDarkEdgeEnabled, options);
+  paintOverlay(context, width, height, selectedEffect, recognitionSettings);
+  paintSpecialOverlay(context, width, height, recognitionSettings, selectedEffect);
+  paintCanvasGrain(context, width, height, recognitionSettings);
+  paintCanvasVignette(context, width, height, recognitionSettings);
   if (options.includePreviewChrome) {
     paintPreviewChrome(context, width, height, {
       scale: options.pixelScale || 1,
@@ -4089,6 +4097,95 @@ function applyAdvancedCameraPixelEffectsToContext(context, width, height, settin
     data[index + 2] = clamp(b, 0, 255);
   }
   context.putImageData(frame, 0, 0);
+}
+
+function buildInvisibleSmartRecognitionSettings(context, width, height, settings, effect, weighting = {}, options = {}) {
+  const foregroundEnabled = Boolean(weighting?.foreground);
+  const backgroundEnabled = Boolean(weighting?.background);
+  const wolfEnabled = Boolean(weighting?.wolf);
+  if (!foregroundEnabled && !backgroundEnabled && !wolfEnabled) return settings;
+  const signals = measureInvisibleSmartRecognitionSignals(context, width, height, weighting, options);
+  const totalSignal = signals.foreground + signals.background + signals.wolf;
+  if (totalSignal <= 0.01) return settings;
+
+  const model = advancedCameraPixelModel(settings, effect);
+  const energy = smartFaceEffectEnergy(settings, effect, model);
+  const next = { ...settings };
+  const thermalLike = isThermalRenderMode(settings, effect);
+  const recognitionGain = clamp((signals.foreground * 0.6 + signals.background * 0.48 + signals.wolf * 0.76) * energy, 0, 1.18);
+
+  const addSetting = (key, amount) => {
+    const range = settingRange(key);
+    next[key] = Math.round(clamp(setting(next, key, DEFAULT_SETTINGS[key] ?? 0) + amount, range.min, range.max));
+  };
+
+  if (foregroundEnabled) {
+    addSetting("contrast", signals.foreground * 7 * recognitionGain);
+    addSetting("saturation", signals.foreground * 8 * recognitionGain);
+    addSetting("clarity", signals.foreground * 10 * recognitionGain);
+    addSetting("localContrast", signals.foreground * 8 * recognitionGain);
+    addSetting("detailBoost", signals.foreground * 7 * recognitionGain);
+  }
+
+  if (backgroundEnabled) {
+    addSetting("dehaze", signals.background * 10 * recognitionGain);
+    addSetting("shadowDepth", signals.background * 8 * recognitionGain);
+    addSetting("thermalContour", signals.background * (thermalLike ? 10 : 5) * recognitionGain);
+    addSetting("colorSeparation", signals.background * 6 * recognitionGain);
+  }
+
+  if (wolfEnabled) {
+    addSetting("edgeEnhance", signals.wolf * 14 * recognitionGain);
+    addSetting("heatEdge", signals.wolf * (thermalLike ? 14 : 8) * recognitionGain);
+    addSetting("thermalContour", signals.wolf * (thermalLike ? 16 : 7) * recognitionGain);
+    addSetting("shadowCrush", signals.wolf * 7 * recognitionGain);
+    addSetting("localContrast", signals.wolf * 11 * recognitionGain);
+    addSetting("detailBoost", signals.wolf * 9 * recognitionGain);
+  }
+
+  return next;
+}
+
+function measureInvisibleSmartRecognitionSignals(context, width, height, weighting = {}, options = {}) {
+  if (!context?.canvas || !width || !height) return { foreground: 0, background: 0, wolf: 0 };
+  const pixelBudget = Math.min(options.pixelBudget || SMART_FACE_PIXEL_BUDGET, SMART_FACE_PIXEL_BUDGET);
+  const scale = width * height > pixelBudget ? Math.sqrt(pixelBudget / (width * height)) : 1;
+  const workWidth = Math.max(1, Math.round(width * scale));
+  const workHeight = Math.max(1, Math.round(height * scale));
+  let frame;
+
+  try {
+    if (scale < 1) {
+      smartFaceWorkCanvas ||= document.createElement("canvas");
+      if (smartFaceWorkCanvas.width !== workWidth) smartFaceWorkCanvas.width = workWidth;
+      if (smartFaceWorkCanvas.height !== workHeight) smartFaceWorkCanvas.height = workHeight;
+      const workContext = smartFaceWorkCanvas.getContext("2d", { alpha: false, willReadFrequently: true });
+      if (!workContext) return { foreground: 0, background: 0, wolf: 0 };
+      workContext.save();
+      workContext.imageSmoothingEnabled = true;
+      workContext.imageSmoothingQuality = "high";
+      workContext.clearRect(0, 0, workWidth, workHeight);
+      workContext.drawImage(context.canvas, 0, 0, width, height, 0, 0, workWidth, workHeight);
+      workContext.restore();
+      frame = workContext.getImageData(0, 0, workWidth, workHeight);
+    } else {
+      frame = context.getImageData(0, 0, width, height);
+    }
+  } catch {
+    return { foreground: 0, background: 0, wolf: 0 };
+  }
+
+  const analysis = buildSmartFaceAnalysis(frame.data, workWidth, workHeight);
+  const foregroundCandidate = weighting.foreground ? findSmartFaceCandidate(analysis, "foreground") : null;
+  const backgroundCandidate = weighting.background ? findSmartFaceCandidate(analysis, "background", foregroundCandidate) : null;
+  const wolfCandidate = weighting.wolf ? findSmartWolfCandidate(analysis, foregroundCandidate, backgroundCandidate) : null;
+  const ambientTexture = clamp(smartRegionAverage(analysis, { x: 0, y: 0, width: analysis.cols, height: analysis.rows }, "edges") * 1.7, 0, 1);
+
+  return {
+    foreground: weighting.foreground ? clamp((foregroundCandidate?.confidence || 0) * 0.92 + ambientTexture * 0.05, 0, 1) : 0,
+    background: weighting.background ? clamp((backgroundCandidate?.confidence || 0) * 0.86 + ambientTexture * 0.08, 0, 1) : 0,
+    wolf: weighting.wolf ? clamp((wolfCandidate?.confidence || 0) * 0.9 + ambientTexture * 0.1, 0, 1) : 0
+  };
 }
 
 function applySmartDarkEdgeAmplifier(context, width, height, settings, effect, enabled = false, options = {}) {
@@ -5242,6 +5339,10 @@ function mixChannel(a, b, amount) {
 
 function isThermalRenderMode(settings, effect) {
   return Boolean(settings?.thermalPalette) || effect?.category?.includes("Thermal") || setting(settings, "thermalBlend") > 0 || setting(settings, "thermalContour") > 0;
+}
+
+function isThermalEffect(settings, effect) {
+  return isThermalRenderMode(settings, effect);
 }
 
 function thermalOverlayWeight(settings, effect) {
