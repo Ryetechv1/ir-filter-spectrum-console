@@ -231,6 +231,69 @@ const INVERSION_ADJUSTMENTS = [
   ["highlightInvert", "Highlight Range Invert", 0, 100, "%", 0]
 ];
 
+const INVERSION_STYLE_VARIANTS = [
+  {
+    name: "Classic RGB Invert",
+    color: "rgba(255, 255, 255, 0.18)",
+    blendMode: "difference",
+    settings: { classicInvert: 92, invert: 32, contrast: 136, saturation: 142, colorSeparation: 18 }
+  },
+  {
+    name: "Luma Negative",
+    color: "rgba(220, 232, 255, 0.2)",
+    blendMode: "difference",
+    settings: { lumaInvert: 94, grayscale: 34, contrast: 148, exposure: -4, clarity: 18 }
+  },
+  {
+    name: "Channel Swap Invert",
+    color: "rgba(255, 70, 220, 0.22)",
+    blendMode: "exclusion",
+    settings: { channelInvert: 96, hue: 48, saturation: 178, colorSeparation: 42, prismSplit: 16 }
+  },
+  {
+    name: "Spectral Invert",
+    color: "rgba(82, 240, 255, 0.24)",
+    blendMode: "difference",
+    settings: { spectralInvert: 100, infraredWash: 18, ultravioletWash: 16, chromaticGlow: 22, contrast: 154, saturation: 210 }
+  },
+  {
+    name: "Thermal Black-Hot Invert",
+    color: "rgba(28, 38, 52, 0.36)",
+    blendMode: "color-dodge",
+    settings: { thermalPalette: "black-hot", thermalInvert: 96, thermalBlend: 92, thermalContour: 78, heatEdge: 62, contrast: 196, saturation: 48 }
+  },
+  {
+    name: "Red Channel Invert",
+    color: "rgba(255, 44, 72, 0.24)",
+    blendMode: "difference",
+    settings: { redInvert: 94, saturation: 176, hue: -18, colorSeparation: 24, contrast: 138 }
+  },
+  {
+    name: "Green Channel Invert",
+    color: "rgba(64, 255, 118, 0.22)",
+    blendMode: "difference",
+    settings: { greenInvert: 94, saturation: 170, hue: 28, nearIrBoost: 12, contrast: 136 }
+  },
+  {
+    name: "Blue Channel Invert",
+    color: "rgba(74, 172, 255, 0.24)",
+    blendMode: "difference",
+    settings: { blueInvert: 94, saturation: 178, hue: -42, ultravioletWash: 12, colorSeparation: 18 }
+  },
+  {
+    name: "Shadow Range Invert",
+    color: "rgba(24, 30, 42, 0.34)",
+    blendMode: "exclusion",
+    settings: { shadowInvert: 100, shadowDepth: 38, shadowCrush: 18, contrast: 164, brightness: 96, localContrast: 18 }
+  },
+  {
+    name: "Highlight Range Invert",
+    color: "rgba(255, 244, 182, 0.22)",
+    blendMode: "exclusion",
+    settings: { highlightInvert: 100, highlightRecovery: 34, whites: 18, contrast: 152, brightness: 112, glow: 8 }
+  }
+];
+
 const CORE_ADJUSTMENTS = [
   ["brightness", "Brightness", 20, 220, "%"],
   ["contrast", "Contrast", 20, 220, "%"],
@@ -620,6 +683,13 @@ const EFFECT_FAMILIES = [
     settings: { brightness: 96, contrast: 145, saturation: 44, hue: 68, grayscale: 44, glow: 18 }
   },
   {
+    category: "Color Inversion Matrix",
+    variants: INVERSION_STYLE_VARIANTS,
+    color: "rgba(245,248,251,0.18)",
+    blendMode: "difference",
+    settings: { brightness: 104, contrast: 146, saturation: 150, colorSeparation: 18, invert: 12 }
+  },
+  {
     category: "Thermal Looks",
     variants: [
       {
@@ -982,8 +1052,15 @@ const EQUATION_MUTATION_KEYS = [
   "ultravioletWash",
   "infraredWash",
   "classicInvert",
+  "lumaInvert",
+  "channelInvert",
   "spectralInvert",
-  "thermalInvert"
+  "thermalInvert",
+  "redInvert",
+  "greenInvert",
+  "blueInvert",
+  "shadowInvert",
+  "highlightInvert"
 ];
 const EQUATION_STYLE_CATEGORY_KEYS = new Map([
   ["Clean Studio", ["ambientLift", "highlightRecovery", "whiteBalance", "skinSmooth"]],
@@ -995,6 +1072,7 @@ const EQUATION_STYLE_CATEGORY_KEYS = new Map([
   ["Duotone", ["duotone", "splitTone", "tint", "colorHarmony", "colorDodge"]],
   ["Retro Film", ["sepia", "grain", "dust", "scratches", "matte", "halation"]],
   ["Night Vision", ["nightScope", "nearIrBoost", "glow", "scanlines", "negativeDepth"]],
+  ["Color Inversion Matrix", ["classicInvert", "lumaInvert", "channelInvert", "spectralInvert", "thermalInvert", "redInvert", "greenInvert", "blueInvert", "shadowInvert", "highlightInvert", "invert", "colorSeparation"]],
   ["Thermal Looks", ["thermalBlend", "thermalContour", "heatEdge", "edgeEnhance", "localContrast"]],
   ["Thermal Variations", ["thermalBlend", "thermalContour", "heatEdge", "edgeEnhance", "shadowCrush", "localContrast"]],
   ["XLS Camera", ["thermalBlend", "thermalContour", "heatEdge", "xrayGhost", "nearIrBoost", "ultravioletWash", "infraredWash"]],
@@ -1167,7 +1245,12 @@ function describeTexture(settings = {}) {
 
 function describeEquationColorBehavior(settings = {}, paletteLabel, isThermalStyle) {
   if (isThermalStyle) return `${paletteLabel} thermal mapping`;
-  if (Number(settings.spectralInvert || 0) || Number(settings.classicInvert || 0) || Number(settings.thermalInvert || 0)) return "stacked inversion color mapping";
+  if (
+    INVERSION_ADJUSTMENTS.some(([key]) => Number(settings[key] || 0)) ||
+    Number(settings.invert || 0)
+  ) {
+    return "stacked inversion color mapping";
+  }
   if (Number(settings.duotone || 0) || Number(settings.splitTone || 0)) return "duotone split-color mapping";
   if (Number(settings.ultravioletWash || 0) || Number(settings.infraredWash || 0) || Number(settings.nearIrBoost || 0)) return "IR/UVA spectral color routing";
   if (Number(settings.colorSeparation || 0) || Number(settings.chromaticGlow || 0)) return "chromatic separation";
