@@ -612,7 +612,58 @@ const EFFECT_FAMILIES = [
   },
   {
     category: "Thermal Looks",
-    names: ["Heat Map", "Solar Scan", "Amber Thermal", "Plasma Core", "Ember Field", "Radiant Skin", "Blue Heat", "Thermal Edge", "White Hot", "Black Hot"],
+    variants: [
+      {
+        name: "Heat Map",
+        color: "rgba(255, 228, 0, 0.34)",
+        settings: { thermalPalette: "rgb-spectrum", thermalBlend: 96, thermalContour: 72, heatEdge: 66, brightness: 112, contrast: 178, saturation: 244, posterize: 14, edgeEnhance: 28 }
+      },
+      {
+        name: "Solar Scan",
+        color: "rgba(255, 190, 0, 0.34)",
+        settings: { thermalPalette: "solar-lime", thermalBlend: 94, thermalContour: 64, heatEdge: 58, brightness: 114, contrast: 170, saturation: 226, glow: 12 }
+      },
+      {
+        name: "Amber Thermal",
+        color: "rgba(255, 146, 24, 0.34)",
+        settings: { thermalPalette: "orange-green", thermalBlend: 92, thermalContour: 66, heatEdge: 56, brightness: 110, contrast: 174, saturation: 218, sepia: 6 }
+      },
+      {
+        name: "Plasma Core",
+        color: "rgba(255, 52, 0, 0.36)",
+        settings: { thermalPalette: "flare-spectrum", thermalBlend: 98, thermalContour: 78, heatEdge: 76, brightness: 108, contrast: 190, saturation: 250, localContrast: 12 }
+      },
+      {
+        name: "Ember Field",
+        color: "rgba(255, 92, 0, 0.34)",
+        settings: { thermalPalette: "ember-green", thermalBlend: 96, thermalContour: 76, heatEdge: 72, brightness: 106, contrast: 186, saturation: 238, shadowCrush: 8, edgeGlow: 8 }
+      },
+      {
+        name: "Radiant Skin",
+        color: "rgba(255, 246, 46, 0.32)",
+        settings: { thermalPalette: "red-lime", thermalBlend: 92, thermalContour: 58, heatEdge: 50, brightness: 118, contrast: 160, saturation: 224, vibrance: 14 }
+      },
+      {
+        name: "Blue Heat",
+        color: "rgba(31, 116, 255, 0.3)",
+        settings: { thermalPalette: "blue-core", thermalBlend: 88, thermalContour: 56, heatEdge: 48, brightness: 110, contrast: 158, saturation: 200, temperature: -8 }
+      },
+      {
+        name: "Thermal Edge",
+        color: "rgba(54, 255, 80, 0.32)",
+        settings: { thermalPalette: "edge-spectrum", thermalBlend: 94, thermalContour: 88, heatEdge: 86, brightness: 106, contrast: 196, saturation: 240, edgeEnhance: 34, localContrast: 14 }
+      },
+      {
+        name: "White Hot",
+        color: "rgba(255, 255, 255, 0.22)",
+        settings: { thermalPalette: "white-hot", thermalBlend: 88, thermalContour: 70, heatEdge: 52, brightness: 122, contrast: 184, saturation: 50, grayscale: 18, glow: 10 }
+      },
+      {
+        name: "Black Hot",
+        color: "rgba(25, 36, 52, 0.35)",
+        settings: { thermalPalette: "black-hot", thermalBlend: 90, thermalContour: 76, heatEdge: 56, brightness: 104, contrast: 190, saturation: 40, grayscale: 26 }
+      }
+    ],
     color: "rgba(255,76,18,0.28)",
     blendMode: "color-dodge",
     settings: { brightness: 115, contrast: 152, saturation: 170, hue: -18, duotone: 36, glow: 20, thermalPalette: "classic", thermalBlend: 70, thermalContour: 44, heatEdge: 36 }
@@ -623,7 +674,37 @@ const EFFECT_FAMILIES = [
       {
         name: "Prismatic Heat",
         color: "rgba(255, 224, 32, 0.34)",
-        settings: { thermalPalette: "rainbow", thermalBlend: 100, thermalContour: 68, heatEdge: 66, brightness: 118, contrast: 170, saturation: 230, posterize: 18, edgeEnhance: 34 }
+        settings: { thermalPalette: "rgb-spectrum", thermalBlend: 100, thermalContour: 72, heatEdge: 72, brightness: 116, contrast: 182, saturation: 250, posterize: 18, edgeEnhance: 36 }
+      },
+      {
+        name: "RGB Spectrum Thermal",
+        color: "rgba(40, 255, 64, 0.34)",
+        settings: { thermalPalette: "rgb-spectrum", thermalBlend: 100, thermalContour: 78, heatEdge: 78, brightness: 112, contrast: 190, saturation: 260, posterize: 20, edgeEnhance: 42, localContrast: 16 }
+      },
+      {
+        name: "Full Range Heat Scan",
+        color: "rgba(255, 222, 0, 0.34)",
+        settings: { thermalPalette: "full-range-rgb", thermalBlend: 100, thermalContour: 82, heatEdge: 80, brightness: 110, contrast: 198, saturation: 260, posterize: 22, edgeEnhance: 38, shadowCrush: 6 }
+      },
+      {
+        name: "Red Lime Thermal",
+        color: "rgba(200, 255, 0, 0.34)",
+        settings: { thermalPalette: "red-lime", thermalBlend: 96, thermalContour: 76, heatEdge: 74, brightness: 110, contrast: 184, saturation: 246, dehaze: 10 }
+      },
+      {
+        name: "Orange Green Field",
+        color: "rgba(255, 150, 0, 0.34)",
+        settings: { thermalPalette: "orange-green", thermalBlend: 96, thermalContour: 74, heatEdge: 70, brightness: 112, contrast: 180, saturation: 238, localContrast: 12 }
+      },
+      {
+        name: "Solar Lime Fire",
+        color: "rgba(255, 238, 0, 0.34)",
+        settings: { thermalPalette: "solar-lime", thermalBlend: 98, thermalContour: 78, heatEdge: 78, brightness: 114, contrast: 188, saturation: 252, glow: 10, edgeGlow: 8 }
+      },
+      {
+        name: "Ember Green Depth",
+        color: "rgba(255, 82, 0, 0.34)",
+        settings: { thermalPalette: "ember-green", thermalBlend: 98, thermalContour: 82, heatEdge: 82, brightness: 106, contrast: 200, saturation: 246, shadowCrush: 14, localContrast: 18 }
       },
       {
         name: "Predator Spectrum",
@@ -851,15 +932,18 @@ const EQUATION_TARGETS = [
 ];
 const EQUATION_TARGET_KEYS = new Set(EQUATION_TARGETS.map(([key]) => key));
 const EQUATION_THERMAL_PALETTES = [
+  "rgb-spectrum",
+  "full-range-rgb",
+  "red-lime",
+  "orange-green",
+  "solar-lime",
+  "ember-green",
   "rainbow",
   "predator",
-  "blue-core",
   "ironbow",
   "lava-rainbow",
-  "deep-ocean",
   "toxic-heat",
   "dark-rainbow",
-  "blue-flame",
   "object-heat-isolate",
   "radar-heat",
   "cobalt-hot"
@@ -3316,6 +3400,7 @@ function applyAdvancedCameraPixelEffectsToContext(context, width, height, settin
   const coldPalette = thermalColdPalette(palette);
   const hotPalette = thermalHotPalette(palette);
   const keepWhiteBackground = thermalAllowsWhiteBackground(palette);
+  const expandedRgbRange = thermalUsesExpandedRgbRange(palette);
   const lumaAt = (pixelIndex) =>
     (source[pixelIndex] * 0.2126 + source[pixelIndex + 1] * 0.7152 + source[pixelIndex + 2] * 0.0722) / 255;
 
@@ -3340,6 +3425,10 @@ function applyAdvancedCameraPixelEffectsToContext(context, width, height, settin
     if (!keepWhiteBackground) thermalDepth -= flatness * 0.16;
     thermalDepth = clamp((thermalDepth - 0.5) * contrastPush + 0.5, 0, 1);
     thermalDepth = clamp(Math.pow(thermalDepth, clamp(0.96 - heatLift * 0.28 - edgeBoost * 0.08, 0.58, 1.16)), 0, 1);
+    if (expandedRgbRange) {
+      thermalDepth = clamp((thermalDepth - 0.14) * 2.18 + localTexture * 0.2 + gradientEdge * edgeBoost * 0.24, 0, 1);
+      thermalDepth = clamp(Math.pow(thermalDepth, 0.76), 0, 1);
+    }
 
     let mappedLuma = thermalDepth;
     if (thermalAmount) {
@@ -3387,6 +3476,7 @@ function applyAdvancedCameraPixelEffectsToContext(context, width, height, settin
 }
 
 function thermalColdPalette(paletteName) {
+  if (["rgb-spectrum", "full-range-rgb", "red-lime", "orange-green", "solar-lime", "ember-green", "edge-spectrum", "flare-spectrum"].includes(paletteName)) return paletteName;
   if (["ironbow", "molten", "carbon-fire", "copper-hot", "midnight-ironbow"].includes(paletteName)) return "deep-ocean";
   if (["white-hot", "ghost-thermal", "xls"].includes(paletteName)) return "blue-core";
   if (["toxic-heat", "radar-heat", "emerald-heat"].includes(paletteName)) return "predator";
@@ -3394,6 +3484,7 @@ function thermalColdPalette(paletteName) {
 }
 
 function thermalHotPalette(paletteName) {
+  if (["rgb-spectrum", "full-range-rgb", "red-lime", "orange-green", "solar-lime", "ember-green", "edge-spectrum", "flare-spectrum"].includes(paletteName)) return paletteName;
   if (["deep-ocean", "blue-core", "cold-room", "arctic", "blue-flame"].includes(paletteName)) return "lava-rainbow";
   if (["ghost-thermal", "xls", "white-hot"].includes(paletteName)) return "pink-plate";
   if (["black-hot"].includes(paletteName)) return "ironbow";
@@ -3404,8 +3495,97 @@ function thermalAllowsWhiteBackground(paletteName) {
   return ["white-hot", "ghost-thermal", "xls"].includes(paletteName);
 }
 
+function thermalUsesExpandedRgbRange(paletteName) {
+  return ["rgb-spectrum", "full-range-rgb", "red-lime", "orange-green", "solar-lime", "ember-green", "edge-spectrum", "flare-spectrum"].includes(paletteName);
+}
+
 function thermalPaletteColor(value, paletteName) {
   const palette = {
+    "rgb-spectrum": [
+      [0, 0, 0, 88],
+      [0.08, 0, 0, 174],
+      [0.16, 0, 42, 255],
+      [0.26, 0, 222, 255],
+      [0.34, 0, 255, 90],
+      [0.42, 168, 255, 0],
+      [0.5, 255, 242, 0],
+      [0.58, 255, 128, 0],
+      [0.66, 255, 0, 0],
+      [1, 255, 255, 255]
+    ],
+    "full-range-rgb": [
+      [0, 0, 0, 78],
+      [0.08, 0, 0, 150],
+      [0.16, 0, 56, 255],
+      [0.24, 0, 184, 255],
+      [0.32, 0, 255, 188],
+      [0.4, 0, 255, 44],
+      [0.48, 180, 255, 0],
+      [0.56, 255, 244, 0],
+      [0.64, 255, 112, 0],
+      [0.72, 255, 0, 0],
+      [1, 255, 255, 255]
+    ],
+    "red-lime": [
+      [0, 0, 0, 52],
+      [0.18, 0, 24, 150],
+      [0.34, 0, 168, 255],
+      [0.5, 38, 255, 78],
+      [0.64, 202, 255, 0],
+      [0.76, 255, 238, 0],
+      [0.86, 255, 96, 0],
+      [1, 255, 0, 0]
+    ],
+    "orange-green": [
+      [0, 0, 0, 58],
+      [0.2, 0, 30, 176],
+      [0.36, 0, 210, 255],
+      [0.52, 46, 255, 60],
+      [0.68, 255, 230, 0],
+      [0.84, 255, 116, 0],
+      [1, 255, 36, 0]
+    ],
+    "solar-lime": [
+      [0, 0, 0, 44],
+      [0.16, 0, 42, 152],
+      [0.3, 0, 192, 255],
+      [0.44, 0, 255, 142],
+      [0.58, 134, 255, 0],
+      [0.72, 255, 252, 0],
+      [0.86, 255, 126, 0],
+      [1, 255, 0, 0]
+    ],
+    "ember-green": [
+      [0, 0, 0, 28],
+      [0.18, 0, 20, 84],
+      [0.34, 0, 128, 170],
+      [0.5, 38, 224, 80],
+      [0.62, 198, 255, 0],
+      [0.74, 255, 184, 0],
+      [0.88, 255, 46, 0],
+      [1, 255, 248, 54]
+    ],
+    "edge-spectrum": [
+      [0, 0, 0, 76],
+      [0.16, 0, 18, 170],
+      [0.32, 0, 136, 255],
+      [0.48, 0, 255, 220],
+      [0.6, 20, 255, 74],
+      [0.72, 238, 255, 0],
+      [0.84, 255, 104, 0],
+      [1, 255, 0, 0]
+    ],
+    "flare-spectrum": [
+      [0, 0, 0, 18],
+      [0.16, 0, 18, 120],
+      [0.3, 0, 170, 255],
+      [0.46, 0, 255, 110],
+      [0.6, 180, 255, 0],
+      [0.73, 255, 224, 0],
+      [0.84, 255, 88, 0],
+      [0.94, 255, 0, 0],
+      [1, 255, 238, 72]
+    ],
     rainbow: [
       [0, 0, 0, 96],
       [0.18, 0, 34, 255],
