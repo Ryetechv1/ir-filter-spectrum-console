@@ -2595,6 +2595,17 @@ function CameraStudio() {
             download or share them yourself.
           </p>
           <p>
+            Biometric facial mapping disclaimer: the smart face tools are not identity identification, person matching, face login, biometric
+            enrollment, or biometric storage. As implemented here, I cannot and should not create a stored biometric identity system for this
+            browser-only studio. The feature only analyzes the current frame locally for experimental facial-region geometry, symmetry, edge
+            density, oval/eye/muzzle-like structure, and tonal depth so visual effects can be weighted differently.
+          </p>
+          <p>
+            Foreground mapping is an experimental near/center face-region weighting pass. Background mapping is experimental wolf facial
+            mapping inspired by a wolf-face mesh structure, using invisible background field cues and face-like geometry to rebalance effects.
+            Both toggles are for visual feature experimentation only, and turning both off returns the effect pipeline to the standard behavior.
+          </p>
+          <p>
             Camera permission is controlled by your browser and operating system. You can stop the stream with Stop Camera or revoke site
             permission from your browser settings at any time. MP4 recording depends on your browser’s MediaRecorder support and automatically
             stops at 3 minutes.
@@ -2637,7 +2648,7 @@ function CameraStudio() {
           <ul>
             <li>{CAMERA_EFFECTS.length} local visual presets for IR-style, UVA-style, full-spectrum thermal, XLS, cinematic, monochrome, duotone, retro, and color-lab looks.</li>
             <li>Four RGBW gradient mixers for Main, Secondary, Third, and Highlights color layers that drive overlays, filter math, and the selected app accent aesthetic.</li>
-            <li>Grouped adjustment dropdowns with 12 core photo controls, 10 color inversion tools, 100 advanced sliders, equation-generated filter names/descriptions, live/overlay adjustment toggles, and optional local smart face-region weighting.</li>
+            <li>Grouped adjustment dropdowns with 12 core photo controls, 10 color inversion tools, 100 advanced sliders, equation-generated filter names/descriptions, live/overlay adjustment toggles, and optional non-identifying local smart face-region weighting.</li>
             <li>Processed PNG snapshots and 1080P or 2K MP4 recordings with local camera effects applied.</li>
             <li>Separate 1-3 layer image/video compositor with opacity, splice masks, blend modes, transforms, full adjustment-stack support, and clean PNG export.</li>
             <li>Rights-reserved white watermarks are added to exported generated images at the top-left and bottom-right corners.</li>
@@ -2940,6 +2951,11 @@ function CameraStudio() {
                 Invisible face-like region masks rebalance every effect locally from the current frame. No identity matching, storage, or upload.
               </small>
             </div>
+            <p className="smart-face-disclaimer">
+              Disclaimer: this is not biometric identification, person matching, face login, or biometric storage. It only uses local
+              frame geometry such as symmetry, edges, oval/eye/muzzle-like regions, and tonal depth. Foreground mapping targets near face-like
+              regions; background mapping is experimental wolf facial mapping for effect-weight experimentation.
+            </p>
             <div className="smart-face-toggle-grid">
               <button
                 type="button"
