@@ -38,6 +38,7 @@ const YOUTUBE_SHARED_CHANNEL_URL = "https://youtube.com/@azel222?si=Uj_ZFMax1TYT
 const YOUTUBE_UPLOADS_PLAYLIST_URL = `https://www.youtube.com/playlist?list=${YOUTUBE_UPLOADS_PLAYLIST_ID}`;
 const YOUTUBE_UPLOADS_PLAYER_URL = `https://www.youtube.com/embed/videoseries?list=${YOUTUBE_UPLOADS_PLAYLIST_ID}&rel=0&modestbranding=1&playsinline=1`;
 const SUPERNATURAL_DATABASE_URL = "https://sites.google.com/view/official-supernatural-database";
+const RIGHTS_WATERMARK_TEXT = "®Seth_Knudson-Supernatural_World-YT ● ALL RIGHTS RESERVED®";
 const studioAssetUrl = (path) => `${import.meta.env.BASE_URL}${path.replace(/^\/+/, "")}`;
 const YOUTUBE_RECENT_UPLOADS = [
   {
@@ -1308,6 +1309,8 @@ function CameraStudio() {
   const [search, setSearch] = useState("");
   const [selectedEffectId, setSelectedEffectId] = useState(CAMERA_EFFECTS[0].id);
   const [manualSettings, setManualSettings] = useState(CAMERA_EFFECTS[0].settings);
+  const [liveAdjustmentsEnabled, setLiveAdjustmentsEnabled] = useState(true);
+  const [overlayAdjustmentsEnabled, setOverlayAdjustmentsEnabled] = useState(true);
   const [openAdjustmentGroups, setOpenAdjustmentGroups] = useState(() => new Set(ADJUSTMENT_GROUPS.filter((group) => group.open).map((group) => group.id)));
   const [snapshotUrl, setSnapshotUrl] = useState("");
   const [cameraHudVisible, setCameraHudVisible] = useState(false);
@@ -1363,16 +1366,24 @@ function CameraStudio() {
     () => createEquationModel(equationValue, selectedEffect, manualSettings, equationRunId, equationTargetKey, equationStyleEffect),
     [equationRunId, equationStyleEffect, equationTargetKey, equationValue, manualSettings, selectedEffect]
   );
+  const liveAdjustmentBaseSettings = useMemo(
+    () => (liveAdjustmentsEnabled ? manualSettings : { ...DEFAULT_SETTINGS, ...(selectedEffect.settings || {}) }),
+    [liveAdjustmentsEnabled, manualSettings, selectedEffect]
+  );
+  const overlayAdjustmentBaseSettings = useMemo(
+    () => (overlayAdjustmentsEnabled ? manualSettings : { ...DEFAULT_SETTINGS, ...(selectedEffect.settings || {}) }),
+    [manualSettings, overlayAdjustmentsEnabled, selectedEffect]
+  );
   const liveManualSettings = useMemo(
-    () => (equationLiveEnabled ? applyEquationSettings(manualSettings, equationModel) : manualSettings),
-    [equationLiveEnabled, equationModel, manualSettings]
+    () => (liveAdjustmentsEnabled && equationLiveEnabled ? applyEquationSettings(liveAdjustmentBaseSettings, equationModel) : liveAdjustmentBaseSettings),
+    [equationLiveEnabled, equationModel, liveAdjustmentBaseSettings, liveAdjustmentsEnabled]
   );
   const mediaManualSettings = useMemo(
-    () => (equationMediaEnabled ? applyEquationSettings(manualSettings, equationModel) : manualSettings),
-    [equationMediaEnabled, equationModel, manualSettings]
+    () => (overlayAdjustmentsEnabled && equationMediaEnabled ? applyEquationSettings(overlayAdjustmentBaseSettings, equationModel) : overlayAdjustmentBaseSettings),
+    [equationMediaEnabled, equationModel, overlayAdjustmentBaseSettings, overlayAdjustmentsEnabled]
   );
-  const liveSelectedEffect = equationLiveEnabled ? equationModel.effect : selectedEffect;
-  const mediaSelectedEffect = equationMediaEnabled ? equationModel.effect : selectedEffect;
+  const liveSelectedEffect = liveAdjustmentsEnabled && equationLiveEnabled ? equationModel.effect : selectedEffect;
+  const mediaSelectedEffect = overlayAdjustmentsEnabled && equationMediaEnabled ? equationModel.effect : selectedEffect;
   const filterCss = useMemo(() => buildFilterCss(liveManualSettings), [liveManualSettings]);
   const mediaFilterCss = useMemo(() => buildFilterCss(mediaManualSettings), [mediaManualSettings]);
   const selectedMediaLayer = useMemo(
@@ -1462,7 +1473,8 @@ function CameraStudio() {
           filterCss: mediaFilterCss,
           selectedEffect: mediaSelectedEffect,
           selectedEffectId,
-          manualSettings: mediaManualSettings
+          manualSettings: mediaManualSettings,
+          overlayAdjustmentsEnabled
         });
         lastDraw = timestamp;
       }
@@ -1475,7 +1487,7 @@ function CameraStudio() {
         mediaCompositeFrameRef.current = 0;
       }
     };
-  }, [mediaFilterCss, mediaManualSettings, mediaLayers, mediaSelectedEffect, selectedEffectId]);
+  }, [mediaFilterCss, mediaManualSettings, mediaLayers, mediaSelectedEffect, overlayAdjustmentsEnabled, selectedEffectId]);
 
   useEffect(() => {
     const frame = cameraFrameRef.current;
@@ -1869,6 +1881,8 @@ function CameraStudio() {
     setEquationRunId(0);
     setEquationLiveEnabled(false);
     setEquationMediaEnabled(false);
+    setLiveAdjustmentsEnabled(true);
+    setOverlayAdjustmentsEnabled(true);
   }
 
   function updateEquationStyle(nextStyleId) {
@@ -1996,7 +2010,8 @@ function CameraStudio() {
       filterCss: mediaFilterCss,
       selectedEffect: mediaSelectedEffect,
       selectedEffectId,
-      manualSettings: mediaManualSettings
+      manualSettings: mediaManualSettings,
+      overlayAdjustmentsEnabled
     });
     if (!canvas?.width || !canvas?.height) {
       setMediaComposerStatus("Composite export failed because the canvas is not ready yet.");
@@ -2009,6 +2024,7 @@ function CameraStudio() {
       const exportContext = exportCanvas.getContext("2d");
       if (!exportContext) throw new Error("This browser could not create a compositor export canvas.");
       exportContext.drawImage(canvas, 0, 0);
+      paintRightsWatermark(exportContext, exportCanvas.width, exportCanvas.height);
       const blob = await canvasToPngBlob(exportCanvas);
       if (!blob) return;
       const url = URL.createObjectURL(blob);
@@ -2056,6 +2072,7 @@ function CameraStudio() {
       pixelScale: size.scale,
       cssWidth: size.cssWidth,
       includePreviewChrome: false,
+      includeWatermark: true,
       pixelBudget: THERMAL_EFFECT_PIXEL_BUDGET
     });
     if (!canvas.width || !canvas.height) {
@@ -2462,13 +2479,46 @@ function CameraStudio() {
         </div>
         <div className="studio-guide-box">
           <h3>What The Studio Offers</h3>
+          <div className="studio-mission-copy">
+            <p>
+              This is a Spectral/Spirit imaging studio with extensive, vast, advanced capabilities. All things spirits, including spirits,
+              and auras; emit very faint visible light. Nowadays factory production installs an IR/UV cut hot glass, to “supposedly” make
+              images better, but cuts out the spectrum of light that would be valuable for spirit photography. I deeply believe it’s a type
+              of conspiracy coverup. However, spirits and auras DO still emit very faint visible light. And this extensive free tool aims to
+              perfect that capability. Head over the [PRIME Examples] section to view the very best image results I’ve ever gotten with just
+              standard limited iPhone photo gallery effects, background environment, atmosphere, and lighting. You’ll see superb images my
+              Wolf Aura (the very FIRST and very BEST image of spectral Photography I’ve EVER gotten), as well as several other images of my
+              wolf spirits, and such. These images are the prized goal of this free app for you. The options and possibilities are ENDLESS!
+              Please have fun and EXPERIMENT!!
+            </p>
+            <button type="button" className="studio-inline-action" onClick={() => setPrimeResultsWindowOpen(true)}>
+              <Sparkles size={15} />
+              Open PRIME Examples Gallery
+            </button>
+            <p className="rights-reserved-notice">
+              🔺®️RIGHTS RESERVED®️🔻<br />
+              »®️I~SETH M. KNUDSON, OWNER OF SUPERNATURAL WORLD YOUTUBE CHANNEL, AM THE RIGHTFUL CREATOR OF THIS UNIQUE METHOD OF
+              SPIRIT/SPECTRAL PHOTOGRAPHY&gt;PLEASE CITE MY IMAGES, AND YOUR RESULTS WITH THIS APP, MY NAME, AND MY YOUTUBE CHANNEL
+              SUPERNATURAL WORLD®«
+            </p>
+            <a className="studio-inline-action" href={YOUTUBE_SHARED_CHANNEL_URL} target="_blank" rel="noreferrer">
+              <Youtube size={15} />
+              Open Supernatural World YouTube Channel
+            </a>
+            <p className="rights-summary">
+              Seth M. Knudson, owner of the Supernatural World YouTube channel, is presented as the creator of this spirit/spectral
+              photography method. Users are asked to cite Seth Knudson, Supernatural World, the source images, and app-generated results
+              when sharing or referencing this work.
+            </p>
+          </div>
           <ul>
-            <li>{CAMERA_EFFECTS.length} local visual presets for IR-style, UVA-style, thermal, XLS, cinematic, monochrome, duotone, retro, and color-lab looks.</li>
-            <li>Four RGBW gradient mixers for Main, Secondary, Third, and Highlights color layers that now drive overlays and filter math.</li>
-            <li>12 core photo controls, 10 color inversion tools, and 100 advanced sliders for exposure, color channels, glow, scanlines, IR/UVA washes, and more.</li>
-            <li>Processed PNG snapshots and 1080P or 2K MP4 recordings with the studio effects applied.</li>
-            <li>Separate 1-3 layer image/video compositor with opacity, splice masks, blend modes, transforms, and clean PNG export.</li>
-            <li>A local shelf for the latest 3 photos/videos, with preview, download, and remove controls.</li>
+            <li>{CAMERA_EFFECTS.length} local visual presets for IR-style, UVA-style, full-spectrum thermal, XLS, cinematic, monochrome, duotone, retro, and color-lab looks.</li>
+            <li>Four RGBW gradient mixers for Main, Secondary, Third, and Highlights color layers that drive overlays, filter math, and the selected app accent aesthetic.</li>
+            <li>Grouped adjustment dropdowns with 12 core photo controls, 10 color inversion tools, 100 advanced sliders, equation-generated filter names/descriptions, and live/overlay adjustment toggles.</li>
+            <li>Processed PNG snapshots and 1080P or 2K MP4 recordings with local camera effects applied.</li>
+            <li>Separate 1-3 layer image/video compositor with opacity, splice masks, blend modes, transforms, full adjustment-stack support, and clean PNG export.</li>
+            <li>Rights-reserved white watermarks are added to exported generated images at the top-left and bottom-right corners.</li>
+            <li>A local shelf stores the latest 3 photos/videos with preview, download, and remove controls.</li>
           </ul>
           <a href={`mailto:${CONTACT_EMAIL}`}><Mail size={15} /> {CONTACT_EMAIL}</a>
         </div>
@@ -2733,6 +2783,32 @@ function CameraStudio() {
           <div className="studio-panel-heading">
             <h2>Adjustments</h2>
             <button type="button" onClick={resetStudio}>Reset all</button>
+          </div>
+          <div className="adjustment-scope-toggles" aria-label="Adjustment processing targets">
+            <button
+              type="button"
+              className={liveAdjustmentsEnabled ? "adjustment-scope-toggle active" : "adjustment-scope-toggle"}
+              aria-pressed={liveAdjustmentsEnabled}
+              onClick={() => setLiveAdjustmentsEnabled((enabled) => !enabled)}
+            >
+              <Camera size={15} />
+              <span>
+                <strong>Live Camera Adjustments</strong>
+                <small>{liveAdjustmentsEnabled ? "All sliders and generated values affect the live feed." : "Live feed uses preset-only processing."}</small>
+              </span>
+            </button>
+            <button
+              type="button"
+              className={overlayAdjustmentsEnabled ? "adjustment-scope-toggle active" : "adjustment-scope-toggle"}
+              aria-pressed={overlayAdjustmentsEnabled}
+              onClick={() => setOverlayAdjustmentsEnabled((enabled) => !enabled)}
+            >
+              <Layers size={15} />
+              <span>
+                <strong>Overlay Studio Adjustments</strong>
+                <small>{overlayAdjustmentsEnabled ? "Uploaded image/video layers use the full adjustment stack." : "Uploaded layers use their selected preset only."}</small>
+              </span>
+            </button>
           </div>
           <div className="adjustment-dropdown-stack" aria-label="Grouped camera adjustments">
             {ADJUSTMENT_GROUPS.map(renderAdjustmentGroup)}
@@ -3091,7 +3167,7 @@ function drawMediaLayer(context, width, height, layer, renderState) {
   const layerContext = mediaLayerWorkCanvas.getContext("2d", { alpha: false });
   if (!layerContext) return;
   const layerEffect = CAMERA_EFFECT_LOOKUP.get(layer.effectId) || renderState.selectedEffect || CAMERA_EFFECTS[0];
-  const layerSettings = mediaLayerSettings(layerEffect, renderState.manualSettings);
+  const layerSettings = mediaLayerSettings(layerEffect, renderState.manualSettings, renderState.overlayAdjustmentsEnabled !== false);
   drawStudioFrame(layerContext, width, height, source, {
     filterCss: buildFilterCss(layerSettings),
     selectedEffect: layerEffect,
@@ -3120,31 +3196,12 @@ function drawMediaLayer(context, width, height, layer, renderState) {
   context.restore();
 }
 
-function mediaLayerSettings(effect, manualSettings) {
-  const globalKeys = Array.from(new Set([
-    "brightness",
-    "contrast",
-    "exposure",
-    "saturation",
-    "hue",
-    "temperature",
-    "tint",
-    "blur",
-    "vignette",
-    "grain",
-    "duotone",
-    "glow",
-    "sepia",
-    "grayscale",
-    "invert",
-    "thermalPalette",
-    ...EQUATION_MUTATION_KEYS
-  ]));
+function mediaLayerSettings(effect, manualSettings, useFullAdjustmentStack = true) {
+  if (!useFullAdjustmentStack) return { ...DEFAULT_SETTINGS, ...(effect.settings || {}) };
   return {
     ...DEFAULT_SETTINGS,
-    ...effect.settings,
-    ...Object.fromEntries([...STACKED_SETTING_KEYS].map((key) => [key, manualSettings[key] ?? DEFAULT_SETTINGS[key] ?? 0])),
-    ...Object.fromEntries(globalKeys.map((key) => [key, manualSettings[key] ?? effect.settings[key] ?? DEFAULT_SETTINGS[key] ?? 0]))
+    ...(effect.settings || {}),
+    ...(manualSettings || {})
   };
 }
 
@@ -3345,6 +3402,30 @@ function drawStudioFrame(context, width, height, mediaSource, renderState, optio
       labels: options.metaLabels || []
     });
   }
+  if (options.includeWatermark) paintRightsWatermark(context, width, height);
+}
+
+function paintRightsWatermark(context, width, height) {
+  const text = RIGHTS_WATERMARK_TEXT;
+  const fontSize = Math.round(clamp(Math.min(width, height) * 0.022, 10, 22));
+  const pad = Math.round(clamp(Math.min(width, height) * 0.024, 10, 28));
+  context.save();
+  context.globalAlpha = 0.74;
+  context.globalCompositeOperation = "source-over";
+  context.font = `700 ${fontSize}px Inter, ui-sans-serif, system-ui, sans-serif`;
+  context.fillStyle = "rgba(255, 255, 255, 0.94)";
+  context.shadowColor = "rgba(0, 0, 0, 0.82)";
+  context.shadowBlur = Math.max(3, fontSize * 0.35);
+  context.shadowOffsetX = 1;
+  context.shadowOffsetY = 1;
+  const maxTextWidth = Math.max(120, width * 0.58);
+  context.textBaseline = "top";
+  context.textAlign = "left";
+  context.fillText(text, pad, pad, maxTextWidth);
+  context.textAlign = "right";
+  context.textBaseline = "bottom";
+  context.fillText(text, width - pad, height - pad, maxTextWidth);
+  context.restore();
 }
 
 function applyCanvasPreviewFilters(context, width, height, filterCss) {
