@@ -143,6 +143,7 @@ const PRIME_SPECTRAL_EXAMPLES = [
     description: "App-generated composite created from a paused feed edit, three stacked filter passes, overlay import, duplicate reimport, and second-layer splice adjustment before final export."
   }
 ];
+const FEATURED_PRIME_RESULT_ID = "prime-09";
 const CONTACT_EMAIL = "alola99990@gmail.com";
 const CAPTURE_LIBRARY_LIMIT = 3;
 const MAX_RECORDING_MS = 180000;
@@ -1309,7 +1310,7 @@ function CameraStudio() {
   const [databaseWindowOpen, setDatabaseWindowOpen] = useState(false);
   const [primeResultsWindowOpen, setPrimeResultsWindowOpen] = useState(false);
   const [selectedYoutubeVideoId, setSelectedYoutubeVideoId] = useState(YOUTUBE_RECENT_UPLOADS[0]?.id || "");
-  const [selectedPrimeResultId, setSelectedPrimeResultId] = useState(PRIME_SPECTRAL_EXAMPLES[0]?.id || "");
+  const [selectedPrimeResultId, setSelectedPrimeResultId] = useState(FEATURED_PRIME_RESULT_ID);
   const [torchActive, setTorchActive] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("All Presets");
@@ -1368,6 +1369,11 @@ function CameraStudio() {
     () => PRIME_SPECTRAL_EXAMPLES.find((example) => example.id === selectedPrimeResultId) || PRIME_SPECTRAL_EXAMPLES[0],
     [selectedPrimeResultId]
   );
+  const orderedPrimeResults = useMemo(() => {
+    const featured = PRIME_SPECTRAL_EXAMPLES.find((example) => example.id === FEATURED_PRIME_RESULT_ID);
+    if (!featured) return PRIME_SPECTRAL_EXAMPLES;
+    return [featured, ...PRIME_SPECTRAL_EXAMPLES.filter((example) => example.id !== FEATURED_PRIME_RESULT_ID)];
+  }, []);
 
   const equationModel = useMemo(
     () => createEquationModel(equationValue, selectedEffect, manualSettings, equationRunId, equationTargetKey, equationStyleEffect),
@@ -3003,7 +3009,7 @@ function CameraStudio() {
             </section>
 
             <div className="prime-results-grid" aria-label="PRIME spectral examples">
-              {PRIME_SPECTRAL_EXAMPLES.map((example, index) => (
+              {orderedPrimeResults.map((example) => (
                 <button
                   key={example.id}
                   type="button"
@@ -3011,7 +3017,7 @@ function CameraStudio() {
                   onClick={() => setSelectedPrimeResultId(example.id)}
                 >
                   <img src={example.src} alt={`${example.title} thumbnail`} loading="lazy" />
-                  <span>Example {index + 1}</span>
+                  <span>{example.id === FEATURED_PRIME_RESULT_ID ? "Latest app generation" : `Example ${PRIME_SPECTRAL_EXAMPLES.findIndex((item) => item.id === example.id) + 1}`}</span>
                   <strong>{example.title}</strong>
                   <small>{example.tone}</small>
                 </button>
