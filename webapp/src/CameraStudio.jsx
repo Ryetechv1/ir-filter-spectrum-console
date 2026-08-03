@@ -199,9 +199,20 @@ const EFFECT_OUTPUT_GAIN = 1.38;
 const PIXEL_EFFECT_GAIN = 1.58;
 const THERMAL_SIGNAL_GAIN = 1.24;
 const RGBW_MIXER_GAIN = 1.46;
+const SMART_FACE_ANALYSIS_WIDTH = 72;
+const SMART_FACE_PIXEL_BUDGET = 58_000;
+const SMART_FACE_FOREGROUND_LABEL = "Foreground smart facial recognition";
+const SMART_FACE_BACKGROUND_LABEL = "Background smart facial recognition";
+const SMART_FACE_MESH_PROFILE = {
+  eyeY: 0.38,
+  eyeOffsetX: 0.22,
+  muzzleY: 0.66,
+  noseY: 0.76
+};
 let thermalWorkCanvas;
 let pixelateWorkCanvas;
 let mediaLayerWorkCanvas;
+let smartFaceWorkCanvas;
 const TRUSTED_ACCESS = [
   {
     name: "Studio Access Holder",
@@ -1386,7 +1397,8 @@ function CameraStudio() {
     filterCss: "",
     selectedEffect: CAMERA_EFFECTS[0],
     manualSettings: CAMERA_EFFECTS[0].settings,
-    cameraFacing: "user"
+    cameraFacing: "user",
+    smartFaceWeighting: { foreground: false, background: false }
   });
   const [authorized, setAuthorized] = useState(() => window.sessionStorage.getItem(STUDIO_UNLOCK_KEY) === "true");
   const [accessCode, setAccessCode] = useState("");
@@ -1413,6 +1425,7 @@ function CameraStudio() {
   const [manualSettings, setManualSettings] = useState(CAMERA_EFFECTS[0].settings);
   const [liveAdjustmentsEnabled, setLiveAdjustmentsEnabled] = useState(true);
   const [overlayAdjustmentsEnabled, setOverlayAdjustmentsEnabled] = useState(true);
+  const [smartFaceWeighting, setSmartFaceWeighting] = useState({ foreground: false, background: false });
   const [openAdjustmentGroups, setOpenAdjustmentGroups] = useState(() => new Set(ADJUSTMENT_GROUPS.filter((group) => group.open).map((group) => group.id)));
   const [snapshotUrl, setSnapshotUrl] = useState("");
   const [cameraHudVisible, setCameraHudVisible] = useState(false);
@@ -1500,8 +1513,8 @@ function CameraStudio() {
 
   useEffect(() => {
     renderVersionRef.current += 1;
-    renderStateRef.current = { filterCss, selectedEffect: liveSelectedEffect, manualSettings: liveManualSettings, cameraFacing };
-  }, [cameraFacing, filterCss, liveManualSettings, liveSelectedEffect]);
+    renderStateRef.current = { filterCss, selectedEffect: liveSelectedEffect, manualSettings: liveManualSettings, cameraFacing, smartFaceWeighting };
+  }, [cameraFacing, filterCss, liveManualSettings, liveSelectedEffect, smartFaceWeighting]);
 
   useEffect(() => {
     cameraFeedPausedRef.current = cameraFeedPaused;
@@ -1581,7 +1594,8 @@ function CameraStudio() {
           selectedEffect: mediaSelectedEffect,
           selectedEffectId,
           manualSettings: mediaManualSettings,
-          overlayAdjustmentsEnabled
+          overlayAdjustmentsEnabled,
+          smartFaceWeighting
         });
         lastDraw = timestamp;
       }
@@ -1594,7 +1608,7 @@ function CameraStudio() {
         mediaCompositeFrameRef.current = 0;
       }
     };
-  }, [mediaFilterCss, mediaManualSettings, mediaLayers, mediaSelectedEffect, overlayAdjustmentsEnabled, selectedEffectId]);
+  }, [mediaFilterCss, mediaManualSettings, mediaLayers, mediaSelectedEffect, overlayAdjustmentsEnabled, selectedEffectId, smartFaceWeighting]);
 
   useEffect(() => {
     const frame = cameraFrameRef.current;
@@ -1990,6 +2004,7 @@ function CameraStudio() {
     setEquationMediaEnabled(false);
     setLiveAdjustmentsEnabled(true);
     setOverlayAdjustmentsEnabled(true);
+    setSmartFaceWeighting({ foreground: false, background: false });
   }
 
   function updateEquationStyle(nextStyleId) {
@@ -2118,7 +2133,8 @@ function CameraStudio() {
       selectedEffect: mediaSelectedEffect,
       selectedEffectId,
       manualSettings: mediaManualSettings,
-      overlayAdjustmentsEnabled
+      overlayAdjustmentsEnabled,
+      smartFaceWeighting
     });
     if (!canvas?.width || !canvas?.height) {
       setMediaComposerStatus("Composite export failed because the canvas is not ready yet.");
@@ -2174,7 +2190,7 @@ function CameraStudio() {
       setCameraStatus("Snapshot failed because this browser could not create an export canvas.");
       return;
     }
-    drawStudioFrame(context, size.width, size.height, source, { filterCss, selectedEffect: liveSelectedEffect, manualSettings: liveManualSettings, cameraFacing }, {
+    drawStudioFrame(context, size.width, size.height, source, { filterCss, selectedEffect: liveSelectedEffect, manualSettings: liveManualSettings, cameraFacing, smartFaceWeighting }, {
       forcePixelFilters: false,
       pixelScale: size.scale,
       cssWidth: size.cssWidth,
@@ -2621,7 +2637,7 @@ function CameraStudio() {
           <ul>
             <li>{CAMERA_EFFECTS.length} local visual presets for IR-style, UVA-style, full-spectrum thermal, XLS, cinematic, monochrome, duotone, retro, and color-lab looks.</li>
             <li>Four RGBW gradient mixers for Main, Secondary, Third, and Highlights color layers that drive overlays, filter math, and the selected app accent aesthetic.</li>
-            <li>Grouped adjustment dropdowns with 12 core photo controls, 10 color inversion tools, 100 advanced sliders, equation-generated filter names/descriptions, and live/overlay adjustment toggles.</li>
+            <li>Grouped adjustment dropdowns with 12 core photo controls, 10 color inversion tools, 100 advanced sliders, equation-generated filter names/descriptions, live/overlay adjustment toggles, and optional local smart face-region weighting.</li>
             <li>Processed PNG snapshots and 1080P or 2K MP4 recordings with local camera effects applied.</li>
             <li>Separate 1-3 layer image/video compositor with opacity, splice masks, blend modes, transforms, full adjustment-stack support, and clean PNG export.</li>
             <li>Rights-reserved white watermarks are added to exported generated images at the top-left and bottom-right corners.</li>
@@ -2916,6 +2932,40 @@ function CameraStudio() {
                 <small>{overlayAdjustmentsEnabled ? "Uploaded image/video layers use the full adjustment stack." : "Uploaded layers use their selected preset only."}</small>
               </span>
             </button>
+          </div>
+          <div className="smart-face-panel" aria-label="Smart face-region weighting">
+            <div>
+              <strong>Local Smart Face Weighting</strong>
+              <small>
+                Invisible face-like region masks rebalance every effect locally from the current frame. No identity matching, storage, or upload.
+              </small>
+            </div>
+            <div className="smart-face-toggle-grid">
+              <button
+                type="button"
+                className={smartFaceWeighting.foreground ? "adjustment-scope-toggle active" : "adjustment-scope-toggle"}
+                aria-pressed={smartFaceWeighting.foreground}
+                onClick={() => setSmartFaceWeighting((current) => ({ ...current, foreground: !current.foreground }))}
+              >
+                <Camera size={15} />
+                <span>
+                  <strong>{SMART_FACE_FOREGROUND_LABEL}</strong>
+                  <small>{smartFaceWeighting.foreground ? "Center/near face-like regions drive stronger effect weighting." : "Off: foreground is unchanged."}</small>
+                </span>
+              </button>
+              <button
+                type="button"
+                className={smartFaceWeighting.background ? "adjustment-scope-toggle active" : "adjustment-scope-toggle"}
+                aria-pressed={smartFaceWeighting.background}
+                onClick={() => setSmartFaceWeighting((current) => ({ ...current, background: !current.background }))}
+              >
+                <Sparkles size={15} />
+                <span>
+                  <strong>{SMART_FACE_BACKGROUND_LABEL}</strong>
+                  <small>{smartFaceWeighting.background ? "Background face-like patterns and inverse field depth are weighted." : "Off: background is unchanged."}</small>
+                </span>
+              </button>
+            </div>
           </div>
           <div className="adjustment-dropdown-stack" aria-label="Grouped camera adjustments">
             {ADJUSTMENT_GROUPS.map(renderAdjustmentGroup)}
@@ -3279,7 +3329,8 @@ function drawMediaLayer(context, width, height, layer, renderState) {
     filterCss: buildFilterCss(layerSettings),
     selectedEffect: layerEffect,
     manualSettings: layerSettings,
-    cameraFacing: "environment"
+    cameraFacing: "environment",
+    smartFaceWeighting: renderState.smartFaceWeighting
   }, {
     forcePixelFilters: false,
     includePreviewChrome: false,
@@ -3498,6 +3549,7 @@ function drawStudioFrame(context, width, height, mediaSource, renderState, optio
   context.restore();
   if (!useCanvasFilter) applyCanvasPreviewFilters(context, width, height, previewFilterCss);
   applyAdvancedCameraPixelEffects(context, width, height, manualSettings, selectedEffect, options);
+  applySmartFaceWeighting(context, width, height, manualSettings, selectedEffect, renderState.smartFaceWeighting, options);
   paintOverlay(context, width, height, selectedEffect, manualSettings);
   paintSpecialOverlay(context, width, height, manualSettings, selectedEffect);
   paintCanvasGrain(context, width, height, manualSettings);
@@ -3805,6 +3857,359 @@ function applyAdvancedCameraPixelEffectsToContext(context, width, height, settin
     data[index + 2] = clamp(b, 0, 255);
   }
   context.putImageData(frame, 0, 0);
+}
+
+function applySmartFaceWeighting(context, width, height, settings, effect, weighting = {}, options = {}) {
+  const foregroundEnabled = Boolean(weighting.foreground);
+  const backgroundEnabled = Boolean(weighting.background);
+  if (!foregroundEnabled && !backgroundEnabled) return;
+  if (!context.canvas || !width || !height) return;
+
+  const pixelBudget = Math.min(options.pixelBudget || SMART_FACE_PIXEL_BUDGET, SMART_FACE_PIXEL_BUDGET);
+  if (width * height > pixelBudget) {
+    const scale = Math.sqrt(pixelBudget / (width * height));
+    const workWidth = Math.max(1, Math.round(width * scale));
+    const workHeight = Math.max(1, Math.round(height * scale));
+    smartFaceWorkCanvas ||= document.createElement("canvas");
+    if (smartFaceWorkCanvas.width !== workWidth) smartFaceWorkCanvas.width = workWidth;
+    if (smartFaceWorkCanvas.height !== workHeight) smartFaceWorkCanvas.height = workHeight;
+    const workContext = smartFaceWorkCanvas.getContext("2d", { alpha: false, willReadFrequently: true });
+    if (!workContext) return;
+    workContext.save();
+    workContext.imageSmoothingEnabled = true;
+    workContext.imageSmoothingQuality = "high";
+    workContext.clearRect(0, 0, workWidth, workHeight);
+    workContext.drawImage(context.canvas, 0, 0, width, height, 0, 0, workWidth, workHeight);
+    workContext.restore();
+    applySmartFaceWeightingToContext(workContext, workWidth, workHeight, settings, effect, weighting);
+    context.save();
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
+    context.clearRect(0, 0, width, height);
+    context.drawImage(smartFaceWorkCanvas, 0, 0, workWidth, workHeight, 0, 0, width, height);
+    context.restore();
+    return;
+  }
+
+  applySmartFaceWeightingToContext(context, width, height, settings, effect, weighting);
+}
+
+function applySmartFaceWeightingToContext(context, width, height, settings, effect, weighting = {}) {
+  let frame;
+  try {
+    frame = context.getImageData(0, 0, width, height);
+  } catch {
+    return;
+  }
+  const data = frame.data;
+  const analysis = buildSmartFaceAnalysis(data, width, height);
+  const foregroundCandidate = weighting.foreground ? findSmartFaceCandidate(analysis, "foreground") || fallbackSmartFaceBox(width, height, "foreground") : null;
+  const backgroundCandidate = weighting.background
+    ? findSmartFaceCandidate(analysis, "background", foregroundCandidate) || fallbackSmartFaceBox(width, height, "background")
+    : null;
+  const model = advancedCameraPixelModel(settings, effect);
+  const palette = settings?.thermalPalette || (model.xlsAmount > model.thermalAmount ? "xls" : "full-range-rgb");
+  const energy = smartFaceEffectEnergy(settings, effect, model);
+  const source = new Uint8ClampedArray(data);
+  const lumaAt = (pixelIndex) => source[pixelIndex] * 0.2126 + source[pixelIndex + 1] * 0.7152 + source[pixelIndex + 2] * 0.0722;
+
+  for (let index = 0; index < data.length; index += 4) {
+    const pixel = index / 4;
+    const x = pixel % width;
+    const y = Math.floor(pixel / width);
+    const luma = lumaAt(index) / 255;
+    const left = x > 0 ? lumaAt(index - 4) / 255 : luma;
+    const right = x < width - 1 ? lumaAt(index + 4) / 255 : luma;
+    const up = y > 0 ? lumaAt(index - width * 4) / 255 : luma;
+    const down = y < height - 1 ? lumaAt(index + width * 4) / 255 : luma;
+    const localEdge = clamp(Math.abs(right - left) + Math.abs(down - up), 0, 1);
+    const localDetail = clamp(localEdge * 1.9 + Math.abs(luma - (left + right + up + down) / 4) * 2.4, 0, 1);
+    const foregroundMask = foregroundCandidate ? smartFaceOvalMask(x, y, foregroundCandidate) * foregroundCandidate.confidence : 0;
+    const backgroundMask = backgroundCandidate ? smartBackgroundFaceMask(x, y, backgroundCandidate, foregroundCandidate, width, height) * backgroundCandidate.confidence : 0;
+    if (!foregroundMask && !backgroundMask) continue;
+
+    let r = data[index];
+    let g = data[index + 1];
+    let b = data[index + 2];
+    const y709 = r * 0.2126 + g * 0.7152 + b * 0.0722;
+
+    if (backgroundMask) {
+      const bgAmount = clamp(backgroundMask * energy * 0.66, 0, 0.78);
+      const depthValue = clamp(luma * 0.48 + localDetail * 0.72 + localEdge * 0.46, 0, 1);
+      const [br, bg, bb] = thermalPaletteColor(depthValue, palette);
+      r = mixChannel(r, br, bgAmount * 0.46);
+      g = mixChannel(g, bg, bgAmount * 0.46);
+      b = mixChannel(b, bb, bgAmount * 0.46);
+      const fieldContrast = 1 + bgAmount * 0.42;
+      r = (r - 128) * fieldContrast + 128 - bgAmount * 10;
+      g = (g - 128) * fieldContrast + 128 - bgAmount * 8;
+      b = (b - 128) * fieldContrast + 128 + bgAmount * 8;
+    }
+
+    if (foregroundMask) {
+      const fgAmount = clamp(foregroundMask * energy * 0.86, 0, 0.92);
+      const faceDepth = clamp(luma * 0.54 + localDetail * 0.86 + localEdge * 0.7, 0, 1);
+      const [fr, fg, fb] = thermalPaletteColor(faceDepth, palette);
+      const saturationLift = 1 + fgAmount * 0.78;
+      r = y709 + (r - y709) * saturationLift;
+      g = y709 + (g - y709) * saturationLift;
+      b = y709 + (b - y709) * saturationLift;
+      r = (r - 128) * (1 + fgAmount * 0.52) + 128 + localEdge * 58 * fgAmount;
+      g = (g - 128) * (1 + fgAmount * 0.46) + 128 + localEdge * 44 * fgAmount;
+      b = (b - 128) * (1 + fgAmount * 0.44) + 128 + localEdge * 32 * fgAmount;
+      r = mixChannel(r, fr, fgAmount * 0.32);
+      g = mixChannel(g, fg, fgAmount * 0.32);
+      b = mixChannel(b, fb, fgAmount * 0.32);
+    }
+
+    data[index] = clamp(r, 0, 255);
+    data[index + 1] = clamp(g, 0, 255);
+    data[index + 2] = clamp(b, 0, 255);
+  }
+  context.putImageData(frame, 0, 0);
+}
+
+function buildSmartFaceAnalysis(data, width, height) {
+  const cols = SMART_FACE_ANALYSIS_WIDTH;
+  const rows = clamp(Math.round((height / Math.max(width, 1)) * cols), 20, 54);
+  const sums = new Float32Array(cols * rows);
+  const counts = new Uint16Array(cols * rows);
+  const step = width * height > 80_000 ? 2 : 1;
+  for (let y = 0; y < height; y += step) {
+    const gy = clamp(Math.floor((y / height) * rows), 0, rows - 1);
+    for (let x = 0; x < width; x += step) {
+      const gx = clamp(Math.floor((x / width) * cols), 0, cols - 1);
+      const index = (y * width + x) * 4;
+      const luma = (data[index] * 0.2126 + data[index + 1] * 0.7152 + data[index + 2] * 0.0722) / 255;
+      const gridIndex = gy * cols + gx;
+      sums[gridIndex] += luma;
+      counts[gridIndex] += 1;
+    }
+  }
+
+  const luma = new Float32Array(cols * rows);
+  for (let index = 0; index < luma.length; index += 1) {
+    luma[index] = counts[index] ? sums[index] / counts[index] : 0;
+  }
+
+  const edges = new Float32Array(cols * rows);
+  for (let y = 0; y < rows; y += 1) {
+    for (let x = 0; x < cols; x += 1) {
+      const index = y * cols + x;
+      const center = luma[index];
+      const left = x > 0 ? luma[index - 1] : center;
+      const right = x < cols - 1 ? luma[index + 1] : center;
+      const up = y > 0 ? luma[index - cols] : center;
+      const down = y < rows - 1 ? luma[index + cols] : center;
+      edges[index] = clamp(Math.abs(right - left) + Math.abs(down - up), 0, 1);
+    }
+  }
+  return { cols, rows, width, height, luma, edges };
+}
+
+function findSmartFaceCandidate(analysis, mode, excludedBox = null) {
+  const { cols, rows } = analysis;
+  let best = null;
+  const widthRatios = mode === "foreground" ? [0.28, 0.34, 0.42, 0.5] : [0.24, 0.3, 0.38, 0.48];
+  const aspectRatios = [1.05, 1.24, 1.42];
+  widthRatios.forEach((widthRatio) => {
+    const candidateWidth = Math.max(8, Math.round(cols * widthRatio));
+    aspectRatios.forEach((aspect) => {
+      const candidateHeight = Math.max(10, Math.round(candidateWidth * aspect));
+      const stepX = Math.max(2, Math.round(candidateWidth / 4));
+      const stepY = Math.max(2, Math.round(candidateHeight / 4));
+      for (let y = 1; y <= rows - candidateHeight - 1; y += stepY) {
+        for (let x = 1; x <= cols - candidateWidth - 1; x += stepX) {
+          const box = { x, y, width: candidateWidth, height: candidateHeight };
+          if (mode === "foreground" && !smartForegroundWindow(box, cols, rows)) continue;
+          if (mode === "background" && excludedBox && smartBoxOverlapRatio(box, excludedBox.gridBox) > 0.28) continue;
+          const score = smartFaceCandidateScore(analysis, box, mode);
+          if (!best || score > best.score) best = { ...box, score };
+        }
+      }
+    });
+  });
+  const threshold = mode === "foreground" ? 0.32 : 0.28;
+  if (!best || best.score < threshold) return null;
+  return gridFaceBoxToPixels(best, analysis, mode);
+}
+
+function smartForegroundWindow(box, cols, rows) {
+  const centerX = (box.x + box.width / 2) / cols;
+  const centerY = (box.y + box.height / 2) / rows;
+  return centerX > 0.18 && centerX < 0.82 && centerY > 0.18 && centerY < 0.84;
+}
+
+function smartFaceCandidateScore(analysis, box, mode) {
+  const { cols, rows, luma, edges } = analysis;
+  const sample = (x, y) => {
+    const sx = clamp(Math.round(x), 0, cols - 1);
+    const sy = clamp(Math.round(y), 0, rows - 1);
+    return luma[sy * cols + sx] || 0;
+  };
+  const edge = (x, y) => {
+    const sx = clamp(Math.round(x), 0, cols - 1);
+    const sy = clamp(Math.round(y), 0, rows - 1);
+    return edges[sy * cols + sx] || 0;
+  };
+  const mean = smartRegionAverage(analysis, box, "luma");
+  const texture = smartRegionAverage(analysis, box, "edges");
+  let symmetryTotal = 0;
+  let symmetryCount = 0;
+  const pairSamples = 6;
+  for (let yStep = 1; yStep <= pairSamples; yStep += 1) {
+    const py = box.y + (box.height * yStep) / (pairSamples + 1);
+    for (let xStep = 1; xStep <= Math.floor(pairSamples / 2); xStep += 1) {
+      const px = (box.width * xStep) / (pairSamples + 1);
+      symmetryTotal += Math.abs(sample(box.x + px, py) - sample(box.x + box.width - px, py));
+      symmetryCount += 1;
+    }
+  }
+  const symmetry = clamp(1 - (symmetryTotal / Math.max(1, symmetryCount)) * 2.2, 0, 1);
+  const eyeY = box.y + box.height * SMART_FACE_MESH_PROFILE.eyeY;
+  const eyeOffset = box.width * SMART_FACE_MESH_PROFILE.eyeOffsetX;
+  const leftEye = sample(box.x + box.width / 2 - eyeOffset, eyeY);
+  const rightEye = sample(box.x + box.width / 2 + eyeOffset, eyeY);
+  const eyeEdge =
+    edge(box.x + box.width / 2 - eyeOffset, eyeY) +
+    edge(box.x + box.width / 2 + eyeOffset, eyeY);
+  const eyeDark = clamp((mean - (leftEye + rightEye) / 2) * 4.2, 0, 1);
+  const eyeBright = clamp(((leftEye + rightEye) / 2 - mean) * 2.8, 0, 1);
+  const eyeScore = clamp(Math.max(eyeDark, eyeBright * 0.74) + eyeEdge * 0.58, 0, 1);
+  const muzzleY = box.y + box.height * SMART_FACE_MESH_PROFILE.muzzleY;
+  const noseY = box.y + box.height * SMART_FACE_MESH_PROFILE.noseY;
+  const muzzle = smartRegionAverage(
+    analysis,
+    {
+      x: box.x + box.width * 0.32,
+      y: muzzleY - box.height * 0.08,
+      width: box.width * 0.36,
+      height: box.height * 0.22
+    },
+    "edges"
+  );
+  const noseDark = clamp((mean - sample(box.x + box.width / 2, noseY)) * 3.4, 0, 1);
+  const shape = smartCandidateShapeScore(box);
+  const centerX = (box.x + box.width / 2) / cols;
+  const centerY = (box.y + box.height / 2) / rows;
+  const centrality = clamp(1 - Math.hypot(centerX - 0.5, centerY - 0.5) * 1.65, 0, 1);
+  const backgroundPreference = mode === "background" ? clamp(Math.hypot(centerX - 0.5, centerY - 0.5) * 1.2 + 0.24, 0, 1) : centrality;
+  return (
+    symmetry * 0.26 +
+    eyeScore * 0.25 +
+    clamp(muzzle * 1.8 + noseDark * 0.55, 0, 1) * 0.2 +
+    clamp(texture * 2.6, 0, 1) * 0.16 +
+    shape * 0.07 +
+    backgroundPreference * 0.06
+  );
+}
+
+function smartRegionAverage(analysis, box, field) {
+  const { cols, rows, luma, edges } = analysis;
+  const source = field === "edges" ? edges : luma;
+  const startX = clamp(Math.floor(box.x), 0, cols - 1);
+  const endX = clamp(Math.ceil(box.x + box.width), 0, cols);
+  const startY = clamp(Math.floor(box.y), 0, rows - 1);
+  const endY = clamp(Math.ceil(box.y + box.height), 0, rows);
+  let total = 0;
+  let count = 0;
+  for (let y = startY; y < endY; y += 1) {
+    for (let x = startX; x < endX; x += 1) {
+      total += source[y * cols + x] || 0;
+      count += 1;
+    }
+  }
+  return count ? total / count : 0;
+}
+
+function smartCandidateShapeScore(box) {
+  const aspect = box.height / Math.max(1, box.width);
+  return clamp(1 - Math.abs(aspect - 1.24) / 0.72, 0, 1);
+}
+
+function smartBoxOverlapRatio(a, b) {
+  if (!a || !b) return 0;
+  const left = Math.max(a.x, b.x);
+  const top = Math.max(a.y, b.y);
+  const right = Math.min(a.x + a.width, b.x + b.width);
+  const bottom = Math.min(a.y + a.height, b.y + b.height);
+  const area = Math.max(0, right - left) * Math.max(0, bottom - top);
+  return area / Math.max(1, Math.min(a.width * a.height, b.width * b.height));
+}
+
+function gridFaceBoxToPixels(box, analysis, mode) {
+  const x = (box.x / analysis.cols) * analysis.width;
+  const y = (box.y / analysis.rows) * analysis.height;
+  const width = (box.width / analysis.cols) * analysis.width;
+  const height = (box.height / analysis.rows) * analysis.height;
+  return {
+    x,
+    y,
+    width,
+    height,
+    confidence: clamp(box.score, mode === "foreground" ? 0.38 : 0.32, mode === "foreground" ? 0.92 : 0.78),
+    gridBox: box,
+    mode
+  };
+}
+
+function fallbackSmartFaceBox(width, height, mode) {
+  if (mode === "background") {
+    return {
+      x: width * 0.04,
+      y: height * 0.05,
+      width: width * 0.92,
+      height: height * 0.9,
+      confidence: 0.34,
+      gridBox: null,
+      mode
+    };
+  }
+  return {
+    x: width * 0.23,
+    y: height * 0.13,
+    width: width * 0.54,
+    height: height * 0.72,
+    confidence: 0.38,
+    gridBox: null,
+    mode
+  };
+}
+
+function smartFaceOvalMask(x, y, box) {
+  if (!box) return 0;
+  const rx = Math.max(1, box.width * 0.5);
+  const ry = Math.max(1, box.height * 0.52);
+  const cx = box.x + box.width * 0.5;
+  const cy = box.y + box.height * 0.52;
+  const normalized = ((x - cx) * (x - cx)) / (rx * rx) + ((y - cy) * (y - cy)) / (ry * ry);
+  if (normalized >= 1) return 0;
+  return Math.pow(1 - normalized, 0.72);
+}
+
+function smartBackgroundFaceMask(x, y, backgroundBox, foregroundBox, width, height) {
+  const boxMask = smartFaceOvalMask(x, y, backgroundBox);
+  const foregroundClear = foregroundBox ? 1 - smartFaceOvalMask(x, y, foregroundBox) * 0.86 : 1;
+  const edgeField = clamp(Math.min(x, width - x, y, height - y) / Math.max(1, Math.min(width, height) * 0.18), 0, 1);
+  return clamp(Math.max(boxMask, 0.28) * foregroundClear * edgeField, 0, 1);
+}
+
+function smartFaceEffectEnergy(settings = {}, effect = {}, model = {}) {
+  const sliderEnergy =
+    Math.abs(setting(settings, "contrast", 100) - 100) * 0.8 +
+    Math.abs(setting(settings, "saturation", 100) - 100) * 0.7 +
+    Math.abs(setting(settings, "exposure")) * 1.8 +
+    setting(settings, "clarity") +
+    setting(settings, "edgeEnhance") +
+    setting(settings, "thermalBlend") +
+    setting(settings, "thermalContour") +
+    setting(settings, "heatEdge") +
+    setting(settings, "glow") * 0.6 +
+    setting(settings, "bloom") * 0.6 +
+    setting(settings, "colorSeparation") * 0.7 +
+    INVERSION_ADJUSTMENTS.reduce((total, [key]) => total + setting(settings, key) * 0.24, 0);
+  const presetEnergy = effect?.category?.includes("Thermal") || effect?.category === "XLS Camera" ? 44 : 16;
+  return clamp(0.46 + (sliderEnergy + presetEnergy + model.thermalAmount * 70 + model.xlsAmount * 44) / 260, 0.48, 1.22);
 }
 
 function applyPixelateToContext(context, width, height, amount) {

@@ -1287,6 +1287,42 @@
     0 0 0 1px rgba(var(--studio-accent-rgb), 0.26);
 }
 
+.smart-face-panel {
+  display: grid;
+  gap: 10px;
+  margin: 12px 14px 0;
+  padding: 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(var(--studio-accent-rgb), 0.18), transparent 38%) padding-box,
+    linear-gradient(180deg, rgba(11, 20, 28, 0.84), rgba(2, 5, 8, 0.9)) padding-box,
+    var(--studio-container-border-gradient) border-box;
+}
+
+.smart-face-panel > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.smart-face-panel > div:first-child strong {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.smart-face-panel > div:first-child small {
+  color: #aeb9c5;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.smart-face-toggle-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
 .adjustment-dropdown-stack {
   display: grid;
   gap: 10px;
@@ -2144,6 +2180,7 @@
   .effect-preset-grid,
   .studio-action-row,
   .adjustment-scope-toggles,
+  .smart-face-toggle-grid,
   .equation-engine-controls,
   .equation-toggle-row,
   .equation-pipeline-grid,
