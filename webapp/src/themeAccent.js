@@ -160,5 +160,15 @@ export function applyAccentTheme(theme) {
   root.style.setProperty("--theme-accent-deep", theme.deep);
   root.style.setProperty("--theme-accent-rgb", theme.rgb);
   root.style.setProperty("--theme-accent-contrast", theme.contrast);
+  root.style.setProperty(
+    "--theme-accent-gradient",
+    `linear-gradient(135deg, ${theme.strong} 0%, ${theme.accent} 48%, ${theme.deep} 100%)`
+  );
+  root.style.setProperty(
+    "--theme-accent-soft-gradient",
+    `linear-gradient(135deg, rgba(${theme.rgb}, 0.34) 0%, rgba(${theme.rgb}, 0.13) 46%, rgba(255, 255, 255, 0.04) 100%)`
+  );
+  root.style.setProperty("--theme-accent-border", `rgba(${theme.rgb}, 0.52)`);
+  root.style.setProperty("--theme-accent-bleed", `rgba(${theme.rgb}, 0.16)`);
   root.style.setProperty("--cyan", theme.accent);
 }

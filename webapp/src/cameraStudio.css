@@ -4,6 +4,12 @@
   --studio-accent-deep: var(--theme-accent-deep, #0891b2);
   --studio-accent-rgb: var(--theme-accent-rgb, 34, 211, 238);
   --studio-accent-contrast: var(--theme-accent-contrast, #050507);
+  --studio-accent-gradient: var(--theme-accent-gradient, linear-gradient(135deg, #8ce8ff 0%, #22d3ee 48%, #0891b2 100%));
+  --studio-accent-soft-gradient: var(--theme-accent-soft-gradient, linear-gradient(135deg, rgba(34, 211, 238, 0.34), rgba(34, 211, 238, 0.13), rgba(255, 255, 255, 0.04)));
+  --studio-accent-border: var(--theme-accent-border, rgba(34, 211, 238, 0.52));
+  --studio-accent-bleed: var(--theme-accent-bleed, rgba(34, 211, 238, 0.16));
+  --studio-container-fill: linear-gradient(180deg, rgba(16, 25, 34, 0.96), rgba(7, 12, 18, 0.98));
+  --studio-container-border-gradient: linear-gradient(135deg, rgba(255, 255, 255, 0.34), rgba(var(--studio-accent-rgb), 0.9) 38%, rgba(var(--studio-accent-rgb), 0.2) 70%, rgba(255, 255, 255, 0.12));
   min-height: 100vh;
   color: #f5f8fb;
   background: linear-gradient(180deg, #080c11 0%, #030508 100%);
@@ -193,6 +199,150 @@
 .youtube-window,
 .database-window {
   contain: layout paint style;
+}
+
+.camera-studio-shell :is(
+  .studio-panel,
+  .studio-welcome-copy,
+  .studio-disclosure-box,
+  .studio-guide-box,
+  .studio-secure-pill,
+  .trusted-user-pill,
+  .studio-search,
+  .effect-preset-grid button,
+  .camera-frame,
+  .camera-floating-hud,
+  .camera-placeholder,
+  .equation-engine-panel,
+  .equation-engine-header > span,
+  .equation-generation-copy,
+  .equation-pipeline-cell,
+  .recording-panel,
+  .capture-shelf,
+  .capture-card,
+  .media-compositor-panel,
+  .media-compositor-frame,
+  .media-layer-tabs button,
+  .media-layer-editor,
+  .media-layer-select-grid button,
+  .media-layer-slider output,
+  .adjustment-dropdown,
+  .rgbw-mixer,
+  .rgbw-slider output,
+  .adjustment-group-label,
+  .studio-adjustment output,
+  .studio-reference-note,
+  .camera-access-card,
+  .youtube-window,
+  .database-window,
+  .prime-results-window,
+  .database-frame-note,
+  .youtube-channel-card,
+  .youtube-featured-upload,
+  .youtube-frame-shell,
+  .youtube-frame-fallback,
+  .youtube-browser-toolbar button,
+  .youtube-upload-grid button,
+  .prime-results-preview-frame,
+  .prime-results-details,
+  .prime-results-grid button,
+  .database-frame-shell
+) {
+  border-color: transparent;
+  background:
+    radial-gradient(circle at 0% 0%, var(--studio-accent-bleed), transparent 35%) padding-box,
+    radial-gradient(circle at 100% 0%, rgba(var(--studio-accent-rgb), 0.1), transparent 42%) padding-box,
+    var(--studio-container-fill) padding-box,
+    var(--studio-container-border-gradient) border-box;
+  box-shadow:
+    inset 0 0 22px rgba(var(--studio-accent-rgb), 0.055),
+    0 0 0 1px rgba(var(--studio-accent-rgb), 0.1),
+    0 18px 48px rgba(0, 0, 0, 0.28);
+}
+
+.camera-studio-shell :is(
+  .effect-category-list button.active,
+  .effect-category-list button:hover,
+  .effect-preset-grid button.active,
+  .media-layer-tabs button.active,
+  .prime-results-grid button.active,
+  .youtube-upload-grid button.active,
+  .adjustment-dropdown[open]
+) {
+  border-color: transparent;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(var(--studio-accent-rgb), 0.32), transparent 42%) padding-box,
+    linear-gradient(180deg, rgba(var(--studio-accent-rgb), 0.18), rgba(2, 5, 8, 0.7)) padding-box,
+    var(--studio-container-border-gradient) border-box;
+}
+
+.camera-studio-shell :is(strong, b, h1, h2, h3, summary strong, .studio-panel-heading h2, .equation-engine-header h2, .adjustment-group-label) {
+  color: #ffffff;
+  background: var(--studio-accent-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  text-shadow: 0 0 18px rgba(var(--studio-accent-rgb), 0.14);
+  -webkit-text-fill-color: transparent;
+}
+
+.camera-studio-shell :is(button, .studio-snapshot, .studio-record-button, .studio-unlock-button, .primary-button) strong,
+.camera-studio-shell :is(.studio-snapshot, .studio-record-button, .studio-unlock-button) {
+  -webkit-text-fill-color: currentColor;
+}
+
+.camera-studio-shell input[type="range"] {
+  width: 100%;
+  height: 24px;
+  accent-color: var(--studio-accent);
+  background: transparent;
+}
+
+.camera-studio-shell input[type="range"]::-webkit-slider-runnable-track {
+  height: 9px;
+  border: 1px solid rgba(var(--studio-accent-rgb), 0.4);
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.9), var(--studio-accent-strong) 30%, var(--studio-accent) 62%, var(--studio-accent-deep)),
+    rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 0 10px rgba(0, 0, 0, 0.35),
+    0 0 20px rgba(var(--studio-accent-rgb), 0.18);
+}
+
+.camera-studio-shell input[type="range"]::-webkit-slider-thumb {
+  width: 22px;
+  height: 22px;
+  margin-top: -7px;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 999px;
+  background: var(--studio-accent-gradient);
+  box-shadow:
+    0 0 0 3px rgba(2, 5, 8, 0.9),
+    0 0 22px rgba(var(--studio-accent-rgb), 0.42);
+  -webkit-appearance: none;
+}
+
+.camera-studio-shell input[type="range"]::-moz-range-track {
+  height: 9px;
+  border: 1px solid rgba(var(--studio-accent-rgb), 0.4);
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.9), var(--studio-accent-strong) 30%, var(--studio-accent) 62%, var(--studio-accent-deep)),
+    rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 0 10px rgba(0, 0, 0, 0.35),
+    0 0 20px rgba(var(--studio-accent-rgb), 0.18);
+}
+
+.camera-studio-shell input[type="range"]::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 999px;
+  background: var(--studio-accent-gradient);
+  box-shadow:
+    0 0 0 3px rgba(2, 5, 8, 0.9),
+    0 0 22px rgba(var(--studio-accent-rgb), 0.42);
 }
 
 .effect-preset-grid button,
@@ -605,6 +755,26 @@
 
 .equation-toggle-row {
   grid-template-columns: minmax(180px, 1fr) auto;
+}
+
+.equation-generation-copy {
+  display: grid;
+  gap: 7px;
+  padding: 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+}
+
+.equation-generation-copy strong {
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.equation-generation-copy p {
+  margin: 0;
+  color: #d8e3eb;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .equation-engine-controls input,

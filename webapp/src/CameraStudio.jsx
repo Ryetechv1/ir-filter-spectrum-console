@@ -1055,6 +1055,18 @@ function createEquationModel(value, baseEffect = CAMERA_EFFECTS[0], baseSettings
                 ? `target-output:${X}`
                 : `target-result:${X}`;
   }
+  const generationCopy = createEquationGenerationCopy({
+    seed,
+    effectName,
+    selectedStyle,
+    palette,
+    target,
+    inputValue: X,
+    outputNumber,
+    blendMode,
+    targetSettings,
+    isThermalStyle
+  });
   return {
     ...rows,
     targetKey: target,
@@ -1065,15 +1077,92 @@ function createEquationModel(value, baseEffect = CAMERA_EFFECTS[0], baseSettings
     settings: targetSettings,
     effect: {
       id: "equation-generated-filter",
-      name: `${effectName} · ${selectedStyle.name}`,
+      name: generationCopy.name,
       category: `Algorithmic Equation / ${selectedStyle.category}`,
       overlayColor: selectedStyle.overlayColor || overlayColor,
       blendMode,
       favorite: false,
+      description: generationCopy.description,
       settings: { ...DEFAULT_SETTINGS, ...styleSettings, ...targetSettings }
     },
-    summary: `${target} target returns a ${selectedStyle.category} / ${selectedStyle.name} generated render from ${X}, mixed with ${blendMode} blend math and the current slider stack.`
+    generationName: generationCopy.name,
+    generationDescription: generationCopy.description,
+    summary: generationCopy.pipelineSummary
   };
+}
+
+function createEquationGenerationCopy({ seed, effectName, selectedStyle, palette, target, inputValue, outputNumber, blendMode, targetSettings, isThermalStyle }) {
+  const rand = seededRandom((seed ^ 0x9e3779b9) >>> 0);
+  const paletteLabel = palette ? titleCaseToken(palette) : "Adaptive Color";
+  const category = selectedStyle.category || "Studio";
+  const styleName = selectedStyle.name || "Custom Stack";
+  const nameSuffix = pickFrom(rand, [
+    "Spectral Pass",
+    "Depth Render",
+    "Signal Bloom",
+    "Field Map",
+    "Color Study",
+    "Luma Scan",
+    "Prism Stack",
+    "Image State"
+  ]);
+  const generationName = `${effectName} · ${styleName} ${nameSuffix}`;
+  const intensity = describeIntensity(
+    Number(targetSettings.thermalBlend || targetSettings.glow || targetSettings.colorSeparation || targetSettings.contrast || 0),
+    isThermalStyle ? 72 : 35,
+    isThermalStyle ? 92 : 70
+  );
+  const contrast = describeIntensity(Number(targetSettings.contrast ?? 100), 92, 162);
+  const texture = describeTexture(targetSettings);
+  const colorBehavior = describeEquationColorBehavior(targetSettings, paletteLabel, isThermalStyle);
+  const spatialBehavior = pickFrom(rand, [
+    "edge transitions stay readable while brighter regions receive the strongest treatment",
+    "midtones are lifted enough to keep structure visible without flattening the frame",
+    "the output prioritizes separation between shadow mass, mid-field texture, and highlight bloom",
+    "local contrast and RGBW mixing are balanced so the result keeps layered depth"
+  ]);
+
+  return {
+    name: generationName,
+    description: `${generationName} is a ${intensity} ${category.toLowerCase()} generation built from ${target}=${inputValue} with ${blendMode} blend routing. It uses ${colorBehavior}, with ${contrast} contrast and ${texture} texture shaping. The result is designed so ${spatialBehavior}.`,
+    pipelineSummary: `${target} target returns ${generationName} from ${inputValue}; Y=${outputNumber} with ${paletteLabel} color routing and the current slider stack.`
+  };
+}
+
+function pickFrom(rand, values) {
+  return values[Math.floor(rand() * values.length)] || values[0];
+}
+
+function titleCaseToken(value) {
+  return String(value || "")
+    .replace(/[-_]+/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function describeIntensity(value, mediumAt, highAt) {
+  if (value >= highAt) return "high-energy";
+  if (value >= mediumAt) return "balanced";
+  return "subtle";
+}
+
+function describeTexture(settings = {}) {
+  const grain = Number(settings.grain || 0) + Number(settings.noise || 0) + Number(settings.dust || 0) + Number(settings.scratches || 0);
+  const edge = Number(settings.thermalContour || 0) + Number(settings.heatEdge || 0) + Number(settings.edgeEnhance || 0) + Number(settings.clarity || 0);
+  const glow = Number(settings.glow || 0) + Number(settings.bloom || 0) + Number(settings.halation || 0) + Number(settings.chromaticGlow || 0);
+  if (grain > 95) return "dense grain/noise";
+  if (edge > 140) return "strong contour";
+  if (glow > 90) return "glow-heavy";
+  if (Number(settings.blur || 0) > 18 || Number(settings.softFocus || 0) > 20) return "soft optical";
+  return "clean tonal";
+}
+
+function describeEquationColorBehavior(settings = {}, paletteLabel, isThermalStyle) {
+  if (isThermalStyle) return `${paletteLabel} thermal mapping`;
+  if (Number(settings.spectralInvert || 0) || Number(settings.classicInvert || 0) || Number(settings.thermalInvert || 0)) return "stacked inversion color mapping";
+  if (Number(settings.duotone || 0) || Number(settings.splitTone || 0)) return "duotone split-color mapping";
+  if (Number(settings.ultravioletWash || 0) || Number(settings.infraredWash || 0) || Number(settings.nearIrBoost || 0)) return "IR/UVA spectral color routing";
+  if (Number(settings.colorSeparation || 0) || Number(settings.chromaticGlow || 0)) return "chromatic separation";
+  return "adaptive RGBW color mixing";
 }
 
 function createEquationStyleSettings(rand, selectedStyle, styleSettings, isThermalStyle, palette) {
@@ -2151,6 +2240,11 @@ function CameraStudio() {
             <Layers size={16} />
             1-3 Media Layers {equationMediaEnabled ? "On" : "Off"}
           </button>
+        </div>
+
+        <div className="equation-generation-copy" aria-live="polite">
+          <strong>{equationModel.generationName}</strong>
+          <p>{equationModel.generationDescription}</p>
         </div>
 
         <div className="equation-pipeline-grid" aria-label="Equation pipeline values">

@@ -20,6 +20,10 @@
   --theme-accent-deep: #0891b2;
   --theme-accent-rgb: 34, 211, 238;
   --theme-accent-contrast: #050507;
+  --theme-accent-gradient: linear-gradient(135deg, #8ce8ff 0%, #22d3ee 48%, #0891b2 100%);
+  --theme-accent-soft-gradient: linear-gradient(135deg, rgba(34, 211, 238, 0.34), rgba(34, 211, 238, 0.13), rgba(255, 255, 255, 0.04));
+  --theme-accent-border: rgba(34, 211, 238, 0.52);
+  --theme-accent-bleed: rgba(34, 211, 238, 0.16);
   --cyan: var(--theme-accent);
   --green: #69df5c;
   --amber: #f1ad38;
@@ -29,6 +33,10 @@
   --blue: #388dff;
   --white: #f4f5eb;
   --shadow: 0 22px 56px rgba(0, 0, 0, 0.42);
+}
+
+:is(.app-shell, .camera-studio-shell) {
+  --app-accent-border-gradient: linear-gradient(135deg, rgba(255, 255, 255, 0.3), rgba(var(--theme-accent-rgb), 0.9) 42%, rgba(var(--theme-accent-rgb), 0.18) 76%, rgba(255, 255, 255, 0.12));
 }
 
 * {
@@ -82,6 +90,105 @@ button:active:not(:disabled) {
 button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+.app-shell :is(
+  .topbar,
+  .prototype-panel,
+  .hologram-panel,
+  .viewer-panel,
+  .lighting-panel,
+  .device-panel,
+  .capture-panel,
+  .hardware-panel,
+  .wiring-panel,
+  .power-gate-panel,
+  .auto-off-panel,
+  .light-card,
+  .rgbw-panel,
+  .hologram-preview,
+  .hologram-mixer,
+  .field-readout,
+  .prototype-summary,
+  .prototype-files,
+  .status-row,
+  .safety-callout
+) {
+  border-color: transparent;
+  background:
+    radial-gradient(circle at 0% 0%, var(--theme-accent-bleed), transparent 38%) padding-box,
+    linear-gradient(180deg, rgba(16, 25, 34, 0.94), rgba(7, 12, 18, 0.96)) padding-box,
+    var(--app-accent-border-gradient) border-box;
+  box-shadow:
+    inset 0 0 22px rgba(var(--theme-accent-rgb), 0.055),
+    0 0 0 1px rgba(var(--theme-accent-rgb), 0.1),
+    var(--shadow);
+}
+
+.app-shell :is(strong, b, h1, h2, h3, .panel-header h2, .auto-title strong, .light-topline strong, .rgbw-topline strong) {
+  color: #ffffff;
+  background: var(--theme-accent-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  text-shadow: 0 0 18px rgba(var(--theme-accent-rgb), 0.14);
+  -webkit-text-fill-color: transparent;
+}
+
+.app-shell :is(button, .primary-action) strong,
+.app-shell .primary-action {
+  -webkit-text-fill-color: currentColor;
+}
+
+.app-shell input[type="range"] {
+  accent-color: var(--theme-accent);
+}
+
+.app-shell input[type="range"]::-webkit-slider-runnable-track {
+  height: 9px;
+  border: 1px solid rgba(var(--theme-accent-rgb), 0.4);
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.9), var(--theme-accent-strong) 30%, var(--theme-accent) 62%, var(--theme-accent-deep)),
+    rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 0 10px rgba(0, 0, 0, 0.35),
+    0 0 20px rgba(var(--theme-accent-rgb), 0.18);
+}
+
+.app-shell input[type="range"]::-webkit-slider-thumb {
+  width: 22px;
+  height: 22px;
+  margin-top: -7px;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 999px;
+  background: var(--theme-accent-gradient);
+  box-shadow:
+    0 0 0 3px rgba(2, 5, 8, 0.9),
+    0 0 22px rgba(var(--theme-accent-rgb), 0.42);
+  -webkit-appearance: none;
+}
+
+.app-shell input[type="range"]::-moz-range-track {
+  height: 9px;
+  border: 1px solid rgba(var(--theme-accent-rgb), 0.4);
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.9), var(--theme-accent-strong) 30%, var(--theme-accent) 62%, var(--theme-accent-deep)),
+    rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 0 10px rgba(0, 0, 0, 0.35),
+    0 0 20px rgba(var(--theme-accent-rgb), 0.18);
+}
+
+.app-shell input[type="range"]::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 999px;
+  background: var(--theme-accent-gradient);
+  box-shadow:
+    0 0 0 3px rgba(2, 5, 8, 0.9),
+    0 0 22px rgba(var(--theme-accent-rgb), 0.42);
 }
 
 .app-shell {
