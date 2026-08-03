@@ -28,7 +28,7 @@ import {
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import "./cameraStudio.css";
 
-const STUDIO_UNLOCK_KEY = "ir-filter-camera-studio-unlocked";
+const STUDIO_UNLOCK_KEY = "ir-filter-camera-studio-unlocked-2026";
 const YOUTUBE_CHANNEL_HANDLE = "@azel222";
 const YOUTUBE_CHANNEL_NAME = "Supernatural World";
 const YOUTUBE_CHANNEL_ID = "UCZd1C1Gw4Pjm4tiIJep4Oaw";
@@ -37,7 +37,7 @@ const YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@azel222";
 const YOUTUBE_SHARED_CHANNEL_URL = "https://youtube.com/@azel222?si=Uj_ZFMax1TYTZWbJ";
 const YOUTUBE_UPLOADS_PLAYLIST_URL = `https://www.youtube.com/playlist?list=${YOUTUBE_UPLOADS_PLAYLIST_ID}`;
 const YOUTUBE_UPLOADS_PLAYER_URL = `https://www.youtube.com/embed/videoseries?list=${YOUTUBE_UPLOADS_PLAYLIST_ID}&rel=0&modestbranding=1&playsinline=1`;
-const SUPERNATURAL_DATABASE_URL = "https://sites.google.com/view/official-supernatural-database/home?igu=1";
+const SUPERNATURAL_DATABASE_URL = "https://sites.google.com/view/official-supernatural-database";
 const studioAssetUrl = (path) => `${import.meta.env.BASE_URL}${path.replace(/^\/+/, "")}`;
 const YOUTUBE_RECENT_UPLOADS = [
   {
@@ -191,7 +191,7 @@ let mediaLayerWorkCanvas;
 const TRUSTED_ACCESS = [
   {
     name: "Studio Access Holder",
-    sha256: "89bf6309ac1633d01b1fc6af1c3e79fcb55464450e6db4534fd01084375c4a65"
+    sha256: "eb9267d3ffe321f965b3b198c28f874043e8246afb0ecf294c382ed9c501851d"
   }
 ];
 
@@ -2492,7 +2492,7 @@ function CameraStudio() {
             <input
               value={accessCode}
               onChange={(event) => setAccessCode(event.target.value)}
-              placeholder="SP3CTR4L_X01-..."
+              placeholder="SP3CTR4L_X1-..."
               autoComplete="off"
               spellCheck="false"
               autoFocus
@@ -2690,7 +2690,7 @@ function CameraStudio() {
               </button>
             </div>
             <p className="database-frame-note">
-              GUI wrapper is testing the Google Sites `?igu=1` view. If Google blocks this iframe on your device, use the external button below.
+              GUI wrapper is using the official Google Sites database address. If Google blocks this iframe on your device, use the external button below.
             </p>
             <div className="database-frame-shell">
               <iframe
@@ -2702,7 +2702,7 @@ function CameraStudio() {
               />
               <div className="youtube-frame-fallback">
                 <strong>Database window</strong>
-                <span>Using /home?igu=1. Google Sites may still block embedded viewing with X-Frame-Options on some browsers.</span>
+                <span>Using /view/official-supernatural-database. Google Sites may still block embedded viewing with X-Frame-Options on some browsers.</span>
               </div>
             </div>
             <div className="youtube-window-actions">
