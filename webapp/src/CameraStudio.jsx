@@ -38,7 +38,6 @@ const YOUTUBE_SHARED_CHANNEL_URL = "https://youtube.com/@azel222?si=Uj_ZFMax1TYT
 const YOUTUBE_UPLOADS_PLAYLIST_URL = `https://www.youtube.com/playlist?list=${YOUTUBE_UPLOADS_PLAYLIST_ID}`;
 const YOUTUBE_UPLOADS_PLAYER_URL = `https://www.youtube.com/embed/videoseries?list=${YOUTUBE_UPLOADS_PLAYLIST_ID}&rel=0&modestbranding=1&playsinline=1`;
 const SUPERNATURAL_DATABASE_URL = "https://sites.google.com/view/official-supernatural-database";
-const RIGHTS_WATERMARK_TEXT = "®Seth_Knudson-Supernatural_World-YT ● ALL RIGHTS RESERVED®";
 const studioAssetUrl = (path) => `${import.meta.env.BASE_URL}${path.replace(/^\/+/, "")}`;
 const YOUTUBE_RECENT_UPLOADS = [
   {
@@ -2193,7 +2192,6 @@ function CameraStudio() {
       const exportContext = exportCanvas.getContext("2d");
       if (!exportContext) throw new Error("This browser could not create a compositor export canvas.");
       exportContext.drawImage(canvas, 0, 0);
-      paintRightsWatermark(exportContext, exportCanvas.width, exportCanvas.height);
       const blob = await canvasToPngBlob(exportCanvas);
       if (!blob) return;
       const url = URL.createObjectURL(blob);
@@ -2212,7 +2210,7 @@ function CameraStudio() {
       link.href = url;
       link.download = `spectral-media-composite-${new Date().toISOString().replace(/[:.]/g, "-")}.png`;
       link.click();
-      setMediaComposerStatus("Composite PNG exported exactly from the displayed compositor canvas.");
+      setMediaComposerStatus("Composite PNG exported as clean media only, with app chrome and watermark overlays hidden.");
     } catch (error) {
       setMediaComposerStatus(`Composite export failed: ${error.message || error}`);
     }
@@ -2248,21 +2246,30 @@ function CameraStudio() {
       setCameraStatus("Start the camera before taking a snapshot.");
       return;
     }
-    const previewCanvas = refreshCameraPreviewForSnapshot();
-    if (!previewCanvas?.width || !previewCanvas?.height) {
+    refreshCameraPreviewForSnapshot();
+    const source = currentCameraRenderSource();
+    if (!source || !isDrawableMediaSource(source)) {
+      setCameraStatus("Snapshot failed because no drawable camera frame is ready yet.");
+      return;
+    }
+    const renderState = renderStateRef.current || {
+      filterCss,
+      selectedEffect: liveSelectedEffect,
+      manualSettings: liveManualSettings,
+      cameraFacing,
+      smartFaceWeighting,
+      smartDarkEdgeEnabled
+    };
+    const canvas = document.createElement("canvas");
+    const drawn = drawCameraOutputCanvas(canvas, cameraFrameRef.current, source, renderState, {
+      includePreviewChrome: false,
+      scaleCap: PREVIEW_CANVAS_SCALE_CAP,
+      pixelBudget: THERMAL_EFFECT_PIXEL_BUDGET
+    });
+    if (!drawn || !canvas.width || !canvas.height) {
       setCameraStatus("Snapshot failed because the preview canvas is not ready yet.");
       return;
     }
-    const canvas = document.createElement("canvas");
-    canvas.width = previewCanvas.width;
-    canvas.height = previewCanvas.height;
-    const context = canvas.getContext("2d", { alpha: false });
-    if (!context) {
-      setCameraStatus("Snapshot failed because this browser could not create an export canvas.");
-      return;
-    }
-    context.drawImage(previewCanvas, 0, 0);
-    paintRightsWatermark(context, canvas.width, canvas.height);
     try {
       const blob = await canvasToPngBlob(canvas);
       if (!blob) return;
@@ -2282,7 +2289,7 @@ function CameraStudio() {
       link.href = url;
       link.download = `spectral-imaging-studio-${new Date().toISOString().replace(/[:.]/g, "-")}.png`;
       link.click();
-      setCameraStatus("Snapshot downloaded from the exact displayed preview canvas.");
+      setCameraStatus("Snapshot downloaded as clean media only, with app chrome and watermark overlays hidden.");
     } catch (error) {
       setCameraStatus(`Snapshot export failed: ${error.message || error}`);
     }
@@ -2740,7 +2747,7 @@ function CameraStudio() {
             <li>Grouped adjustment dropdowns with 12 core photo controls, 10 color inversion tools, 10 smart darker-edge controls, 100 advanced sliders, equation-generated filter names/descriptions, live/overlay adjustment toggles, and optional non-identifying local smart face/wolf-region weighting.</li>
             <li>Processed PNG snapshots and 1080P or 2K MP4 recordings with local camera effects applied.</li>
             <li>Separate 1-3 layer image/video compositor with opacity, splice masks, blend modes, transforms, full adjustment-stack support, and clean PNG export.</li>
-            <li>Rights-reserved white watermarks are added to exported generated images at the top-left and bottom-right corners.</li>
+            <li>Clean exports hide app-added preview chrome, labels, and watermark overlays so only the processed image or video remains.</li>
             <li>A local shelf stores the latest 3 photos/videos with preview, download, and remove controls.</li>
           </ul>
           <a href={`mailto:${CONTACT_EMAIL}`}><Mail size={15} /> {CONTACT_EMAIL}</a>
@@ -3681,30 +3688,6 @@ function drawStudioFrame(context, width, height, mediaSource, renderState, optio
       labels: options.metaLabels || []
     });
   }
-  if (options.includeWatermark) paintRightsWatermark(context, width, height);
-}
-
-function paintRightsWatermark(context, width, height) {
-  const text = RIGHTS_WATERMARK_TEXT;
-  const fontSize = Math.round(clamp(Math.min(width, height) * 0.022, 10, 22));
-  const pad = Math.round(clamp(Math.min(width, height) * 0.024, 10, 28));
-  context.save();
-  context.globalAlpha = 0.74;
-  context.globalCompositeOperation = "source-over";
-  context.font = `700 ${fontSize}px Inter, ui-sans-serif, system-ui, sans-serif`;
-  context.fillStyle = "rgba(255, 255, 255, 0.94)";
-  context.shadowColor = "rgba(0, 0, 0, 0.82)";
-  context.shadowBlur = Math.max(3, fontSize * 0.35);
-  context.shadowOffsetX = 1;
-  context.shadowOffsetY = 1;
-  const maxTextWidth = Math.max(120, width * 0.58);
-  context.textBaseline = "top";
-  context.textAlign = "left";
-  context.fillText(text, pad, pad, maxTextWidth);
-  context.textAlign = "right";
-  context.textBaseline = "bottom";
-  context.fillText(text, width - pad, height - pad, maxTextWidth);
-  context.restore();
 }
 
 function applyCanvasPreviewFilters(context, width, height, filterCss) {
