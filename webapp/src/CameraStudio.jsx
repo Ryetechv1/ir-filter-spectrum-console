@@ -39,6 +39,8 @@ const YOUTUBE_UPLOADS_PLAYLIST_URL = `https://www.youtube.com/playlist?list=${YO
 const YOUTUBE_UPLOADS_PLAYER_URL = `https://www.youtube.com/embed/videoseries?list=${YOUTUBE_UPLOADS_PLAYLIST_ID}&rel=0&modestbranding=1&playsinline=1`;
 const SUPERNATURAL_DATABASE_URL = "https://sites.google.com/view/official-supernatural-database";
 const studioAssetUrl = (path) => `${import.meta.env.BASE_URL}${path.replace(/^\/+/, "")}`;
+const TORCH_LEVEL_COUNT = 10;
+const DEFAULT_TORCH_LEVEL = 6;
 const YOUTUBE_RECENT_UPLOADS = [
   {
     id: "5_T2LfeRDEY",
@@ -227,7 +229,7 @@ let smartDarkEdgeWorkCanvas;
 const TRUSTED_ACCESS = [
   {
     name: "Studio Access Holder",
-    sha256: "eb9267d3ffe321f965b3b198c28f874043e8246afb0ecf294c382ed9c501851d"
+    sha256: "183d71611e8b55c363ced595d93c8e1ca88a4237b2bf233718273c1fd5c9d994"
   }
 ];
 
@@ -1460,6 +1462,8 @@ function CameraStudio() {
   const [selectedPrimeResultId, setSelectedPrimeResultId] = useState(FEATURED_PRIME_RESULT_ID);
   const [torchActive, setTorchActive] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
+  const [torchLevel, setTorchLevel] = useState(DEFAULT_TORCH_LEVEL);
+  const [torchLevelReflected, setTorchLevelReflected] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("All Presets");
   const [search, setSearch] = useState("");
   const [selectedEffectId, setSelectedEffectId] = useState(CAMERA_EFFECTS[0].id);
@@ -1697,8 +1701,10 @@ function CameraStudio() {
   const updateTorchCapability = useCallback((stream) => {
     const videoTrack = stream?.getVideoTracks?.()[0];
     const capabilities = videoTrack?.getCapabilities?.() || {};
+    const settings = videoTrack?.getSettings?.() || {};
     const supported = Boolean(capabilities.torch);
     setTorchSupported(supported);
+    setTorchLevelReflected(supported && typeof settings.torchLevel === "number");
     setTorchActive(false);
     return supported;
   }, []);
@@ -1752,6 +1758,7 @@ function CameraStudio() {
     cameraFeedPausedRef.current = false;
     setTorchActive(false);
     setTorchSupported(false);
+    setTorchLevelReflected(false);
     setCameraFeedPaused(false);
     setCameraActive(false);
   }, []);
@@ -1790,37 +1797,115 @@ function CameraStudio() {
     }
   }, [attachCameraStream, cameraFacing, stopCamera]);
 
-  const toggleTorch = useCallback(async () => {
+  const ensureRearCameraStreamForTorch = useCallback(async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
-      setCameraStatus("Flashlight access is not supported in this browser.");
+      throw new Error("Flashlight access is not supported in this browser.");
+    }
+    let stream = streamRef.current;
+    if (!stream || cameraFacing !== "environment") {
+      stopCamera();
+      setCameraStatus("Requesting rear camera for flashlight access...");
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } } });
+      await attachCameraStream(stream, "environment");
+    }
+    return stream;
+  }, [attachCameraStream, cameraFacing, stopCamera]);
+
+  const applyTorchConstraint = useCallback(async (videoTrack, nextTorchActive, requestedLevel) => {
+    if (!videoTrack?.applyConstraints) {
+      throw new Error("This browser does not expose camera track constraints.");
+    }
+    const normalizedLevel = normalizeTorchLevel(requestedLevel);
+    if (!nextTorchActive) {
+      await videoTrack.applyConstraints({ advanced: [{ torch: false }] });
+      return { normalizedLevel, reflectedLevel: false, usedLevelConstraint: false };
+    }
+
+    try {
+      await videoTrack.applyConstraints({
+        advanced: [{ torch: true, torchLevel: torchLevelRatio(normalizedLevel) }]
+      });
+    } catch (error) {
+      await videoTrack.applyConstraints({ advanced: [{ torch: true }] });
+      return { normalizedLevel, reflectedLevel: false, usedLevelConstraint: false, fallbackError: error };
+    }
+
+    const settings = videoTrack.getSettings?.() || {};
+    return {
+      normalizedLevel,
+      reflectedLevel: typeof settings.torchLevel === "number",
+      usedLevelConstraint: true
+    };
+  }, []);
+
+  const setTorchBrightnessLevel = useCallback(async (value) => {
+    const normalizedLevel = normalizeTorchLevel(value);
+    setTorchLevel(normalizedLevel);
+    if (!torchActive) {
+      setCameraStatus(`Flashlight brightness level ${normalizedLevel}/${TORCH_LEVEL_COUNT} selected. Turn on Rear Flashlight to apply it.`);
       return;
     }
     try {
-      let stream = streamRef.current;
-      if (!stream || cameraFacing !== "environment") {
-        stopCamera();
-        setCameraStatus("Requesting rear camera for flashlight access...");
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } } });
-        await attachCameraStream(stream, "environment");
+      const stream = streamRef.current;
+      const videoTrack = stream?.getVideoTracks?.()[0];
+      const capabilities = videoTrack?.getCapabilities?.() || {};
+      if (!capabilities.torch) {
+        setTorchSupported(false);
+        setTorchActive(false);
+        setTorchLevelReflected(false);
+        setCameraStatus("This active camera stream does not expose flashlight control.");
+        return;
       }
+      const result = await applyTorchConstraint(videoTrack, true, normalizedLevel);
+      setTorchSupported(true);
+      setTorchActive(true);
+      setTorchLevelReflected(result.reflectedLevel);
+      setCameraStatus(
+        result.reflectedLevel
+          ? `Rear flashlight brightness applied at ${normalizedLevel}/${TORCH_LEVEL_COUNT}.`
+          : `Rear flashlight is on. Requested brightness ${normalizedLevel}/${TORCH_LEVEL_COUNT}; this browser may expose only on/off torch control.`
+      );
+    } catch (error) {
+      setCameraStatus(`Flashlight brightness update failed: ${error.message || error}`);
+    }
+  }, [applyTorchConstraint, torchActive]);
+
+  const toggleTorch = useCallback(async () => {
+    try {
+      if (torchActive) {
+        const videoTrack = streamRef.current?.getVideoTracks?.()[0];
+        if (videoTrack) await applyTorchConstraint(videoTrack, false, torchLevel);
+        setTorchActive(false);
+        setTorchLevelReflected(false);
+        setCameraStatus("Rear camera flashlight is off.");
+        return;
+      }
+
+      const stream = await ensureRearCameraStreamForTorch();
       const videoTrack = stream.getVideoTracks()[0];
       const capabilities = videoTrack?.getCapabilities?.() || {};
       if (!capabilities.torch) {
         setTorchSupported(false);
         setTorchActive(false);
+        setTorchLevelReflected(false);
         setCameraStatus("This device/browser does not expose rear-camera flashlight control for this stream.");
         return;
       }
-      const nextTorch = !torchActive;
-      await videoTrack.applyConstraints({ advanced: [{ torch: nextTorch }] });
+      const result = await applyTorchConstraint(videoTrack, true, torchLevel);
       setTorchSupported(true);
-      setTorchActive(nextTorch);
-      setCameraStatus(nextTorch ? "Rear camera flashlight is on. Stream remains local to this device." : "Rear camera flashlight is off.");
+      setTorchActive(true);
+      setTorchLevelReflected(result.reflectedLevel);
+      setCameraStatus(
+        result.reflectedLevel
+          ? `Rear flashlight is on at brightness ${result.normalizedLevel}/${TORCH_LEVEL_COUNT}. Stream remains local to this device.`
+          : `Rear flashlight is on. Requested brightness ${result.normalizedLevel}/${TORCH_LEVEL_COUNT}; this browser may expose only on/off torch control.`
+      );
     } catch (error) {
       setTorchActive(false);
+      setTorchLevelReflected(false);
       setCameraStatus(`Flashlight toggle failed: ${error.message || error}`);
     }
-  }, [attachCameraStream, cameraFacing, stopCamera, torchActive]);
+  }, [applyTorchConstraint, ensureRearCameraStreamForTorch, torchActive, torchLevel]);
 
   function currentCameraRenderSource() {
     return cameraFeedPausedRef.current && pausedFrameCanvasRef.current ? pausedFrameCanvasRef.current : videoRef.current;
@@ -2049,6 +2134,7 @@ function CameraStudio() {
     setOverlayAdjustmentsEnabled(true);
     setSmartFaceWeighting({ foreground: false, background: false, wolf: false });
     setSmartDarkEdgeEnabled(false);
+    setTorchLevel(DEFAULT_TORCH_LEVEL);
   }
 
   function updateEquationStyle(nextStyleId) {
@@ -2854,6 +2940,48 @@ function CameraStudio() {
             </button>
           </div>
 
+          <section className={torchActive ? "torch-brightness-panel active" : "torch-brightness-panel"} aria-label="Rear flashlight brightness control">
+            <div className="torch-brightness-heading">
+              <span>
+                <Zap size={15} />
+                <strong>Torch Brightness</strong>
+              </span>
+              <output>{torchLevel}/{TORCH_LEVEL_COUNT}</output>
+            </div>
+            <div className="torch-level-grid" role="group" aria-label="Ten flashlight brightness levels">
+              {Array.from({ length: TORCH_LEVEL_COUNT }, (_, index) => {
+                const level = index + 1;
+                const selected = level <= torchLevel;
+                return (
+                  <button
+                    key={level}
+                    type="button"
+                    className={selected ? "torch-level-button active" : "torch-level-button"}
+                    aria-pressed={level === torchLevel}
+                    aria-label={`Set flashlight brightness level ${level} of ${TORCH_LEVEL_COUNT}`}
+                    onClick={() => setTorchBrightnessLevel(level)}
+                  >
+                    <span>{level}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <input
+              type="range"
+              min="1"
+              max={TORCH_LEVEL_COUNT}
+              step="1"
+              value={torchLevel}
+              aria-label="Flashlight brightness level"
+              onChange={(event) => setTorchBrightnessLevel(event.target.value)}
+            />
+            <p>
+              {torchLevelReflected
+                ? "This active stream reports level-aware torch settings."
+                : "Level is requested through camera constraints; some mobile browsers expose only on/off flashlight control."}
+            </p>
+          </section>
+
           {renderEquationEnginePanel()}
 
           <section className="recording-panel" aria-labelledby="recordingPanelTitle">
@@ -3111,7 +3239,7 @@ function CameraStudio() {
             <input
               value={accessCode}
               onChange={(event) => setAccessCode(event.target.value)}
-              placeholder="SP3CTR4L_X1-..."
+              placeholder="Enter access code"
               autoComplete="off"
               spellCheck="false"
               autoFocus
@@ -5995,6 +6123,14 @@ function closeStudioWindow() {
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, Number(value) || 0));
+}
+
+function normalizeTorchLevel(value) {
+  return Math.round(clamp(value, 1, TORCH_LEVEL_COUNT));
+}
+
+function torchLevelRatio(value) {
+  return normalizeTorchLevel(value) / TORCH_LEVEL_COUNT;
 }
 
 export default CameraStudio;
