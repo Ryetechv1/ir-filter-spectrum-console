@@ -835,6 +835,16 @@ const CATEGORY_COUNTS = new Map(
 );
 
 const EQUATION_DEFAULT_VALUE = "SP3CTR4L-37";
+const EQUATION_TARGETS = [
+  ["A", "A - Value pipeline"],
+  ["B", "B - Fetch data"],
+  ["C", "C - Return data"],
+  ["W", "W - Base value"],
+  ["X", "X - New input"],
+  ["Y", "Y - Output value"],
+  ["Z", "Z - Result"]
+];
+const EQUATION_TARGET_KEYS = new Set(EQUATION_TARGETS.map(([key]) => key));
 const EQUATION_THERMAL_PALETTES = [
   "rainbow",
   "predator",
@@ -878,10 +888,11 @@ const EQUATION_MUTATION_KEYS = [
   "thermalInvert"
 ];
 
-function createEquationModel(value, baseEffect = CAMERA_EFFECTS[0], baseSettings = DEFAULT_SETTINGS, runId = 0) {
+function createEquationModel(value, baseEffect = CAMERA_EFFECTS[0], baseSettings = DEFAULT_SETTINGS, runId = 0, targetKey = "X") {
   const X = String(value || "").trim() || EQUATION_DEFAULT_VALUE;
   const runSeed = Number.isFinite(Number(runId)) ? Number(runId) : 0;
-  const seed = seededHash(`${X}|${baseEffect.id || "effect"}|run:${runSeed}|spectral-equation`);
+  const target = EQUATION_TARGET_KEYS.has(targetKey) ? targetKey : "X";
+  const seed = seededHash(`${target}:${X}|${baseEffect.id || "effect"}|run:${runSeed}|spectral-equation`);
   const rand = seededRandom(seed);
   const palette = EQUATION_THERMAL_PALETTES[Math.floor(rand() * EQUATION_THERMAL_PALETTES.length)] || "classic";
   const blendMode = MEDIA_BLEND_MODES[Math.floor(rand() * MEDIA_BLEND_MODES.length)]?.[0] || "screen";
@@ -933,14 +944,32 @@ function createEquationModel(value, baseEffect = CAMERA_EFFECTS[0], baseSettings
   );
   const effectName = `Equation Z-${String(outputNumber).slice(-5)}`;
   const overlayColor = `rgba(${primary[0]}, ${primary[1]}, ${primary[2]}, 0.36)`;
-  return {
+  const rows = {
     A: `pipeline:${X} run:${runSeed}`,
     B: `hash:${W.toString(16).toUpperCase()} palette:${palette}`,
     C: `${EQUATION_MUTATION_KEYS.length} controls + RGBW matrix`,
     W: String(W),
     X,
     Y: String(outputNumber),
-    Z: `${effectName} / ${palette}`,
+    Z: `${effectName} / ${palette}`
+  };
+  if (target !== "X") {
+    rows[target] =
+      target === "A"
+        ? `target-pipeline:${X} run:${runSeed}`
+        : target === "B"
+          ? `target-fetch:${X}`
+          : target === "C"
+            ? `target-return:${X}`
+            : target === "W"
+              ? `target-base:${X}`
+              : target === "Y"
+                ? `target-output:${X}`
+                : `target-result:${X}`;
+  }
+  return {
+    ...rows,
+    targetKey: target,
     settings: targetSettings,
     effect: {
       id: "equation-generated-filter",
@@ -951,7 +980,7 @@ function createEquationModel(value, baseEffect = CAMERA_EFFECTS[0], baseSettings
       favorite: false,
       settings: { ...DEFAULT_SETTINGS, ...targetSettings }
     },
-    summary: `Z returns a layered ${palette} pseudo-thermal render from ${baseEffect.name}, mixed with ${blendMode} overlay math and the current slider stack.`
+    summary: `${target} target returns a layered ${palette} pseudo-thermal render from ${baseEffect.name}, mixed with ${blendMode} overlay math and the current slider stack.`
   };
 }
 
@@ -1063,6 +1092,7 @@ function CameraStudio() {
   const [mediaComposerStatus, setMediaComposerStatus] = useState("Upload 1-3 local images or videos to build a separate composited edit.");
   const [mediaSnapshotUrl, setMediaSnapshotUrl] = useState("");
   const [equationValue, setEquationValue] = useState(EQUATION_DEFAULT_VALUE);
+  const [equationTargetKey, setEquationTargetKey] = useState("X");
   const [equationRunId, setEquationRunId] = useState(0);
   const [equationLiveEnabled, setEquationLiveEnabled] = useState(false);
   const [equationMediaEnabled, setEquationMediaEnabled] = useState(false);
@@ -1101,8 +1131,8 @@ function CameraStudio() {
   );
 
   const equationModel = useMemo(
-    () => createEquationModel(equationValue, selectedEffect, manualSettings, equationRunId),
-    [equationRunId, equationValue, manualSettings, selectedEffect]
+    () => createEquationModel(equationValue, selectedEffect, manualSettings, equationRunId, equationTargetKey),
+    [equationRunId, equationTargetKey, equationValue, manualSettings, selectedEffect]
   );
   const liveManualSettings = useMemo(
     () => (equationLiveEnabled ? applyEquationSettings(manualSettings, equationModel) : manualSettings),
@@ -1606,9 +1636,17 @@ function CameraStudio() {
     setSelectedEffectId(CAMERA_EFFECTS[0].id);
     setManualSettings(CAMERA_EFFECTS[0].settings);
     setSnapshotUrl("");
+    setEquationTargetKey("X");
     setEquationRunId(0);
     setEquationLiveEnabled(false);
     setEquationMediaEnabled(false);
+  }
+
+  function updateEquationTarget(nextTarget) {
+    const target = EQUATION_TARGET_KEYS.has(nextTarget) ? nextTarget : "X";
+    setEquationTargetKey(target);
+    setEquationRunId((current) => current + 1);
+    setCameraStatus(`Equation input now targets ${target}. Press Generate Value to create a fresh filter from that slot.`);
   }
 
   function randomizeEquationValue() {
@@ -1624,7 +1662,7 @@ function CameraStudio() {
     setEquationRunId((current) => current + 1);
     setEquationLiveEnabled(true);
     if (mediaLayersRef.current.length) setEquationMediaEnabled(true);
-    setCameraStatus("Generated and applied a new A to Z equation filter to the live feed.");
+    setCameraStatus(`Generated and applied a new ${equationTargetKey}-targeted equation filter to the live feed.`);
   }
 
   async function handleMediaUpload(event) {
@@ -1899,12 +1937,26 @@ function CameraStudio() {
         </div>
 
         <div className="equation-engine-controls">
+          <label className="equation-target-select">
+            Target value
+            <select
+              value={equationTargetKey}
+              onChange={(event) => updateEquationTarget(event.target.value)}
+              aria-label="Target equation pipeline value"
+            >
+              {EQUATION_TARGETS.map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
           <label>
-            X input value
+            {equationTargetKey} input value
             <input
               value={equationValue}
               onChange={(event) => setEquationValue(event.target.value)}
-              placeholder={EQUATION_DEFAULT_VALUE}
+              placeholder={`Enter ${equationTargetKey} target value`}
             />
           </label>
           <button type="button" onClick={randomizeEquationValue}>
