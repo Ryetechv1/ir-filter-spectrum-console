@@ -310,7 +310,6 @@ const CORE_ADJUSTMENTS = [
   ["temperature", "Temperature", -80, 80, ""],
   ["tint", "Tint", -80, 80, ""],
   ["blur", "Blur", 0, 12, "px"],
-  ["vignette", "Vignette", 0, 90, "%"],
   ["grain", "Grain", 0, 80, "%"],
   ["duotone", "Duotone", 0, 100, "%"],
   ["glow", "Glow", 0, 60, "px"]
@@ -498,7 +497,7 @@ const DEFAULT_SETTINGS = {
   temperature: 0,
   tint: 0,
   blur: 0,
-  vignette: 12,
+  vignette: 0,
   grain: 0,
   duotone: 0,
   glow: 0,
@@ -534,7 +533,7 @@ const ADJUSTMENT_GROUPS = [
   {
     id: "core",
     title: "Core Photo Controls",
-    description: "Fast brightness, exposure, contrast, temperature, blur, glow, grain, and vignette controls.",
+    description: "Fast brightness, exposure, contrast, temperature, blur, glow, and grain controls.",
     controls: CORE_ADJUSTMENTS,
     open: true
   },
@@ -697,7 +696,7 @@ const ADJUSTMENT_GROUPS = [
     id: "creative",
     title: "Creative Mix Finish",
     description: "Overlay and compositing finishers that bind color mixers, inversion, and spectral filters together.",
-    controls: ["overlayStrength", "glow", "grain", "vignette", "sepia", "grayscale", "invert"]
+    controls: ["overlayStrength", "glow", "grain", "sepia", "grayscale", "invert"]
   }
 ];
 
@@ -735,7 +734,7 @@ const EFFECT_FAMILIES = [
     names: ["Teal Orange", "Low Key", "Cinema Warm", "Matte Film", "Steel Scene", "Black Chrome", "Drama Soft", "Late Night", "Soft Focus", "Anamorphic"],
     color: "rgba(255,126,44,0.15)",
     blendMode: "overlay",
-    settings: { brightness: 96, contrast: 126, saturation: 112, temperature: 18, vignette: 28, grain: 8 }
+    settings: { brightness: 96, contrast: 126, saturation: 112, temperature: 18, grain: 8 }
   },
   {
     category: "Cyber Neon",
@@ -1042,7 +1041,7 @@ const EFFECT_FAMILIES = [
     names: ["Low Exposure", "High Exposure", "Shadow Lift", "Highlight Guard", "Contrast Pull", "Gamma Lift", "Soft HDR", "Hard HDR", "Backlight Save", "Window Light"],
     color: "rgba(255,255,255,0.1)",
     blendMode: "screen",
-    settings: { brightness: 104, contrast: 116, saturation: 108, exposure: 14, vignette: 8 }
+    settings: { brightness: 104, contrast: 116, saturation: 108, exposure: 14 }
   },
   {
     category: "Color Lab",
@@ -1060,6 +1059,7 @@ function amplifyPresetSettings(settings = {}) {
 }
 
 function amplifyPresetSettingValue(key, value) {
+  if (key === "vignette") return 0;
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return value;
   const range = settingRange(key);
@@ -1086,7 +1086,6 @@ const CAMERA_EFFECTS = EFFECT_FAMILIES.flatMap((family, familyIndex) =>
       contrast: clamp((baseSettings.contrast ?? 100) + Math.round((index % 5) * 3), 20, 220),
       saturation: clamp((baseSettings.saturation ?? 100) + Math.round((index % 4) * 5), 0, 260),
       hue: clamp((baseSettings.hue ?? 0) + ((familyIndex * 17 + index * 9) % 82) - 41, -180, 180),
-      vignette: clamp((baseSettings.vignette ?? 0) + (baseSettings.vignette == null ? 0 : (index % 3) * 5), 0, 90),
       grain: clamp((baseSettings.grain ?? 0) + (baseSettings.grain == null ? 0 : (index % 4) * 2), 0, 80),
       glow: clamp((baseSettings.glow ?? 0) + (baseSettings.glow == null ? 0 : (index % 3) * 3), 0, 60)
     };
@@ -1194,7 +1193,7 @@ const EQUATION_STYLE_CATEGORY_KEYS = new Map([
   ["Clean Studio", ["ambientLift", "highlightRecovery", "whiteBalance", "skinSmooth"]],
   ["IR Simulations", ["infraredWash", "nearIrBoost", "grayscale", "negativeDepth", "xrayGhost"]],
   ["UVA / Fluorescence", ["ultravioletWash", "uvaFluorescence", "mineralPop", "auraBloom", "chromaticGlow"]],
-  ["Cinematic", ["vignette", "grain", "matte", "halation", "shadowCrush"]],
+  ["Cinematic", ["grain", "matte", "halation", "shadowCrush"]],
   ["Cyber Neon", ["glow", "bloom", "chromaticGlow", "colorSeparation", "prismSplit"]],
   ["Black & White", ["grayscale", "contrast", "grain", "threshold", "clarity"]],
   ["Duotone", ["duotone", "splitTone", "tint", "colorHarmony", "colorDodge"]],
@@ -2057,10 +2056,24 @@ function CameraStudio() {
 
   function selectEffect(effect) {
     setSelectedEffectId(effect.id);
-    setManualSettings((current) => ({
-      ...effect.settings,
-      ...Object.fromEntries([...STACKED_SETTING_KEYS].map((key) => [key, current[key] ?? DEFAULT_SETTINGS[key] ?? 0]))
-    }));
+    setEquationLiveEnabled(false);
+    setManualSettings({
+      ...DEFAULT_SETTINGS,
+      ...(effect.settings || {}),
+      vignette: 0
+    });
+    setCameraStatus(`${effect.name} preset applied to the live camera feed.`);
+  }
+
+  function selectEffectCategory(category) {
+    setSelectedCategory(category);
+    const nextEffect =
+      category === "All Presets"
+        ? CAMERA_EFFECTS[0]
+        : category === "Favorites"
+          ? CAMERA_EFFECTS.find((effect) => effect.favorite)
+          : CAMERA_EFFECTS.find((effect) => effect.category === category);
+    if (nextEffect) selectEffect(nextEffect);
   }
 
   function updateSetting(key, value) {
@@ -2084,7 +2097,7 @@ function CameraStudio() {
 
   function resetStudio() {
     setSelectedEffectId(CAMERA_EFFECTS[0].id);
-    setManualSettings(CAMERA_EFFECTS[0].settings);
+    setManualSettings({ ...DEFAULT_SETTINGS, ...CAMERA_EFFECTS[0].settings, vignette: 0 });
     setSnapshotUrl("");
     setEquationTargetKey("X");
     setEquationStyleEffectId(EQUATION_STYLE_AUTO);
@@ -2819,7 +2832,7 @@ function CameraStudio() {
           <ul>
             <li>{CAMERA_EFFECTS.length} local visual presets compiled at 500% intensity for IR-style, UVA-style, full-spectrum thermal, XLS, cinematic, monochrome, duotone, retro, and color-lab looks.</li>
             <li>Four RGBW gradient mixers for Main, Secondary, Third, and Highlights color layers that drive overlays, filter math, and the selected app accent aesthetic.</li>
-            <li>Grouped adjustment dropdowns with 12 core photo controls, 10 color inversion tools, 10 smart darker-edge controls, 15 smart signal engines with 10 sliders each, 100 advanced sliders, equation-generated filter names/descriptions, and live/overlay adjustment toggles.</li>
+            <li>Grouped adjustment dropdowns with 11 core photo controls, 10 color inversion tools, 10 smart darker-edge controls, 15 smart signal engines with 10 sliders each, 100 advanced sliders, equation-generated filter names/descriptions, and live/overlay adjustment toggles.</li>
             <li>Processed PNG snapshots and 1080P or 2K MP4 recordings with local camera effects applied.</li>
             <li>Separate 1-3 layer image/video compositor with opacity, splice masks, blend modes, transforms, full adjustment-stack support, and clean PNG export.</li>
             <li>Clean exports hide app-added preview chrome, labels, and watermark overlays so only the processed image or video remains.</li>
@@ -2845,7 +2858,7 @@ function CameraStudio() {
                 key={category}
                 type="button"
                 className={category === selectedCategory ? "active" : ""}
-                onClick={() => setSelectedCategory(category)}
+                onClick={() => selectEffectCategory(category)}
               >
                 <Sparkles size={15} />
                 <span>{category}</span>
@@ -3705,7 +3718,6 @@ function drawStudioFrame(context, width, height, mediaSource, renderState, optio
   paintOverlay(context, width, height, selectedEffect, signalSettings);
   paintSpecialOverlay(context, width, height, signalSettings, selectedEffect);
   paintCanvasGrain(context, width, height, signalSettings);
-  paintCanvasVignette(context, width, height, signalSettings);
   if (options.includePreviewChrome) {
     paintPreviewChrome(context, width, height, {
       scale: options.pixelScale || 1,
@@ -4013,7 +4025,6 @@ function buildSmartSignalProcessorSettings(context, width, height, settings, eff
     } else if (processor.id === "field") {
       addSetting("lightWrap", 12 * strength);
       addSetting("auraBloom", 10 * strength);
-      addSetting("vignette", 6 * strength);
       addSetting("colorSeparation", 7 * strength);
     } else if (processor.id === "range") {
       addSetting("hdrRange", 18 * strength);
@@ -5463,15 +5474,6 @@ function paintOverlay(context, width, height, effect, settings) {
     context.fillStyle = spectralGradient;
     context.fillRect(0, 0, width, height);
   }
-  if (settings.vignette > 0) {
-    context.globalCompositeOperation = "multiply";
-    const gradient = context.createRadialGradient(width / 2, height / 2, width * 0.12, width / 2, height / 2, width * 0.72);
-    gradient.addColorStop(0, "rgba(255,255,255,1)");
-    gradient.addColorStop(1, `rgba(0,0,0,${effectSetting(settings, "vignette") / 82})`);
-    context.globalAlpha = 1;
-    context.fillStyle = gradient;
-    context.fillRect(0, 0, width, height);
-  }
   context.restore();
 }
 
@@ -5628,21 +5630,6 @@ function paintCanvasGrain(context, width, height, settings) {
       context.fillRect(x, y, 1, 1);
     }
   }
-  context.restore();
-}
-
-function paintCanvasVignette(context, width, height, settings) {
-  const alpha = clamp((setting(settings, "vignette") + setting(settings, "shadowDepth") * 0.24 + setting(settings, "negativeDepth") * 0.18) / 100, 0, 0.96);
-  if (!alpha) return;
-  context.save();
-  context.globalCompositeOperation = "multiply";
-  const radius = Math.max(width, height) * 0.72;
-  const vignette = context.createRadialGradient(width / 2, height / 2, Math.max(width, height) * 0.2, width / 2, height / 2, radius);
-  vignette.addColorStop(0, "rgba(255,255,255,1)");
-  vignette.addColorStop(0.46, "rgba(255,255,255,1)");
-  vignette.addColorStop(1, `rgba(0,0,0,${alpha * 0.82})`);
-  context.fillStyle = vignette;
-  context.fillRect(0, 0, width, height);
   context.restore();
 }
 

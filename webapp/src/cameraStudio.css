@@ -567,8 +567,7 @@
 
 .studio-color-overlay,
 .studio-special-overlay,
-.studio-grain,
-.studio-vignette {
+.studio-grain {
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -580,10 +579,6 @@
     radial-gradient(circle at 60% 70%, rgba(255, 255, 255, 0.22) 0 1px, transparent 1px);
   background-size: 7px 7px, 11px 11px;
   mix-blend-mode: soft-light;
-}
-
-.studio-vignette {
-  background: radial-gradient(circle at center, transparent 46%, rgba(0, 0, 0, 0.82) 100%);
 }
 
 .camera-floating-hud {
