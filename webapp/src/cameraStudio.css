@@ -2110,6 +2110,18 @@
     grid-template-columns: 1fr;
   }
 
+  .camera-preview-panel {
+    order: 1;
+  }
+
+  .effect-browser {
+    order: 2;
+  }
+
+  .adjustments-panel {
+    order: 3;
+  }
+
   .studio-secure-pill,
   .trusted-user-pill {
     justify-content: center;
@@ -2120,6 +2132,10 @@
 @media (max-width: 720px) {
   .camera-studio-grid {
     padding: 8px;
+  }
+
+  .camera-preview-panel {
+    padding: 10px;
   }
 
   .camera-access-overlay {
@@ -2134,7 +2150,15 @@
 
   .camera-frame,
   .camera-output-canvas {
-    min-height: 420px;
+    height: min(72vh, 620px);
+    min-height: 430px;
+  }
+
+  @supports (height: 1svh) {
+    .camera-frame,
+    .camera-output-canvas {
+      height: min(72svh, 620px);
+    }
   }
 
   .camera-floating-hud {
@@ -2148,7 +2172,6 @@
     aspect-ratio: 4 / 3;
   }
 
-  .effect-preset-grid,
   .studio-action-row,
   .adjustment-scope-toggles,
   .equation-engine-controls,
@@ -2182,6 +2205,32 @@
 
   .camera-studio-title {
     align-items: flex-start;
+  }
+
+  .effect-browser {
+    max-height: none;
+  }
+
+  .effect-category-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .effect-category-list button {
+    min-height: 38px;
+  }
+
+  .effect-preset-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-height: 300px;
+  }
+
+  .effect-preset-grid button {
+    min-height: 74px;
+    align-content: start;
+  }
+
+  .effect-preset-grid button > span {
+    height: 22px;
   }
 
   .studio-intro-box {
