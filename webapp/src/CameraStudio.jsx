@@ -182,10 +182,11 @@ const MP4_MIME_TYPES = [
   "video/mp4"
 ];
 const PREVIEW_CANVAS_SCALE_CAP = 0.85;
-const HUD_CANVAS_SCALE_CAP = 0.48;
 const MEDIA_CANVAS_SCALE_CAP = 0.78;
+const CAMERA_CANONICAL_RENDER_WIDTH = 720;
+const CAMERA_CANONICAL_RENDER_HEIGHT = 600;
+const CAMERA_CANONICAL_CSS_WIDTH = 650;
 const THERMAL_EFFECT_PIXEL_BUDGET = 95_000;
-const HUD_THERMAL_EFFECT_PIXEL_BUDGET = 42_000;
 const MEDIA_THERMAL_EFFECT_PIXEL_BUDGET = 72_000;
 const CAMERA_LIGHT_FRAME_INTERVAL_MS = 68;
 const CAMERA_HEAVY_FRAME_INTERVAL_MS = 106;
@@ -3587,9 +3588,12 @@ function drawCameraOutputCanvas(canvas, frameElement, source, renderState, optio
   const sourceSize = mediaSourceSize(source, 1280, 720);
   const fallbackWidth = sourceSize.width || 1280;
   const fallbackHeight = sourceSize.height || 720;
-  const size = getRenderedCameraFrameSize(frameElement || canvas, fallbackWidth, fallbackHeight, {
-    scaleCap: options.scaleCap ?? PREVIEW_CANVAS_SCALE_CAP
-  });
+  const size =
+    options.useRenderedFrameSize === true
+      ? getRenderedCameraFrameSize(frameElement || canvas, fallbackWidth, fallbackHeight, {
+          scaleCap: options.scaleCap ?? PREVIEW_CANVAS_SCALE_CAP
+        })
+      : getCanonicalCameraFrameSize();
   if (!size.width || !size.height) return false;
   if (canvas.width !== size.width) canvas.width = size.width;
   if (canvas.height !== size.height) canvas.height = size.height;
@@ -3604,6 +3608,15 @@ function drawCameraOutputCanvas(canvas, frameElement, source, renderState, optio
     pixelBudget: options.pixelBudget
   });
   return true;
+}
+
+function getCanonicalCameraFrameSize() {
+  return {
+    width: CAMERA_CANONICAL_RENDER_WIDTH,
+    height: CAMERA_CANONICAL_RENDER_HEIGHT,
+    scale: 1,
+    cssWidth: CAMERA_CANONICAL_CSS_WIDTH
+  };
 }
 
 function clearCameraOutputCanvas(canvas) {
