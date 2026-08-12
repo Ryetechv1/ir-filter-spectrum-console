@@ -205,6 +205,8 @@ let pixelateWorkCanvas;
 let mediaLayerWorkCanvas;
 let smartDarkEdgeWorkCanvas;
 let smartSignalWorkCanvas;
+let previewFilterWorkCanvas;
+let canvasFilterSupportMemo;
 const TRUSTED_ACCESS = [
   {
     name: "Studio Access Holder",
@@ -1077,16 +1079,203 @@ function amplifyPresetOverlayColor(color) {
   });
 }
 
+const DISTINCT_PRESET_TUNING = [
+  { exposure: 8, contrast: 113, saturation: 122, colorSeparation: 8, clarity: 8, redChannel: 112, greenChannel: 96, blueChannel: 104 },
+  { exposure: -6, contrast: 128, saturation: 146, hue: 28, chromaticGlow: 10, blueChannel: 138, greenChannel: 92, purpleShift: 14 },
+  { exposure: 3, contrast: 150, saturation: 120, edgeEnhance: 12, colorSeparation: 18, prismSplit: 8, sharpen: 10 },
+  { exposure: 12, contrast: 138, saturation: 172, glow: 10, bloom: 12, colorLeak: 10, redChannel: 132, blueChannel: 120 },
+  { exposure: -10, contrast: 162, saturation: 88, grayscale: 12, shadowCrush: 10, localContrast: 12, blueHueShift: -10 },
+  { exposure: 6, contrast: 124, saturation: 190, temperature: 12, vibrance: 18, orangeShift: 16, greenChannel: 124 },
+  { exposure: -2, contrast: 146, saturation: 208, hue: -36, duotone: 12, purpleShift: 22, chromaticAberration: 10 },
+  { exposure: 14, contrast: 118, saturation: 132, matte: 12, halation: 12, highlightRecovery: 14, softFocus: 8 },
+  { exposure: -14, contrast: 176, saturation: 156, dehaze: 14, structure: 14, blackPoint: 12, shadowDepth: 14 },
+  { exposure: 4, contrast: 134, saturation: 236, hue: 58, scanlines: 10, glitchShift: 8, colorDodge: 10 }
+];
+
+const UVA_PRESET_TUNING = [
+  { uvaFluorescence: 18, ultravioletWash: 16, chromaticGlow: 18, auraBloom: 14, glow: 12, greenChannel: 132, blueChannel: 156, redChannel: 82, purpleShift: 18 },
+  { uvaFluorescence: 14, ultravioletWash: 20, blueChannel: 176, redChannel: 74, colorSeparation: 12, prismSplit: 6, tint: 18 },
+  { uvaFluorescence: 12, edgeGlow: 18, edgeEnhance: 16, contrast: 142, saturation: 168, aquaShift: 14, blueChannel: 148 },
+  { uvaFluorescence: 16, ultravioletWash: 18, colorDodge: 14, glowStrength: 18, magentaBalance: 20, blueChannel: 132, redChannel: 128 },
+  { uvaFluorescence: 10, nearIrBoost: 12, grayscale: 16, contrast: 158, blueChannel: 178, greenChannel: 74, purpleShift: 20 },
+  { mineralPop: 18, uvaFluorescence: 10, chlorophyllGlow: 12, colorSeparation: 14, yellowBalance: 18, greenChannel: 154, redChannel: 118 },
+  { auraBloom: 18, chromaticGlow: 20, bokehBloom: 12, purpleShift: 28, saturation: 190, glow: 14 },
+  { ultravioletWash: 16, tint: 30, colorizeHue: -78, colorizeStrength: 16, redChannel: 142, blueChannel: 164 },
+  { ultravioletWash: 12, uvaFluorescence: 12, ambientLift: 12, softFocus: 8, blueChannel: 150, greenChannel: 118 },
+  { auraBloom: 14, mineralPop: 10, chromaticGlow: 16, hue: -52, saturation: 180, redHueShift: 16, purpleShift: 24 }
+];
+
+const CYBER_PRESET_TUNING = [
+  { hue: -22, colorSeparation: 20, chromaticGlow: 18, cyanBalance: 26, blueChannel: 168, greenChannel: 132, redChannel: 60 },
+  { hue: 42, colorSeparation: 28, chromaticAberration: 18, magentaBalance: 44, redChannel: 184, blueChannel: 168, greenChannel: 42, purpleShift: 28 },
+  { hue: -118, prismSplit: 24, glitchShift: 14, scanlines: 10, redChannel: 18, greenChannel: 72, blueChannel: 200, cyanBalance: 26, contrast: 154 },
+  { hue: 96, redHueShift: 36, purpleShift: 42, chromaticGlow: 20, colorLeak: 18, redChannel: 196, blueChannel: 150, greenChannel: 28 },
+  { hue: 118, duotone: 20, splitTone: 28, colorizeStrength: 16, purpleShift: 36, orangeShift: 18 },
+  { hue: -112, thermalContour: 10, edgeGlow: 18, colorSeparation: 22, blueChannel: 184, greenChannel: 88 },
+  { hue: 12, glowStrength: 20, bloom: 16, saturation: 220, redChannel: 156, greenChannel: 118, blueChannel: 164 },
+  { hue: -46, scanlines: 22, glitchShift: 20, noiseColor: 10, greenChannel: 148, blueChannel: 132 },
+  { hue: 64, chrome: 0, grayscale: 22, colorDodge: 18, contrast: 166, chromaticAberration: 20 },
+  { hue: 156, posterize: 12, threshold: 8, colorSeparation: 26, prismSplit: 22, saturation: 232 }
+];
+
+const CATEGORY_PRESET_TUNING = {
+  "UVA / Fluorescence": UVA_PRESET_TUNING,
+  "Cyber Neon": CYBER_PRESET_TUNING,
+  "Clean Studio": [
+    { brightness: 102, contrast: 102, saturation: 104 },
+    { softFocus: 8, brightness: 106, highlights: 8 },
+    { clarity: 10, dehaze: 6, contrast: 112 },
+    { exposure: 8, glow: 5, tint: 6 },
+    { vibrance: 10, colorHarmony: 8, saturation: 112 },
+    { temperature: 10, whiteBalance: 8, brightness: 112 },
+    { redChannel: 104, greenChannel: 104, blueChannel: 104, clarityMask: 8 },
+    { ambientLift: 8, highlights: 12, softFocus: 5 },
+    { grayscale: 8, contrast: 120, fineSharpen: 8 },
+    { exposure: 6, saturation: 118, whitePoint: 8 }
+  ],
+  "Cinematic": [
+    { temperature: 24, aquaShift: -18, orangeShift: 28, contrast: 142 },
+    { exposure: -12, shadowCrush: 16, blackPoint: 14, contrast: 162 },
+    { temperature: 32, halation: 14, bloom: 8, saturation: 126 },
+    { matte: 18, fade: 12, grain: 14, contrast: 110 },
+    { cyanBalance: 20, grayscale: 12, contrast: 156 },
+    { saturation: 70, colorDodge: 10, dehaze: 16, blackPoint: 18 },
+    { softFocus: 14, highlights: 18, tint: 10 },
+    { exposure: -8, blueHueShift: -18, shadowDepth: 18, glow: 6 },
+    { softFocus: 20, bokehBloom: 14, brightness: 106 },
+    { flareStreak: 18, lensFlare: 12, chromaticAberration: 12, orangeShift: 14 }
+  ],
+  "Black & White": [
+    { grayscale: 100, contrast: 136, clarity: 8 },
+    { grayscale: 100, contrast: 180, threshold: 8, shadowCrush: 18 },
+    { grayscale: 100, softFocus: 12, matte: 12, contrast: 112 },
+    { grayscale: 100, posterize: 14, grain: 20, contrast: 150 },
+    { grayscale: 100, sepia: 10, glow: 6, exposure: -4 },
+    { grayscale: 100, structure: 18, dehaze: 14, contrast: 160 },
+    { grayscale: 100, grain: 28, scratches: 12, halation: 10 },
+    { grayscale: 100, blackPoint: 20, shadowDepth: 22, edgeEnhance: 12 },
+    { grayscale: 100, brightness: 108, contrast: 124, fineSharpen: 10 },
+    { grayscale: 100, exposure: 12, whites: 18, glowStrength: 12 }
+  ],
+  "Duotone": [
+    { splitTone: 34, blueHueShift: -22, orangeShift: 22, duotone: 22 },
+    { splitTone: -36, redHueShift: 26, aquaShift: 28, duotone: 24 },
+    { purpleShift: 30, greenHueShift: 24, colorSeparation: 12, duotone: 26 },
+    { redHueShift: 18, yellowBalance: 20, tint: 18, duotone: 28 },
+    { aquaShift: 28, magentaBalance: 20, colorHarmony: 12, duotone: 30 },
+    { greenHueShift: 28, cyanBalance: 18, grayscale: 8, duotone: 22 },
+    { orangeShift: 30, blueHueShift: -34, shadowDepth: 10, duotone: 26 },
+    { redHueShift: 32, grayscale: 16, blackPoint: 12, duotone: 24 },
+    { temperature: -24, orangeShift: 36, saturation: 176, duotone: 30 },
+    { splitTone: 48, colorSeparation: 22, contrast: 154, duotone: 34 }
+  ],
+  "Retro Film": [
+    { sepia: 16, temperature: 22, grain: 22, dust: 8 },
+    { sepia: 32, matte: 18, scratches: 10, contrast: 104 },
+    { fade: 20, saturation: 70, grain: 16, blueHueShift: -12 },
+    { temperature: 28, halation: 16, bloom: 8, exposure: 6 },
+    { temperature: -18, cyanBalance: 16, fade: 14, dust: 10 },
+    { scanlines: 12, filmGrainSize: 18, contrast: 118, halation: 10 },
+    { contrast: 152, grain: 24, shadowCrush: 12, saturation: 112 },
+    { matte: 22, posterize: 8, grain: 14, blackPoint: 10 },
+    { temperature: 34, fade: 10, sepia: 18, glow: 7 },
+    { saturation: 62, dust: 18, scratches: 14, contrast: 116 }
+  ],
+  "Night Vision": [
+    { nightScope: 18, greenChannel: 170, redChannel: 46, blueChannel: 58, scanlines: 8 },
+    { nightScope: 22, glow: 12, greenHueShift: 28, contrast: 160 },
+    { thermalPalette: "predator", thermalBlend: 14, greenChannel: 160, heatEdge: 10 },
+    { shadowCrush: 18, greenChannel: 156, dehaze: 16, contrast: 172 },
+    { nightScope: 26, glowStrength: 16, saturation: 82, greenHueShift: 34 },
+    { exposure: -16, shadowDepth: 24, edgeEnhance: 12, scanlines: 16 },
+    { grayscale: 78, nightScope: 24, greenChannel: 180, contrast: 154 },
+    { scanlines: 24, crtCurve: 18, greenHueShift: 22, edgeGlow: 8 },
+    { glow: 16, lensFlare: 8, greenChannel: 166, brightness: 104 },
+    { exposure: -20, blackPoint: 18, greenChannel: 142, dehaze: 20 }
+  ],
+  "Exposure Tools": [
+    { exposure: -22, blackPoint: 12, contrast: 128 },
+    { exposure: 26, whitePoint: 12, highlights: 18 },
+    { shadows: 26, ambientLift: 18, shadowDepth: 6 },
+    { highlightRecovery: 28, whites: -12, specularControl: -18 },
+    { contrast: 164, midtoneContrast: 18, localContrast: 14 },
+    { gamma: 28, midtoneLift: 16, brightness: 108 },
+    { hdrRange: 28, highlightRecovery: 18, shadows: 14 },
+    { hdrRange: 38, contrast: 156, detailBoost: 14 },
+    { ambientLift: 24, highlightRecovery: 22, dehaze: 10 },
+    { whites: 18, exposure: 12, glow: 6 }
+  ],
+  "Color Lab": [
+    { hue: 72, saturation: 160, colorSeparation: 10 },
+    { temperature: 34, orangeShift: 24, redChannel: 130 },
+    { temperature: -34, aquaShift: 24, blueChannel: 148 },
+    { tint: 34, magentaBalance: 24, redHueShift: 18 },
+    { tint: -34, greenHueShift: 28, greenChannel: 144 },
+    { saturation: 210, vibrance: 24, colorHarmony: 14 },
+    { saturation: 54, matte: 10, fade: 12 },
+    { saturation: 226, contrast: 146, colorLeak: 12 },
+    { brightness: 114, saturation: 126, softFocus: 10 },
+    { prismSplit: 20, colorSeparation: 22, chromaticGlow: 18 }
+  ]
+};
+
+function retouchPresetSettings(category, name, index, baseSettings = {}) {
+  const categoryTuningSet = CATEGORY_PRESET_TUNING[category];
+  const generic = categoryTuningSet ? {} : DISTINCT_PRESET_TUNING[index % DISTINCT_PRESET_TUNING.length] || {};
+  const categoryTuning = categoryTuningSet?.[index] || {};
+  const tuned = {
+    ...baseSettings,
+    ...generic,
+    ...categoryTuning
+  };
+  if (category.includes("Thermal")) {
+    tuned.thermalBlend = Math.max(tuned.thermalBlend ?? 0, 18 + (index % 5) * 3);
+    tuned.thermalContour = Math.max(tuned.thermalContour ?? 0, 12 + (index % 7) * 2);
+    tuned.heatEdge = Math.max(tuned.heatEdge ?? 0, 10 + (index % 6) * 2);
+    tuned.posterize = Math.max(tuned.posterize ?? 0, 6 + (index % 4) * 2);
+    tuned.edgeEnhance = Math.max(tuned.edgeEnhance ?? 0, 8 + (index % 5) * 2);
+  }
+  if (category === "Color Inversion Matrix") {
+    tuned.colorSeparation = Math.max(tuned.colorSeparation ?? 0, 10 + index * 2);
+    tuned.contrast = Math.max(tuned.contrast ?? 100, 138 + index * 3);
+  }
+  if (name === "UVA Bloom") {
+    Object.assign(tuned, {
+      uvaFluorescence: Math.max(tuned.uvaFluorescence ?? 0, 22),
+      ultravioletWash: Math.max(tuned.ultravioletWash ?? 0, 18),
+      chromaticGlow: Math.max(tuned.chromaticGlow ?? 0, 20),
+      auraBloom: Math.max(tuned.auraBloom ?? 0, 16),
+      colorSeparation: Math.max(tuned.colorSeparation ?? 0, 18),
+      greenChannel: Math.max(tuned.greenChannel ?? 100, 148),
+      blueChannel: Math.max(tuned.blueChannel ?? 100, 168),
+      redChannel: Math.min(tuned.redChannel ?? 100, 72)
+    });
+  }
+  return clampPresetSettings(tuned);
+}
+
+function clampPresetSettings(settings = {}) {
+  return Object.fromEntries(
+    Object.entries(settings).map(([key, value]) => {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return [key, value];
+      const range = settingRange(key);
+      return [key, Math.round(clamp(numeric, range.min, range.max))];
+    })
+  );
+}
+
 const CAMERA_EFFECTS = EFFECT_FAMILIES.flatMap((family, familyIndex) =>
   (family.variants || family.names.map((name) => ({ name }))).map((variant, index) => {
-    const baseSettings = { ...family.settings, ...(variant.settings || {}) };
+    const baseSettings = retouchPresetSettings(family.category, variant.name, index, { ...family.settings, ...(variant.settings || {}) });
     const wave = index - 4.5;
+    const hueVariation = family.category === "Clean Studio" ? 0 : ((familyIndex * 17 + index * 9) % 82) - 41;
     const variedSettings = {
       ...baseSettings,
       brightness: clamp((baseSettings.brightness ?? 100) + Math.round(wave * 1.5), 20, 220),
       contrast: clamp((baseSettings.contrast ?? 100) + Math.round((index % 5) * 3), 20, 220),
       saturation: clamp((baseSettings.saturation ?? 100) + Math.round((index % 4) * 5), 0, 260),
-      hue: clamp((baseSettings.hue ?? 0) + ((familyIndex * 17 + index * 9) % 82) - 41, -180, 180),
+      hue: clamp((baseSettings.hue ?? 0) + hueVariation, -180, 180),
       grain: clamp((baseSettings.grain ?? 0) + (baseSettings.grain == null ? 0 : (index % 4) * 2), 0, 80),
       glow: clamp((baseSettings.glow ?? 0) + (baseSettings.glow == null ? 0 : (index % 3) * 3), 0, 60)
     };
@@ -3693,7 +3882,7 @@ function getRenderedCameraFrameSize(frameElement, fallbackWidth, fallbackHeight,
 function drawStudioFrame(context, width, height, mediaSource, renderState, options = {}) {
   const { filterCss, selectedEffect, manualSettings, cameraFacing } = renderState;
   const previewFilterCss = filterCss || buildFilterCss(manualSettings);
-  const useCanvasFilter = !options.forcePixelFilters && supportsCanvasContextFilter(context);
+  const useCanvasFilter = options.allowNativeCanvasFilter === true && !options.forcePixelFilters && supportsCanvasContextFilter(context);
   context.save();
   context.filter = "none";
   context.globalAlpha = 1;
@@ -3723,7 +3912,7 @@ function drawStudioFrame(context, width, height, mediaSource, renderState, optio
     context.drawImage(mediaSource, sx, sy, sw, sh, 0, 0, width, height);
   }
   context.restore();
-  if (!useCanvasFilter) applyCanvasPreviewFilters(context, width, height, previewFilterCss);
+  if (!useCanvasFilter) applyCanvasPreviewFilters(context, width, height, previewFilterCss, options);
   const signalSettings = buildSmartSignalProcessorSettings(
     context,
     width,
@@ -3748,7 +3937,38 @@ function drawStudioFrame(context, width, height, mediaSource, renderState, optio
   }
 }
 
-function applyCanvasPreviewFilters(context, width, height, filterCss) {
+function applyCanvasPreviewFilters(context, width, height, filterCss, options = {}) {
+  const pixelBudget = options.pixelBudget || 0;
+  if (context.canvas && pixelBudget && width * height > pixelBudget) {
+    const scale = Math.sqrt(pixelBudget / (width * height));
+    const workWidth = Math.max(1, Math.round(width * scale));
+    const workHeight = Math.max(1, Math.round(height * scale));
+    previewFilterWorkCanvas ||= document.createElement("canvas");
+    if (previewFilterWorkCanvas.width !== workWidth) previewFilterWorkCanvas.width = workWidth;
+    if (previewFilterWorkCanvas.height !== workHeight) previewFilterWorkCanvas.height = workHeight;
+    const workContext = previewFilterWorkCanvas.getContext("2d", { alpha: false, willReadFrequently: true });
+    if (!workContext) return;
+    workContext.save();
+    workContext.filter = "none";
+    workContext.imageSmoothingEnabled = true;
+    workContext.imageSmoothingQuality = "high";
+    workContext.clearRect(0, 0, workWidth, workHeight);
+    workContext.drawImage(context.canvas, 0, 0, width, height, 0, 0, workWidth, workHeight);
+    workContext.restore();
+    applyCanvasPreviewFiltersToContext(workContext, workWidth, workHeight, filterCss);
+    context.save();
+    context.filter = "none";
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
+    context.clearRect(0, 0, width, height);
+    context.drawImage(previewFilterWorkCanvas, 0, 0, workWidth, workHeight, 0, 0, width, height);
+    context.restore();
+    return;
+  }
+  applyCanvasPreviewFiltersToContext(context, width, height, filterCss);
+}
+
+function applyCanvasPreviewFiltersToContext(context, width, height, filterCss) {
   const model = parseFilterCss(filterCss);
   if (!filterModelChangesPixels(model)) return;
   let frame;
@@ -4955,7 +5175,27 @@ function thermalOverlayWeight(settings, effect) {
 }
 
 function supportsCanvasContextFilter(context) {
-  return context && "filter" in context;
+  if (!context || !("filter" in context) || typeof document === "undefined") return false;
+  if (typeof canvasFilterSupportMemo === "boolean") return canvasFilterSupportMemo;
+  try {
+    const probe = document.createElement("canvas");
+    probe.width = 1;
+    probe.height = 1;
+    const probeContext = probe.getContext("2d", { alpha: false, willReadFrequently: true });
+    if (!probeContext || !("filter" in probeContext)) {
+      canvasFilterSupportMemo = false;
+      return canvasFilterSupportMemo;
+    }
+    probeContext.fillStyle = "rgb(0,0,0)";
+    probeContext.filter = "invert(100%)";
+    probeContext.fillRect(0, 0, 1, 1);
+    const pixel = probeContext.getImageData(0, 0, 1, 1).data;
+    canvasFilterSupportMemo = pixel[0] > 245 && pixel[1] > 245 && pixel[2] > 245;
+    return canvasFilterSupportMemo;
+  } catch {
+    canvasFilterSupportMemo = false;
+    return canvasFilterSupportMemo;
+  }
 }
 
 function parseFilterCss(filterCss = "") {
