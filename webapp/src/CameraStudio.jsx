@@ -22,7 +22,6 @@ import {
   Upload,
   Video,
   Youtube,
-  Zap,
   X
 } from "lucide-react";
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
@@ -39,8 +38,6 @@ const YOUTUBE_UPLOADS_PLAYLIST_URL = `https://www.youtube.com/playlist?list=${YO
 const YOUTUBE_UPLOADS_PLAYER_URL = `https://www.youtube.com/embed/videoseries?list=${YOUTUBE_UPLOADS_PLAYLIST_ID}&rel=0&modestbranding=1&playsinline=1`;
 const SUPERNATURAL_DATABASE_URL = "https://sites.google.com/view/official-supernatural-database";
 const studioAssetUrl = (path) => `${import.meta.env.BASE_URL}${path.replace(/^\/+/, "")}`;
-const TORCH_LEVEL_COUNT = 10;
-const DEFAULT_TORCH_LEVEL = 6;
 const YOUTUBE_RECENT_UPLOADS = [
   {
     id: "5_T2LfeRDEY",
@@ -195,41 +192,21 @@ const CAMERA_HEAVY_FRAME_INTERVAL_MS = 106;
 const CAMERA_HUD_FRAME_INTERVAL_MS = 134;
 const MEDIA_VIDEO_FRAME_INTERVAL_MS = 96;
 const RECORDING_FRAME_INTERVAL_MS = 50;
-const EFFECT_OUTPUT_GAIN = 1.38;
-const PIXEL_EFFECT_GAIN = 1.58;
-const THERMAL_SIGNAL_GAIN = 1.24;
-const RGBW_MIXER_GAIN = 1.46;
-const SMART_FACE_ANALYSIS_WIDTH = 72;
-const SMART_FACE_PIXEL_BUDGET = 58_000;
-const SMART_FACE_FOREGROUND_LABEL = "Foreground smart facial recognition";
-const SMART_FACE_BACKGROUND_LABEL = "Background smart facial recognition";
-const SMART_WOLF_RECOGNITION_LABEL = "Smart wolf recognition";
+const EFFECT_OUTPUT_GAIN = 1.74;
+const PIXEL_EFFECT_GAIN = 2.05;
+const THERMAL_SIGNAL_GAIN = 1.42;
+const RGBW_MIXER_GAIN = 1.72;
+const SMART_SIGNAL_PIXEL_BUDGET = 74_000;
 const SMART_DARK_EDGE_LABEL = "Smart darker edge amplifier";
-const SMART_FACE_MESH_PROFILE = {
-  eyeY: 0.38,
-  eyeOffsetX: 0.22,
-  muzzleY: 0.66,
-  noseY: 0.76
-};
-const SMART_WOLF_MESH_PROFILE = {
-  earY: 0.08,
-  earHeight: 0.28,
-  earOffsetX: 0.31,
-  eyeY: 0.39,
-  eyeOffsetX: 0.22,
-  muzzleY: 0.66,
-  noseY: 0.78,
-  ridgeY: 0.5
-};
 let thermalWorkCanvas;
 let pixelateWorkCanvas;
 let mediaLayerWorkCanvas;
-let smartFaceWorkCanvas;
 let smartDarkEdgeWorkCanvas;
+let smartSignalWorkCanvas;
 const TRUSTED_ACCESS = [
   {
     name: "Studio Access Holder",
-    sha256: "eb9267d3ffe321f965b3b198c28f874043e8246afb0ecf294c382ed9c501851d"
+    sha256: "5d24654cf27da2785c1bfcf4af2449005fcf4895fed21df42828a9188969c5cd"
   }
 ];
 
@@ -357,6 +334,52 @@ const SMART_DARK_EDGE_ADJUSTMENTS = [
   ["darkEdgeMicroGrain", "Dark Micro Grain", 0, 100, "%", 24]
 ];
 
+const SMART_SIGNAL_PROCESSOR_SLIDERS = [
+  ["Amount", "Power", 0, 100, "%", 62],
+  ["Sensitivity", "Sensitivity", 0, 100, "%", 54],
+  ["Radius", "Radius", 0, 100, "%", 44],
+  ["Contrast", "Contrast", 0, 100, "%", 58],
+  ["Shadow", "Shadow Bias", 0, 100, "%", 42],
+  ["Highlight", "Highlight Bias", 0, 100, "%", 46],
+  ["Midtone", "Midtone Bias", 0, 100, "%", 50],
+  ["Isolation", "Isolation", 0, 100, "%", 40],
+  ["Smoothing", "Smoothing", 0, 100, "%", 34],
+  ["Blend", "Blend", 0, 100, "%", 64]
+];
+
+const SMART_SIGNAL_PROCESSORS = [
+  ["depth", "Depth", "Local contrast, shadow depth, and false-depth heat separation."],
+  ["field", "Field", "Field-of-view emphasis with center-to-edge tonal drift and glow shaping."],
+  ["range", "Range", "Dynamic range compression and highlight/shadow separation for stronger detail."],
+  ["metricMapping", "Metric Mapping", "Quantized tonal mapping that turns subtle luminance distance into visible structure."],
+  ["weight", "Weight", "Weighted contrast and channel balance that gives the active preset more visual force."],
+  ["details", "Details", "Fine detail, edges, and microtexture amplification."],
+  ["midtones", "Midtones", "Midtone isolation, lift, and contour control."],
+  ["invert", "Invert", "Stackable smart inversion that responds to tonal depth instead of replacing the whole preset."],
+  ["structure", "Structure", "Structure extraction for contours, ridges, and clustered shapes."],
+  ["blackpoint", "Blackpoint", "Darker black floor, shadow grouping, and silhouette strength."],
+  ["whitepoint", "Whitepoint", "White floor shaping, highlight pressure, and bright region definition."],
+  ["lift", "Lift", "Low-light lift and faint-signal reveal without flattening the whole image."],
+  ["amplify", "Amplify", "Overall signal amplification for color, contrast, glow, and thermal response."],
+  ["exposure", "Exposure", "Smart exposure gain that prioritizes visible effect movement."],
+  ["isolateGroupedPixels", "Isolate Grouped Pixels", "Groups similar color, shadow, depth, range, shade, and size into more uniform rendered shapes."]
+].map(([id, title, description]) => ({
+  id,
+  title,
+  description,
+  controls: SMART_SIGNAL_PROCESSOR_SLIDERS.map(([suffix, label, min, max, unit, initial]) => [
+    smartSignalControlKey(id, suffix),
+    label,
+    min,
+    max,
+    unit,
+    initial
+  ])
+}));
+
+const SMART_SIGNAL_ADJUSTMENTS = SMART_SIGNAL_PROCESSORS.flatMap((processor) => processor.controls);
+const DEFAULT_SMART_SIGNAL_TOGGLES = Object.fromEntries(SMART_SIGNAL_PROCESSORS.map((processor) => [processor.id, false]));
+
 const EXTRA_ADJUSTMENTS = [
   ["gamma", "Gamma", -100, 100, "", 0],
   ["shadows", "Shadows", -100, 100, "", 0],
@@ -483,6 +506,7 @@ const DEFAULT_SETTINGS = {
   invert: 0,
   ...Object.fromEntries(INVERSION_ADJUSTMENTS.map(([key, , , , , initial = 0]) => [key, initial])),
   ...Object.fromEntries(SMART_DARK_EDGE_ADJUSTMENTS.map(([key, , , , , initial = 0]) => [key, initial])),
+  ...Object.fromEntries(SMART_SIGNAL_ADJUSTMENTS.map(([key, , , , , initial = 0]) => [key, initial])),
   ...Object.fromEntries(ADVANCED_ADJUSTMENTS.map(([key, , , , , initial = 0]) => [key, initial])),
   ...Object.fromEntries(
     RGBW_MIXERS.flatMap((group) =>
@@ -494,6 +518,7 @@ const DEFAULT_SETTINGS = {
 const STACKED_SETTING_KEYS = new Set([
   ...INVERSION_ADJUSTMENTS.map(([key]) => key),
   ...SMART_DARK_EDGE_ADJUSTMENTS.map(([key]) => key),
+  ...SMART_SIGNAL_ADJUSTMENTS.map(([key]) => key),
   ...RGBW_MIXERS.flatMap((group) => RGBW_CHANNELS.map((channel) => `${group.key}${channel.key}`))
 ]);
 
@@ -527,6 +552,14 @@ const ADJUSTMENT_GROUPS = [
     type: "smart-dark-edge",
     controls: SMART_DARK_EDGE_ADJUSTMENTS
   },
+  ...SMART_SIGNAL_PROCESSORS.map((processor) => ({
+    id: `smart-signal-${processor.id}`,
+    title: `Smart ${processor.title}`,
+    description: processor.description,
+    type: "smart-signal",
+    processor,
+    controls: processor.controls
+  })),
   {
     id: "tone",
     title: "Tone Curve & Exposure",
@@ -668,7 +701,7 @@ const ADJUSTMENT_GROUPS = [
 ];
 
 const ADJUSTMENT_LOOKUP = new Map(
-  [...CORE_ADJUSTMENTS, ...FINISH_ADJUSTMENTS, ...INVERSION_ADJUSTMENTS, ...SMART_DARK_EDGE_ADJUSTMENTS, ...ADVANCED_ADJUSTMENTS].map((control) => [
+  [...CORE_ADJUSTMENTS, ...FINISH_ADJUSTMENTS, ...INVERSION_ADJUSTMENTS, ...SMART_DARK_EDGE_ADJUSTMENTS, ...SMART_SIGNAL_ADJUSTMENTS, ...ADVANCED_ADJUSTMENTS].map((control) => [
     control[0],
     control
   ])
@@ -1123,7 +1156,8 @@ const EQUATION_MUTATION_KEYS = [
   "blueInvert",
   "shadowInvert",
   "highlightInvert",
-  ...SMART_DARK_EDGE_ADJUSTMENTS.map(([key]) => key)
+  ...SMART_DARK_EDGE_ADJUSTMENTS.map(([key]) => key),
+  ...SMART_SIGNAL_ADJUSTMENTS.map(([key]) => key)
 ];
 const EQUATION_STYLE_CATEGORY_KEYS = new Map([
   ["Clean Studio", ["ambientLift", "highlightRecovery", "whiteBalance", "skinSmooth"]],
@@ -1141,10 +1175,25 @@ const EQUATION_STYLE_CATEGORY_KEYS = new Map([
   ["XLS Camera", ["thermalBlend", "thermalContour", "heatEdge", "xrayGhost", "nearIrBoost", "ultravioletWash", "infraredWash"]],
   ["Exposure Tools", ["exposure", "highlightRecovery", "ambientLift", "shadowDepth", "localContrast"]],
   ["Color Lab", ["hue", "tint", "vibrance", "colorSeparation", "colorHarmony", "colorizeStrength"]],
-  ["Detail, Texture & Noise", ["clarity", "dehaze", "edgeEnhance", "localContrast", "darkEdgeAmount", "darkEdgeDetailAmplify", "darkEdgeContrast"]]
+  ["Detail, Texture & Noise", ["clarity", "dehaze", "edgeEnhance", "localContrast", "darkEdgeAmount", "darkEdgeDetailAmplify", "darkEdgeContrast"]],
+  ["Smart Signal Engines", SMART_SIGNAL_ADJUSTMENTS.map(([key]) => key)]
 ]);
 const EQUATION_CORE_STYLE_KEYS = ["brightness", "contrast", "exposure", "saturation", "hue", "temperature", "tint", "glow"];
 const EQUATION_THERMAL_RESET_KEYS = ["thermalBlend", "thermalContour", "heatEdge", "thermalInvert"];
+
+function smartSignalControlKey(processorId, suffix) {
+  const normalizedId = String(processorId || "")
+    .replace(/[^a-z0-9]+/gi, " ")
+    .trim()
+    .split(/\s+/)
+    .map((part, index) => (index === 0 ? part.toLowerCase() : `${part.charAt(0).toUpperCase()}${part.slice(1)}`))
+    .join("");
+  return `smart${normalizedId.charAt(0).toUpperCase()}${normalizedId.slice(1)}${suffix}`;
+}
+
+function normalizeSmartSignalToggles(value = {}) {
+  return Object.fromEntries(SMART_SIGNAL_PROCESSORS.map((processor) => [processor.id, Boolean(value?.[processor.id])]));
+}
 
 function createEquationModel(value, baseEffect = CAMERA_EFFECTS[0], baseSettings = DEFAULT_SETTINGS, runId = 0, targetKey = "X", styleEffect = baseEffect) {
   const X = String(value || "").trim() || EQUATION_DEFAULT_VALUE;
@@ -1440,8 +1489,8 @@ function CameraStudio() {
     selectedEffect: CAMERA_EFFECTS[0],
     manualSettings: CAMERA_EFFECTS[0].settings,
     cameraFacing: "user",
-    smartFaceWeighting: { foreground: false, background: false, wolf: false },
-    smartDarkEdgeEnabled: false
+    smartDarkEdgeEnabled: false,
+    smartSignalEnabled: DEFAULT_SMART_SIGNAL_TOGGLES
   });
   const [authorized, setAuthorized] = useState(() => window.sessionStorage.getItem(STUDIO_UNLOCK_KEY) === "true");
   const [accessCode, setAccessCode] = useState("");
@@ -1460,18 +1509,14 @@ function CameraStudio() {
   const [primeResultsWindowOpen, setPrimeResultsWindowOpen] = useState(false);
   const [selectedYoutubeVideoId, setSelectedYoutubeVideoId] = useState(YOUTUBE_RECENT_UPLOADS[0]?.id || "");
   const [selectedPrimeResultId, setSelectedPrimeResultId] = useState(FEATURED_PRIME_RESULT_ID);
-  const [torchActive, setTorchActive] = useState(false);
-  const [torchSupported, setTorchSupported] = useState(false);
-  const [torchLevel, setTorchLevel] = useState(DEFAULT_TORCH_LEVEL);
-  const [torchLevelReflected, setTorchLevelReflected] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("All Presets");
   const [search, setSearch] = useState("");
   const [selectedEffectId, setSelectedEffectId] = useState(CAMERA_EFFECTS[0].id);
   const [manualSettings, setManualSettings] = useState(CAMERA_EFFECTS[0].settings);
   const [liveAdjustmentsEnabled, setLiveAdjustmentsEnabled] = useState(true);
   const [overlayAdjustmentsEnabled, setOverlayAdjustmentsEnabled] = useState(true);
-  const [smartFaceWeighting, setSmartFaceWeighting] = useState({ foreground: false, background: false, wolf: false });
   const [smartDarkEdgeEnabled, setSmartDarkEdgeEnabled] = useState(false);
+  const [smartSignalEnabled, setSmartSignalEnabled] = useState(DEFAULT_SMART_SIGNAL_TOGGLES);
   const [openAdjustmentGroups, setOpenAdjustmentGroups] = useState(() => new Set(ADJUSTMENT_GROUPS.filter((group) => group.open).map((group) => group.id)));
   const [snapshotUrl, setSnapshotUrl] = useState("");
   const [cameraHudVisible, setCameraHudVisible] = useState(false);
@@ -1559,8 +1604,15 @@ function CameraStudio() {
 
   useEffect(() => {
     renderVersionRef.current += 1;
-    renderStateRef.current = { filterCss, selectedEffect: liveSelectedEffect, manualSettings: liveManualSettings, cameraFacing, smartFaceWeighting, smartDarkEdgeEnabled };
-  }, [cameraFacing, filterCss, liveManualSettings, liveSelectedEffect, smartDarkEdgeEnabled, smartFaceWeighting]);
+    renderStateRef.current = {
+      filterCss,
+      selectedEffect: liveSelectedEffect,
+      manualSettings: liveManualSettings,
+      cameraFacing,
+      smartDarkEdgeEnabled,
+      smartSignalEnabled: normalizeSmartSignalToggles(smartSignalEnabled)
+    };
+  }, [cameraFacing, filterCss, liveManualSettings, liveSelectedEffect, smartDarkEdgeEnabled, smartSignalEnabled]);
 
   useEffect(() => {
     cameraFeedPausedRef.current = cameraFeedPaused;
@@ -1591,7 +1643,7 @@ function CameraStudio() {
         const pausedAndUnchanged = cameraFeedPausedRef.current && renderVersion === lastPausedVersion;
         const frameInterval = cameraHudVisible
           ? CAMERA_HUD_FRAME_INTERVAL_MS
-          : cameraFrameInterval(renderState.manualSettings, renderState.selectedEffect, renderState.smartDarkEdgeEnabled);
+          : cameraFrameInterval(renderState.manualSettings, renderState.selectedEffect, renderState.smartDarkEdgeEnabled, renderState.smartSignalEnabled);
         if (!pausedAndUnchanged && (!lastDraw || timestamp - lastDraw > frameInterval)) {
           const cameraLabel = cameraFeedPausedRef.current ? "Paused still frame" : "Local camera stream";
           drawCameraOutputCanvas(previewCanvasRef.current, cameraFrameRef.current, source, renderState, {
@@ -1641,8 +1693,8 @@ function CameraStudio() {
           selectedEffectId,
           manualSettings: mediaManualSettings,
           overlayAdjustmentsEnabled,
-          smartFaceWeighting,
-          smartDarkEdgeEnabled
+          smartDarkEdgeEnabled,
+          smartSignalEnabled: normalizeSmartSignalToggles(smartSignalEnabled)
         });
         lastDraw = timestamp;
       }
@@ -1655,7 +1707,7 @@ function CameraStudio() {
         mediaCompositeFrameRef.current = 0;
       }
     };
-  }, [mediaFilterCss, mediaManualSettings, mediaLayers, mediaSelectedEffect, overlayAdjustmentsEnabled, selectedEffectId, smartDarkEdgeEnabled, smartFaceWeighting]);
+  }, [mediaFilterCss, mediaManualSettings, mediaLayers, mediaSelectedEffect, overlayAdjustmentsEnabled, selectedEffectId, smartDarkEdgeEnabled, smartSignalEnabled]);
 
   useEffect(() => {
     const frame = cameraFrameRef.current;
@@ -1698,17 +1750,6 @@ function CameraStudio() {
     }
   }, [cameraActive, cameraHudVisible, cameraFacing]);
 
-  const updateTorchCapability = useCallback((stream) => {
-    const videoTrack = stream?.getVideoTracks?.()[0];
-    const capabilities = videoTrack?.getCapabilities?.() || {};
-    const settings = videoTrack?.getSettings?.() || {};
-    const supported = Boolean(capabilities.torch);
-    setTorchSupported(supported);
-    setTorchLevelReflected(supported && typeof settings.torchLevel === "number");
-    setTorchActive(false);
-    return supported;
-  }, []);
-
   const attachCameraStream = useCallback(async (stream, nextFacing = cameraFacing) => {
     streamRef.current = stream;
     if (videoRef.current) {
@@ -1719,11 +1760,10 @@ function CameraStudio() {
       hudVideoRef.current.srcObject = stream;
       await Promise.resolve(hudVideoRef.current.play()).catch(() => undefined);
     }
-    updateTorchCapability(stream);
     setCameraFacing(nextFacing);
     setCameraActive(true);
     setCameraStatus("Camera active. The video is local to this device and is not uploaded.");
-  }, [cameraFacing, updateTorchCapability]);
+  }, [cameraFacing]);
 
   const addCaptureToShelf = useCallback((capture) => {
     setCaptureShelf((current) => {
@@ -1756,9 +1796,6 @@ function CameraStudio() {
     if (hudVideoRef.current) hudVideoRef.current.srcObject = null;
     pausedFrameCanvasRef.current = null;
     cameraFeedPausedRef.current = false;
-    setTorchActive(false);
-    setTorchSupported(false);
-    setTorchLevelReflected(false);
     setCameraFeedPaused(false);
     setCameraActive(false);
   }, []);
@@ -1796,116 +1833,6 @@ function CameraStudio() {
       setCameraStatus(`Camera flip failed: ${error.message || error}`);
     }
   }, [attachCameraStream, cameraFacing, stopCamera]);
-
-  const ensureRearCameraStreamForTorch = useCallback(async () => {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      throw new Error("Flashlight access is not supported in this browser.");
-    }
-    let stream = streamRef.current;
-    if (!stream || cameraFacing !== "environment") {
-      stopCamera();
-      setCameraStatus("Requesting rear camera for flashlight access...");
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } } });
-      await attachCameraStream(stream, "environment");
-    }
-    return stream;
-  }, [attachCameraStream, cameraFacing, stopCamera]);
-
-  const applyTorchConstraint = useCallback(async (videoTrack, nextTorchActive, requestedLevel) => {
-    if (!videoTrack?.applyConstraints) {
-      throw new Error("This browser does not expose camera track constraints.");
-    }
-    const normalizedLevel = normalizeTorchLevel(requestedLevel);
-    if (!nextTorchActive) {
-      await videoTrack.applyConstraints({ advanced: [{ torch: false }] });
-      return { normalizedLevel, reflectedLevel: false, usedLevelConstraint: false };
-    }
-
-    try {
-      await videoTrack.applyConstraints({
-        advanced: [{ torch: true, torchLevel: torchLevelRatio(normalizedLevel) }]
-      });
-    } catch (error) {
-      await videoTrack.applyConstraints({ advanced: [{ torch: true }] });
-      return { normalizedLevel, reflectedLevel: false, usedLevelConstraint: false, fallbackError: error };
-    }
-
-    const settings = videoTrack.getSettings?.() || {};
-    return {
-      normalizedLevel,
-      reflectedLevel: typeof settings.torchLevel === "number",
-      usedLevelConstraint: true
-    };
-  }, []);
-
-  const setTorchBrightnessLevel = useCallback(async (value) => {
-    const normalizedLevel = normalizeTorchLevel(value);
-    setTorchLevel(normalizedLevel);
-    if (!torchActive) {
-      setCameraStatus(`Flashlight brightness level ${normalizedLevel}/${TORCH_LEVEL_COUNT} selected. Turn on Rear Flashlight to apply it.`);
-      return;
-    }
-    try {
-      const stream = streamRef.current;
-      const videoTrack = stream?.getVideoTracks?.()[0];
-      const capabilities = videoTrack?.getCapabilities?.() || {};
-      if (!capabilities.torch) {
-        setTorchSupported(false);
-        setTorchActive(false);
-        setTorchLevelReflected(false);
-        setCameraStatus("This active camera stream does not expose flashlight control.");
-        return;
-      }
-      const result = await applyTorchConstraint(videoTrack, true, normalizedLevel);
-      setTorchSupported(true);
-      setTorchActive(true);
-      setTorchLevelReflected(result.reflectedLevel);
-      setCameraStatus(
-        result.reflectedLevel
-          ? `Rear flashlight brightness applied at ${normalizedLevel}/${TORCH_LEVEL_COUNT}.`
-          : `Rear flashlight is on. Requested brightness ${normalizedLevel}/${TORCH_LEVEL_COUNT}; this browser may expose only on/off torch control.`
-      );
-    } catch (error) {
-      setCameraStatus(`Flashlight brightness update failed: ${error.message || error}`);
-    }
-  }, [applyTorchConstraint, torchActive]);
-
-  const toggleTorch = useCallback(async () => {
-    try {
-      if (torchActive) {
-        const videoTrack = streamRef.current?.getVideoTracks?.()[0];
-        if (videoTrack) await applyTorchConstraint(videoTrack, false, torchLevel);
-        setTorchActive(false);
-        setTorchLevelReflected(false);
-        setCameraStatus("Rear camera flashlight is off.");
-        return;
-      }
-
-      const stream = await ensureRearCameraStreamForTorch();
-      const videoTrack = stream.getVideoTracks()[0];
-      const capabilities = videoTrack?.getCapabilities?.() || {};
-      if (!capabilities.torch) {
-        setTorchSupported(false);
-        setTorchActive(false);
-        setTorchLevelReflected(false);
-        setCameraStatus("This device/browser does not expose rear-camera flashlight control for this stream.");
-        return;
-      }
-      const result = await applyTorchConstraint(videoTrack, true, torchLevel);
-      setTorchSupported(true);
-      setTorchActive(true);
-      setTorchLevelReflected(result.reflectedLevel);
-      setCameraStatus(
-        result.reflectedLevel
-          ? `Rear flashlight is on at brightness ${result.normalizedLevel}/${TORCH_LEVEL_COUNT}. Stream remains local to this device.`
-          : `Rear flashlight is on. Requested brightness ${result.normalizedLevel}/${TORCH_LEVEL_COUNT}; this browser may expose only on/off torch control.`
-      );
-    } catch (error) {
-      setTorchActive(false);
-      setTorchLevelReflected(false);
-      setCameraStatus(`Flashlight toggle failed: ${error.message || error}`);
-    }
-  }, [applyTorchConstraint, ensureRearCameraStreamForTorch, torchActive, torchLevel]);
 
   function currentCameraRenderSource() {
     return cameraFeedPausedRef.current && pausedFrameCanvasRef.current ? pausedFrameCanvasRef.current : videoRef.current;
@@ -2132,9 +2059,8 @@ function CameraStudio() {
     setEquationMediaEnabled(false);
     setLiveAdjustmentsEnabled(true);
     setOverlayAdjustmentsEnabled(true);
-    setSmartFaceWeighting({ foreground: false, background: false, wolf: false });
     setSmartDarkEdgeEnabled(false);
-    setTorchLevel(DEFAULT_TORCH_LEVEL);
+    setSmartSignalEnabled(DEFAULT_SMART_SIGNAL_TOGGLES);
   }
 
   function updateEquationStyle(nextStyleId) {
@@ -2264,8 +2190,8 @@ function CameraStudio() {
       selectedEffectId,
       manualSettings: mediaManualSettings,
       overlayAdjustmentsEnabled,
-      smartFaceWeighting,
-      smartDarkEdgeEnabled
+      smartDarkEdgeEnabled,
+      smartSignalEnabled: normalizeSmartSignalToggles(smartSignalEnabled)
     });
     if (!canvas?.width || !canvas?.height) {
       setMediaComposerStatus("Composite export failed because the canvas is not ready yet.");
@@ -2310,8 +2236,8 @@ function CameraStudio() {
       selectedEffect: liveSelectedEffect,
       manualSettings: liveManualSettings,
       cameraFacing,
-      smartFaceWeighting,
-      smartDarkEdgeEnabled
+      smartDarkEdgeEnabled,
+      smartSignalEnabled: normalizeSmartSignalToggles(smartSignalEnabled)
     };
     const cameraLabel = cameraFeedPausedRef.current ? "Paused still frame" : "Local camera stream";
     const drawn = drawCameraOutputCanvas(previewCanvasRef.current, cameraFrameRef.current, source, renderState, {
@@ -2343,8 +2269,8 @@ function CameraStudio() {
       selectedEffect: liveSelectedEffect,
       manualSettings: liveManualSettings,
       cameraFacing,
-      smartFaceWeighting,
-      smartDarkEdgeEnabled
+      smartDarkEdgeEnabled,
+      smartSignalEnabled: normalizeSmartSignalToggles(smartSignalEnabled)
     };
     const canvas = document.createElement("canvas");
     const drawn = drawCameraOutputCanvas(canvas, cameraFrameRef.current, source, renderState, {
@@ -2580,6 +2506,8 @@ function CameraStudio() {
             ? renderRgbwMixerGroup()
             : group.type === "smart-dark-edge"
               ? renderSmartDarkEdgeGroup(group)
+              : group.type === "smart-signal"
+                ? renderSmartSignalGroup(group)
               : (
                 <div className="adjustment-list">
                   {group.controls.map((controlKey) =>
@@ -2591,6 +2519,39 @@ function CameraStudio() {
                 </div>
               ))}
       </details>
+    );
+  }
+
+  function renderSmartSignalGroup(group) {
+    const processor = group.processor;
+    const enabled = Boolean(smartSignalEnabled[processor.id]);
+    return (
+      <div className="smart-dark-edge-group smart-signal-group">
+        <button
+          type="button"
+          className={enabled ? "adjustment-scope-toggle active" : "adjustment-scope-toggle"}
+          aria-pressed={enabled}
+          onClick={() =>
+            setSmartSignalEnabled((current) => ({
+              ...normalizeSmartSignalToggles(current),
+              [processor.id]: !current?.[processor.id]
+            }))
+          }
+        >
+          <ShieldCheck size={15} />
+          <span>
+            <strong>Smart {processor.title}</strong>
+            <small>
+              {enabled
+                ? "Active on live camera, HUD, snapshots, recordings, and overlay exports."
+                : "Off: this smart signal pass is bypassed while slider values remain ready."}
+            </small>
+          </span>
+        </button>
+        <div className="adjustment-list smart-dark-edge-list">
+          {processor.controls.map((control) => renderAdjustmentSlider(control, "smart-dark-edge-adjustment smart-signal-adjustment"))}
+        </div>
+      </div>
     );
   }
 
@@ -2777,15 +2738,9 @@ function CameraStudio() {
             download or share them yourself.
           </p>
           <p>
-            Biometric facial mapping disclaimer: the smart face tools are not identity identification, person matching, face login, biometric
-            enrollment, or biometric storage. As implemented here, I cannot and should not create a stored biometric identity system for this
-            browser-only studio. The feature only analyzes the current frame locally for experimental facial-region geometry, symmetry, edge
-            density, oval/eye/muzzle-like structure, and tonal depth so visual effects can be weighted differently.
-          </p>
-          <p>
-            Foreground mapping is an experimental near/center face-region weighting pass. Background mapping is experimental wolf facial
-            mapping inspired by a wolf-face mesh structure, using invisible background field cues and face-like geometry to rebalance effects.
-            Both toggles are for visual feature experimentation only, and turning both off returns the effect pipeline to the standard behavior.
+            Smart signal controls are experimental local image-processing tools only. They do not identify people, match identities, store
+            biometrics, or compare faces. They analyze the current frame for visible tone, edge, depth, range, midtone, highlight, shadow,
+            structure, and grouped-pixel signals so visual effects can be weighted more strongly inside this browser.
           </p>
           <p>
             Camera permission is controlled by your browser and operating system. You can stop the stream with Stop Camera or revoke site
@@ -2830,7 +2785,7 @@ function CameraStudio() {
           <ul>
             <li>{CAMERA_EFFECTS.length} local visual presets for IR-style, UVA-style, full-spectrum thermal, XLS, cinematic, monochrome, duotone, retro, and color-lab looks.</li>
             <li>Four RGBW gradient mixers for Main, Secondary, Third, and Highlights color layers that drive overlays, filter math, and the selected app accent aesthetic.</li>
-            <li>Grouped adjustment dropdowns with 12 core photo controls, 10 color inversion tools, 10 smart darker-edge controls, 100 advanced sliders, equation-generated filter names/descriptions, live/overlay adjustment toggles, and optional non-identifying local smart face/wolf-region weighting.</li>
+            <li>Grouped adjustment dropdowns with 12 core photo controls, 10 color inversion tools, 10 smart darker-edge controls, 15 smart signal engines with 10 sliders each, 100 advanced sliders, equation-generated filter names/descriptions, and live/overlay adjustment toggles.</li>
             <li>Processed PNG snapshots and 1080P or 2K MP4 recordings with local camera effects applied.</li>
             <li>Separate 1-3 layer image/video compositor with opacity, splice masks, blend modes, transforms, full adjustment-stack support, and clean PNG export.</li>
             <li>Clean exports hide app-added preview chrome, labels, and watermark overlays so only the processed image or video remains.</li>
@@ -2926,10 +2881,6 @@ function CameraStudio() {
               <FlipHorizontal size={18} />
               Flip Camera
             </button>
-            <button type="button" className={torchActive ? "studio-torch active" : "studio-torch"} onClick={toggleTorch}>
-              <Zap size={18} />
-              {torchActive ? "Flashlight On" : "Rear Flashlight"}
-            </button>
             <button type="button" className="studio-snapshot" onClick={captureSnapshot} disabled={!cameraActive}>
               <Download size={19} />
               Snapshot
@@ -2939,48 +2890,6 @@ function CameraStudio() {
               Reset
             </button>
           </div>
-
-          <section className={torchActive ? "torch-brightness-panel active" : "torch-brightness-panel"} aria-label="Rear flashlight brightness control">
-            <div className="torch-brightness-heading">
-              <span>
-                <Zap size={15} />
-                <strong>Torch Brightness</strong>
-              </span>
-              <output>{torchLevel}/{TORCH_LEVEL_COUNT}</output>
-            </div>
-            <div className="torch-level-grid" role="group" aria-label="Ten flashlight brightness levels">
-              {Array.from({ length: TORCH_LEVEL_COUNT }, (_, index) => {
-                const level = index + 1;
-                const selected = level <= torchLevel;
-                return (
-                  <button
-                    key={level}
-                    type="button"
-                    className={selected ? "torch-level-button active" : "torch-level-button"}
-                    aria-pressed={level === torchLevel}
-                    aria-label={`Set flashlight brightness level ${level} of ${TORCH_LEVEL_COUNT}`}
-                    onClick={() => setTorchBrightnessLevel(level)}
-                  >
-                    <span>{level}</span>
-                  </button>
-                );
-              })}
-            </div>
-            <input
-              type="range"
-              min="1"
-              max={TORCH_LEVEL_COUNT}
-              step="1"
-              value={torchLevel}
-              aria-label="Flashlight brightness level"
-              onChange={(event) => setTorchBrightnessLevel(event.target.value)}
-            />
-            <p>
-              {torchLevelReflected
-                ? "This active stream reports level-aware torch settings."
-                : "Level is requested through camera constraints; some mobile browsers expose only on/off flashlight control."}
-            </p>
-          </section>
 
           {renderEquationEnginePanel()}
 
@@ -3020,9 +2929,6 @@ function CameraStudio() {
           </section>
 
           <p className="studio-status">{cameraStatus}</p>
-          {cameraActive && cameraFacing === "environment" && !torchSupported && (
-            <p className="studio-status torch-note">Flashlight control appears unsupported for the current rear-camera stream.</p>
-          )}
           {snapshotUrl && (
             <a className="snapshot-review" href={snapshotUrl} target="_blank" rel="noreferrer">
               Open last local snapshot
@@ -3167,58 +3073,6 @@ function CameraStudio() {
                 <small>{overlayAdjustmentsEnabled ? "Uploaded image/video layers use the full adjustment stack." : "Uploaded layers use their selected preset only."}</small>
               </span>
             </button>
-          </div>
-          <div className="smart-face-panel" aria-label="Smart face-region weighting">
-            <div>
-              <strong>Local Smart Face Weighting</strong>
-              <small>
-                Invisible face-like region masks rebalance every effect locally from the current frame. No identity matching, storage, or upload.
-              </small>
-            </div>
-            <p className="smart-face-disclaimer">
-              Disclaimer: this is not biometric identification, person matching, face login, or biometric storage. It only uses local
-              frame geometry such as symmetry, edges, oval/eye/muzzle-like regions, and tonal depth. Foreground mapping targets near face-like
-              regions; background mapping is experimental wolf facial mapping for effect-weight experimentation. Smart wolf recognition adds
-              invisible paired-ear, eye-symmetry, muzzle/snout, ridge, contour-edge, and depth-field cues for stronger local effect weighting.
-            </p>
-            <div className="smart-face-toggle-grid">
-              <button
-                type="button"
-                className={smartFaceWeighting.foreground ? "adjustment-scope-toggle active" : "adjustment-scope-toggle"}
-                aria-pressed={smartFaceWeighting.foreground}
-                onClick={() => setSmartFaceWeighting((current) => ({ ...current, foreground: !current.foreground }))}
-              >
-                <Camera size={15} />
-                <span>
-                  <strong>{SMART_FACE_FOREGROUND_LABEL}</strong>
-                  <small>{smartFaceWeighting.foreground ? "Center/near face-like regions drive stronger effect weighting." : "Off: foreground is unchanged."}</small>
-                </span>
-              </button>
-              <button
-                type="button"
-                className={smartFaceWeighting.background ? "adjustment-scope-toggle active" : "adjustment-scope-toggle"}
-                aria-pressed={smartFaceWeighting.background}
-                onClick={() => setSmartFaceWeighting((current) => ({ ...current, background: !current.background }))}
-              >
-                <Sparkles size={15} />
-                <span>
-                  <strong>{SMART_FACE_BACKGROUND_LABEL}</strong>
-                  <small>{smartFaceWeighting.background ? "Background face-like patterns and inverse field depth are weighted." : "Off: background is unchanged."}</small>
-                </span>
-              </button>
-              <button
-                type="button"
-                className={smartFaceWeighting.wolf ? "adjustment-scope-toggle active" : "adjustment-scope-toggle"}
-                aria-pressed={smartFaceWeighting.wolf}
-                onClick={() => setSmartFaceWeighting((current) => ({ ...current, wolf: !current.wolf }))}
-              >
-                <ShieldCheck size={15} />
-                <span>
-                  <strong>{SMART_WOLF_RECOGNITION_LABEL}</strong>
-                  <small>{smartFaceWeighting.wolf ? "Wolf mesh cues drive stronger spectral weighting." : "Off: wolf mesh weighting is unchanged."}</small>
-                </span>
-              </button>
-            </div>
           </div>
           <div className="adjustment-dropdown-stack" aria-label="Grouped camera adjustments">
             {ADJUSTMENT_GROUPS.map(renderAdjustmentGroup)}
@@ -3583,8 +3437,8 @@ function drawMediaLayer(context, width, height, layer, renderState) {
     selectedEffect: layerEffect,
     manualSettings: layerSettings,
     cameraFacing: "environment",
-    smartFaceWeighting: renderState.smartFaceWeighting,
-    smartDarkEdgeEnabled: renderState.smartDarkEdgeEnabled
+    smartDarkEdgeEnabled: renderState.smartDarkEdgeEnabled,
+    smartSignalEnabled: normalizeSmartSignalToggles(renderState.smartSignalEnabled)
   }, {
     forcePixelFilters: false,
     includePreviewChrome: false,
@@ -3802,21 +3656,22 @@ function drawStudioFrame(context, width, height, mediaSource, renderState, optio
   }
   context.restore();
   if (!useCanvasFilter) applyCanvasPreviewFilters(context, width, height, previewFilterCss);
-  const recognitionSettings = buildInvisibleSmartRecognitionSettings(
+  const signalSettings = buildSmartSignalProcessorSettings(
     context,
     width,
     height,
     manualSettings,
     selectedEffect,
-    renderState.smartFaceWeighting,
+    renderState.smartSignalEnabled,
     options
   );
-  applyAdvancedCameraPixelEffects(context, width, height, recognitionSettings, selectedEffect, options);
-  applySmartDarkEdgeAmplifier(context, width, height, recognitionSettings, selectedEffect, renderState.smartDarkEdgeEnabled, options);
-  paintOverlay(context, width, height, selectedEffect, recognitionSettings);
-  paintSpecialOverlay(context, width, height, recognitionSettings, selectedEffect);
-  paintCanvasGrain(context, width, height, recognitionSettings);
-  paintCanvasVignette(context, width, height, recognitionSettings);
+  applyAdvancedCameraPixelEffects(context, width, height, signalSettings, selectedEffect, options);
+  applySmartDarkEdgeAmplifier(context, width, height, signalSettings, selectedEffect, renderState.smartDarkEdgeEnabled, options);
+  applySmartSignalProcessorEffects(context, width, height, signalSettings, selectedEffect, renderState.smartSignalEnabled, options);
+  paintOverlay(context, width, height, selectedEffect, signalSettings);
+  paintSpecialOverlay(context, width, height, signalSettings, selectedEffect);
+  paintCanvasGrain(context, width, height, signalSettings);
+  paintCanvasVignette(context, width, height, signalSettings);
   if (options.includePreviewChrome) {
     paintPreviewChrome(context, width, height, {
       scale: options.pixelScale || 1,
@@ -3898,8 +3753,8 @@ function applyCanvasPreviewFilters(context, width, height, filterCss) {
   context.putImageData(frame, 0, 0);
 }
 
-function cameraFrameInterval(settings, effect, smartDarkEdgeEnabled = false) {
-  return hasAdvancedCameraPixelEffects(settings, effect, smartDarkEdgeEnabled) ? CAMERA_HEAVY_FRAME_INTERVAL_MS : CAMERA_LIGHT_FRAME_INTERVAL_MS;
+function cameraFrameInterval(settings, effect, smartDarkEdgeEnabled = false, smartSignalEnabled = {}) {
+  return hasAdvancedCameraPixelEffects(settings, effect, smartDarkEdgeEnabled, smartSignalEnabled) ? CAMERA_HEAVY_FRAME_INTERVAL_MS : CAMERA_LIGHT_FRAME_INTERVAL_MS;
 }
 
 function advancedCameraPixelModel(settings, effect) {
@@ -3931,7 +3786,7 @@ function advancedCameraPixelModel(settings, effect) {
   };
 }
 
-function hasAdvancedCameraPixelEffects(settings, effect, smartDarkEdgeEnabled = false) {
+function hasAdvancedCameraPixelEffects(settings, effect, smartDarkEdgeEnabled = false, smartSignalEnabled = {}) {
   const model = advancedCameraPixelModel(settings, effect);
   return Boolean(
     model.thermalAmount ||
@@ -3940,7 +3795,8 @@ function hasAdvancedCameraPixelEffects(settings, effect, smartDarkEdgeEnabled = 
       model.pixelateAmount ||
       model.noiseReductionAmount ||
       model.colorBalanceAmount ||
-      smartDarkEdgeEnabled
+      smartDarkEdgeEnabled ||
+      hasEnabledSmartSignalProcessor(smartSignalEnabled)
   );
 }
 
@@ -4099,92 +3955,159 @@ function applyAdvancedCameraPixelEffectsToContext(context, width, height, settin
   context.putImageData(frame, 0, 0);
 }
 
-function buildInvisibleSmartRecognitionSettings(context, width, height, settings, effect, weighting = {}, options = {}) {
-  const foregroundEnabled = Boolean(weighting?.foreground);
-  const backgroundEnabled = Boolean(weighting?.background);
-  const wolfEnabled = Boolean(weighting?.wolf);
-  if (!foregroundEnabled && !backgroundEnabled && !wolfEnabled) return settings;
-  const signals = measureInvisibleSmartRecognitionSignals(context, width, height, weighting, options);
-  const totalSignal = signals.foreground + signals.background + signals.wolf;
-  if (totalSignal <= 0.01) return settings;
-
-  const model = advancedCameraPixelModel(settings, effect);
-  const energy = smartFaceEffectEnergy(settings, effect, model);
+function buildSmartSignalProcessorSettings(context, width, height, settings, effect, smartSignalEnabled = {}, options = {}) {
+  const enabled = normalizeSmartSignalToggles(smartSignalEnabled);
+  if (!hasEnabledSmartSignalProcessor(enabled)) return settings;
+  const frameSignals = measureSmartSignalFrame(context, width, height, options);
   const next = { ...settings };
   const thermalLike = isThermalRenderMode(settings, effect);
-  const recognitionGain = clamp((signals.foreground * 0.6 + signals.background * 0.48 + signals.wolf * 0.76) * energy, 0, 1.18);
 
   const addSetting = (key, amount) => {
     const range = settingRange(key);
     next[key] = Math.round(clamp(setting(next, key, DEFAULT_SETTINGS[key] ?? 0) + amount, range.min, range.max));
   };
 
-  if (foregroundEnabled) {
-    addSetting("contrast", signals.foreground * 7 * recognitionGain);
-    addSetting("saturation", signals.foreground * 8 * recognitionGain);
-    addSetting("clarity", signals.foreground * 10 * recognitionGain);
-    addSetting("localContrast", signals.foreground * 8 * recognitionGain);
-    addSetting("detailBoost", signals.foreground * 7 * recognitionGain);
-  }
-
-  if (backgroundEnabled) {
-    addSetting("dehaze", signals.background * 10 * recognitionGain);
-    addSetting("shadowDepth", signals.background * 8 * recognitionGain);
-    addSetting("thermalContour", signals.background * (thermalLike ? 10 : 5) * recognitionGain);
-    addSetting("colorSeparation", signals.background * 6 * recognitionGain);
-  }
-
-  if (wolfEnabled) {
-    addSetting("edgeEnhance", signals.wolf * 14 * recognitionGain);
-    addSetting("heatEdge", signals.wolf * (thermalLike ? 14 : 8) * recognitionGain);
-    addSetting("thermalContour", signals.wolf * (thermalLike ? 16 : 7) * recognitionGain);
-    addSetting("shadowCrush", signals.wolf * 7 * recognitionGain);
-    addSetting("localContrast", signals.wolf * 11 * recognitionGain);
-    addSetting("detailBoost", signals.wolf * 9 * recognitionGain);
-  }
+  SMART_SIGNAL_PROCESSORS.forEach((processor) => {
+    if (!enabled[processor.id]) return;
+    const strength = smartSignalProcessorStrength(settings, processor) * (0.82 + frameSignals.contrast * 0.28 + frameSignals.edge * 0.22);
+    const thermalBoost = thermalLike ? 1.28 : 0.82;
+    if (processor.id === "depth") {
+      addSetting("shadowDepth", 18 * strength);
+      addSetting("localContrast", 14 * strength);
+      addSetting("negativeDepth", 10 * strength);
+      addSetting("thermalContour", 8 * strength * thermalBoost);
+    } else if (processor.id === "field") {
+      addSetting("lightWrap", 12 * strength);
+      addSetting("auraBloom", 10 * strength);
+      addSetting("vignette", 6 * strength);
+      addSetting("colorSeparation", 7 * strength);
+    } else if (processor.id === "range") {
+      addSetting("hdrRange", 18 * strength);
+      addSetting("highlightRecovery", 15 * strength);
+      addSetting("shadows", -10 * strength);
+      addSetting("whites", 8 * strength);
+    } else if (processor.id === "metricMapping") {
+      addSetting("posterize", 12 * strength);
+      addSetting("thermalContour", 14 * strength * thermalBoost);
+      addSetting("edgeEnhance", 10 * strength);
+      addSetting("colorSeparation", 9 * strength);
+    } else if (processor.id === "weight") {
+      addSetting("contrast", 12 * strength);
+      addSetting("saturation", 10 * strength);
+      addSetting("vibrance", 12 * strength);
+      addSetting("blackPoint", -8 * strength);
+    } else if (processor.id === "details") {
+      addSetting("detailBoost", 16 * strength);
+      addSetting("fineSharpen", 14 * strength);
+      addSetting("clarity", 13 * strength);
+      addSetting("texture", 11 * strength);
+    } else if (processor.id === "midtones") {
+      addSetting("midtoneLift", 16 * strength);
+      addSetting("midtoneContrast", 15 * strength);
+      addSetting("gamma", -9 * strength);
+      addSetting("ambientLift", 7 * strength);
+    } else if (processor.id === "invert") {
+      addSetting("spectralInvert", 16 * strength);
+      addSetting("lumaInvert", 12 * strength);
+      addSetting("channelInvert", 8 * strength);
+      addSetting("colorSeparation", 7 * strength);
+    } else if (processor.id === "structure") {
+      addSetting("structure", 18 * strength);
+      addSetting("edgeEnhance", 16 * strength);
+      addSetting("localContrast", 13 * strength);
+      addSetting("dehaze", 8 * strength);
+    } else if (processor.id === "blackpoint") {
+      addSetting("blackPoint", -18 * strength);
+      addSetting("blacks", -15 * strength);
+      addSetting("shadowCrush", 13 * strength);
+      addSetting("darkEdgeBlackClamp", 10 * strength);
+    } else if (processor.id === "whitepoint") {
+      addSetting("whitePoint", 16 * strength);
+      addSetting("whites", 14 * strength);
+      addSetting("highlightRecovery", 10 * strength);
+      addSetting("specularControl", -8 * strength);
+    } else if (processor.id === "lift") {
+      addSetting("ambientLift", 16 * strength);
+      addSetting("brightness", 6 * strength);
+      addSetting("shadows", 12 * strength);
+      addSetting("nearIrBoost", 7 * strength);
+    } else if (processor.id === "amplify") {
+      addSetting("contrast", 12 * strength);
+      addSetting("saturation", 14 * strength);
+      addSetting("glowStrength", 9 * strength);
+      addSetting("thermalBlend", 10 * strength * thermalBoost);
+    } else if (processor.id === "exposure") {
+      addSetting("exposure", 13 * strength);
+      addSetting("microExposure", 16 * strength);
+      addSetting("highlightRecovery", 9 * strength);
+      addSetting("hdrRange", 8 * strength);
+    } else if (processor.id === "isolateGroupedPixels") {
+      addSetting("posterize", 16 * strength);
+      addSetting("noiseReduction", 12 * strength);
+      addSetting("thermalContour", 10 * strength * thermalBoost);
+      addSetting("colorSeparation", 12 * strength);
+    }
+  });
 
   return next;
 }
 
-function measureInvisibleSmartRecognitionSignals(context, width, height, weighting = {}, options = {}) {
-  if (!context?.canvas || !width || !height) return { foreground: 0, background: 0, wolf: 0 };
-  const pixelBudget = Math.min(options.pixelBudget || SMART_FACE_PIXEL_BUDGET, SMART_FACE_PIXEL_BUDGET);
+function measureSmartSignalFrame(context, width, height, options = {}) {
+  if (!context?.canvas || !width || !height) return { mean: 0.5, contrast: 0.35, edge: 0.25, saturation: 0.35, dark: 0.35, bright: 0.35 };
+  const pixelBudget = Math.min(options.pixelBudget || SMART_SIGNAL_PIXEL_BUDGET, SMART_SIGNAL_PIXEL_BUDGET);
   const scale = width * height > pixelBudget ? Math.sqrt(pixelBudget / (width * height)) : 1;
   const workWidth = Math.max(1, Math.round(width * scale));
   const workHeight = Math.max(1, Math.round(height * scale));
   let frame;
-
   try {
     if (scale < 1) {
-      smartFaceWorkCanvas ||= document.createElement("canvas");
-      if (smartFaceWorkCanvas.width !== workWidth) smartFaceWorkCanvas.width = workWidth;
-      if (smartFaceWorkCanvas.height !== workHeight) smartFaceWorkCanvas.height = workHeight;
-      const workContext = smartFaceWorkCanvas.getContext("2d", { alpha: false, willReadFrequently: true });
-      if (!workContext) return { foreground: 0, background: 0, wolf: 0 };
-      workContext.save();
-      workContext.imageSmoothingEnabled = true;
-      workContext.imageSmoothingQuality = "high";
-      workContext.clearRect(0, 0, workWidth, workHeight);
+      smartSignalWorkCanvas ||= document.createElement("canvas");
+      if (smartSignalWorkCanvas.width !== workWidth) smartSignalWorkCanvas.width = workWidth;
+      if (smartSignalWorkCanvas.height !== workHeight) smartSignalWorkCanvas.height = workHeight;
+      const workContext = smartSignalWorkCanvas.getContext("2d", { alpha: false, willReadFrequently: true });
+      if (!workContext) return { mean: 0.5, contrast: 0.35, edge: 0.25, saturation: 0.35, dark: 0.35, bright: 0.35 };
       workContext.drawImage(context.canvas, 0, 0, width, height, 0, 0, workWidth, workHeight);
-      workContext.restore();
       frame = workContext.getImageData(0, 0, workWidth, workHeight);
     } else {
       frame = context.getImageData(0, 0, width, height);
     }
   } catch {
-    return { foreground: 0, background: 0, wolf: 0 };
+    return { mean: 0.5, contrast: 0.35, edge: 0.25, saturation: 0.35, dark: 0.35, bright: 0.35 };
   }
-
-  const analysis = buildSmartFaceAnalysis(frame.data, workWidth, workHeight);
-  const foregroundCandidate = weighting.foreground ? findSmartFaceCandidate(analysis, "foreground") : null;
-  const backgroundCandidate = weighting.background ? findSmartFaceCandidate(analysis, "background", foregroundCandidate) : null;
-  const wolfCandidate = weighting.wolf ? findSmartWolfCandidate(analysis, foregroundCandidate, backgroundCandidate) : null;
-  const ambientTexture = clamp(smartRegionAverage(analysis, { x: 0, y: 0, width: analysis.cols, height: analysis.rows }, "edges") * 1.7, 0, 1);
-
+  const data = frame.data;
+  let lumaTotal = 0;
+  let contrastTotal = 0;
+  let edgeTotal = 0;
+  let saturationTotal = 0;
+  let dark = 0;
+  let bright = 0;
+  const count = Math.max(1, workWidth * workHeight);
+  for (let index = 0; index < data.length; index += 4) {
+    const r = data[index] / 255;
+    const g = data[index + 1] / 255;
+    const b = data[index + 2] / 255;
+    const luma = r * 0.2126 + g * 0.7152 + b * 0.0722;
+    lumaTotal += luma;
+    contrastTotal += Math.abs(luma - 0.5) * 2;
+    saturationTotal += Math.max(r, g, b) - Math.min(r, g, b);
+    if (luma < 0.3) dark += 1;
+    if (luma > 0.72) bright += 1;
+    const pixel = index / 4;
+    const x = pixel % workWidth;
+    const y = Math.floor(pixel / workWidth);
+    const rightIndex = x < workWidth - 1 ? index + 4 : index;
+    const downIndex = y < workHeight - 1 ? index + workWidth * 4 : index;
+    const rightLuma = (data[rightIndex] * 0.2126 + data[rightIndex + 1] * 0.7152 + data[rightIndex + 2] * 0.0722) / 255;
+    const downLuma = (data[downIndex] * 0.2126 + data[downIndex + 1] * 0.7152 + data[downIndex + 2] * 0.0722) / 255;
+    edgeTotal += Math.abs(rightLuma - luma) + Math.abs(downLuma - luma);
+  }
   return {
-    foreground: weighting.foreground ? clamp((foregroundCandidate?.confidence || 0) * 0.92 + ambientTexture * 0.05, 0, 1) : 0,
-    background: weighting.background ? clamp((backgroundCandidate?.confidence || 0) * 0.86 + ambientTexture * 0.08, 0, 1) : 0,
-    wolf: weighting.wolf ? clamp((wolfCandidate?.confidence || 0) * 0.9 + ambientTexture * 0.1, 0, 1) : 0
+    mean: clamp(lumaTotal / count, 0, 1),
+    contrast: clamp(contrastTotal / count, 0, 1),
+    edge: clamp(edgeTotal / count * 4, 0, 1),
+    saturation: clamp(saturationTotal / count, 0, 1),
+    dark: clamp(dark / count, 0, 1),
+    bright: clamp(bright / count, 0, 1)
   };
 }
 
@@ -4192,7 +4115,7 @@ function applySmartDarkEdgeAmplifier(context, width, height, settings, effect, e
   if (!enabled || !context.canvas || !width || !height) return;
   const intensity = smartDarkEdgeSignal(settings, effect);
   if (intensity <= 0.01) return;
-  const pixelBudget = Math.min(options.pixelBudget || SMART_FACE_PIXEL_BUDGET, SMART_FACE_PIXEL_BUDGET);
+  const pixelBudget = Math.min(options.pixelBudget || SMART_SIGNAL_PIXEL_BUDGET, SMART_SIGNAL_PIXEL_BUDGET);
   if (width * height > pixelBudget) {
     const scale = Math.sqrt(pixelBudget / (width * height));
     const workWidth = Math.max(1, Math.round(width * scale));
@@ -4316,22 +4239,33 @@ function smartDarkEdgeSignal(settings = {}, effect = {}) {
   return clamp(sliderSignal * 1.15 + effectSignal + presetSignal, 0, 1.45);
 }
 
-function applySmartFaceWeighting(context, width, height, settings, effect, weighting = {}, options = {}) {
-  const foregroundEnabled = Boolean(weighting.foreground);
-  const backgroundEnabled = Boolean(weighting.background);
-  const wolfEnabled = Boolean(weighting.wolf);
-  if (!foregroundEnabled && !backgroundEnabled && !wolfEnabled) return;
-  if (!context.canvas || !width || !height) return;
+function hasEnabledSmartSignalProcessor(smartSignalEnabled = {}) {
+  return SMART_SIGNAL_PROCESSORS.some((processor) => Boolean(smartSignalEnabled?.[processor.id]));
+}
 
-  const pixelBudget = Math.min(options.pixelBudget || SMART_FACE_PIXEL_BUDGET, SMART_FACE_PIXEL_BUDGET);
+function smartSignalSetting(settings = {}, processor, suffix) {
+  return setting(settings, smartSignalControlKey(processor.id, suffix), DEFAULT_SETTINGS[smartSignalControlKey(processor.id, suffix)] ?? 0);
+}
+
+function smartSignalProcessorStrength(settings = {}, processor) {
+  const amount = smartSignalSetting(settings, processor, "Amount") / 100;
+  const sensitivity = smartSignalSetting(settings, processor, "Sensitivity") / 100;
+  const blend = smartSignalSetting(settings, processor, "Blend") / 100;
+  return clamp(amount * (0.62 + sensitivity * 0.72) * (0.42 + blend * 0.9) * 1.42, 0, 1.8);
+}
+
+function applySmartSignalProcessorEffects(context, width, height, settings, effect, smartSignalEnabled = {}, options = {}) {
+  const enabled = normalizeSmartSignalToggles(smartSignalEnabled);
+  if (!hasEnabledSmartSignalProcessor(enabled) || !context.canvas || !width || !height) return;
+  const pixelBudget = Math.min(options.pixelBudget || SMART_SIGNAL_PIXEL_BUDGET, SMART_SIGNAL_PIXEL_BUDGET);
   if (width * height > pixelBudget) {
     const scale = Math.sqrt(pixelBudget / (width * height));
     const workWidth = Math.max(1, Math.round(width * scale));
     const workHeight = Math.max(1, Math.round(height * scale));
-    smartFaceWorkCanvas ||= document.createElement("canvas");
-    if (smartFaceWorkCanvas.width !== workWidth) smartFaceWorkCanvas.width = workWidth;
-    if (smartFaceWorkCanvas.height !== workHeight) smartFaceWorkCanvas.height = workHeight;
-    const workContext = smartFaceWorkCanvas.getContext("2d", { alpha: false, willReadFrequently: true });
+    smartSignalWorkCanvas ||= document.createElement("canvas");
+    if (smartSignalWorkCanvas.width !== workWidth) smartSignalWorkCanvas.width = workWidth;
+    if (smartSignalWorkCanvas.height !== workHeight) smartSignalWorkCanvas.height = workHeight;
+    const workContext = smartSignalWorkCanvas.getContext("2d", { alpha: false, willReadFrequently: true });
     if (!workContext) return;
     workContext.save();
     workContext.imageSmoothingEnabled = true;
@@ -4339,20 +4273,19 @@ function applySmartFaceWeighting(context, width, height, settings, effect, weigh
     workContext.clearRect(0, 0, workWidth, workHeight);
     workContext.drawImage(context.canvas, 0, 0, width, height, 0, 0, workWidth, workHeight);
     workContext.restore();
-    applySmartFaceWeightingToContext(workContext, workWidth, workHeight, settings, effect, weighting);
+    applySmartSignalProcessorEffectsToContext(workContext, workWidth, workHeight, settings, effect, enabled);
     context.save();
     context.imageSmoothingEnabled = true;
     context.imageSmoothingQuality = "high";
     context.clearRect(0, 0, width, height);
-    context.drawImage(smartFaceWorkCanvas, 0, 0, workWidth, workHeight, 0, 0, width, height);
+    context.drawImage(smartSignalWorkCanvas, 0, 0, workWidth, workHeight, 0, 0, width, height);
     context.restore();
     return;
   }
-
-  applySmartFaceWeightingToContext(context, width, height, settings, effect, weighting);
+  applySmartSignalProcessorEffectsToContext(context, width, height, settings, effect, enabled);
 }
 
-function applySmartFaceWeightingToContext(context, width, height, settings, effect, weighting = {}) {
+function applySmartSignalProcessorEffectsToContext(context, width, height, settings, effect, smartSignalEnabled = {}) {
   let frame;
   try {
     frame = context.getImageData(0, 0, width, height);
@@ -4360,91 +4293,95 @@ function applySmartFaceWeightingToContext(context, width, height, settings, effe
     return;
   }
   const data = frame.data;
-  const analysis = buildSmartFaceAnalysis(data, width, height);
-  const foregroundCandidate = weighting.foreground ? findSmartFaceCandidate(analysis, "foreground") || fallbackSmartFaceBox(width, height, "foreground") : null;
-  const backgroundCandidate = weighting.background
-    ? findSmartFaceCandidate(analysis, "background", foregroundCandidate) || fallbackSmartFaceBox(width, height, "background")
-    : null;
-  const wolfCandidate = weighting.wolf
-    ? findSmartWolfCandidate(analysis, foregroundCandidate, backgroundCandidate) || fallbackSmartWolfBox(width, height)
-    : null;
-  const model = advancedCameraPixelModel(settings, effect);
-  const palette = settings?.thermalPalette || (model.xlsAmount > model.thermalAmount ? "xls" : "full-range-rgb");
-  const energy = smartFaceEffectEnergy(settings, effect, model);
   const source = new Uint8ClampedArray(data);
-  const lumaAt = (pixelIndex) => source[pixelIndex] * 0.2126 + source[pixelIndex + 1] * 0.7152 + source[pixelIndex + 2] * 0.0722;
-
+  const model = smartSignalPixelModel(settings, effect, smartSignalEnabled);
+  if (model.energy <= 0.01) return;
+  const lumaAt = (pixelIndex) =>
+    (source[pixelIndex] * 0.2126 + source[pixelIndex + 1] * 0.7152 + source[pixelIndex + 2] * 0.0722) / 255;
   for (let index = 0; index < data.length; index += 4) {
     const pixel = index / 4;
     const x = pixel % width;
     const y = Math.floor(pixel / width);
-    const luma = lumaAt(index) / 255;
-    const left = x > 0 ? lumaAt(index - 4) / 255 : luma;
-    const right = x < width - 1 ? lumaAt(index + 4) / 255 : luma;
-    const up = y > 0 ? lumaAt(index - width * 4) / 255 : luma;
-    const down = y < height - 1 ? lumaAt(index + width * 4) / 255 : luma;
-    const localEdge = clamp(Math.abs(right - left) + Math.abs(down - up), 0, 1);
-    const localDetail = clamp(localEdge * 1.9 + Math.abs(luma - (left + right + up + down) / 4) * 2.4, 0, 1);
-    const foregroundMask = foregroundCandidate ? smartFaceOvalMask(x, y, foregroundCandidate) * foregroundCandidate.confidence : 0;
-    const backgroundMask = backgroundCandidate ? smartBackgroundFaceMask(x, y, backgroundCandidate, foregroundCandidate, width, height) * backgroundCandidate.confidence : 0;
-    const wolfMask = wolfCandidate ? smartWolfMeshMask(x, y, wolfCandidate) * wolfCandidate.confidence : 0;
-    if (!foregroundMask && !backgroundMask && !wolfMask) continue;
-
+    const luma = lumaAt(index);
+    const left = x > 0 ? lumaAt(index - 4) : luma;
+    const right = x < width - 1 ? lumaAt(index + 4) : luma;
+    const up = y > 0 ? lumaAt(index - width * 4) : luma;
+    const down = y < height - 1 ? lumaAt(index + width * 4) : luma;
+    const localAverage = (luma * 2 + left + right + up + down) / 6;
+    const edge = clamp(Math.abs(right - left) + Math.abs(down - up) + Math.abs(luma - localAverage) * 1.7, 0, 1);
+    const midMask = clamp(1 - Math.abs(luma - 0.5) * 2, 0, 1);
+    const shadowMask = clamp((0.58 - luma) * 1.9, 0, 1);
+    const highlightMask = clamp((luma - 0.55) * 1.9, 0, 1);
+    const radial = distanceFromCenter(x / Math.max(1, width - 1), y / Math.max(1, height - 1));
     let r = data[index];
     let g = data[index + 1];
     let b = data[index + 2];
-    const y709 = r * 0.2126 + g * 0.7152 + b * 0.0722;
+    const gray = r * 0.2126 + g * 0.7152 + b * 0.0722;
 
-    if (backgroundMask) {
-      const bgAmount = clamp(backgroundMask * energy * 0.66, 0, 0.78);
-      const depthValue = clamp(luma * 0.48 + localDetail * 0.72 + localEdge * 0.46, 0, 1);
-      const [br, bg, bb] = thermalPaletteColor(depthValue, palette);
-      r = mixChannel(r, br, bgAmount * 0.46);
-      g = mixChannel(g, bg, bgAmount * 0.46);
-      b = mixChannel(b, bb, bgAmount * 0.46);
-      const fieldContrast = 1 + bgAmount * 0.42;
-      r = (r - 128) * fieldContrast + 128 - bgAmount * 10;
-      g = (g - 128) * fieldContrast + 128 - bgAmount * 8;
-      b = (b - 128) * fieldContrast + 128 + bgAmount * 8;
+    const fieldBias = clamp((radial - 0.35) * model.field, -0.18, 0.42);
+    const exposureLift = (model.exposure * 36 + model.lift * 24) * (0.55 + midMask * 0.45) - model.blackpoint * shadowMask * 28 + model.whitepoint * highlightMask * 20;
+    r += exposureLift + fieldBias * 30;
+    g += exposureLift + fieldBias * 22;
+    b += exposureLift + fieldBias * 16;
+
+    const contrastPush = 1 + model.weight * 0.52 + model.range * 0.34 + model.structure * edge * 0.72 + model.midtones * midMask * 0.34;
+    r = gray + (r - gray) * contrastPush;
+    g = gray + (g - gray) * contrastPush;
+    b = gray + (b - gray) * contrastPush;
+
+    const detailPush = (luma - localAverage) * 255 * (model.details * 1.45 + model.structure * 1.12 + model.depth * 0.74);
+    r += detailPush;
+    g += detailPush * 0.93;
+    b += detailPush * 0.86;
+
+    if (model.metric > 0.01 || model.depth > 0.01 || model.isolate > 0.01) {
+      const thermalValue = clamp(luma * (0.82 + model.range * 0.32) + edge * (model.depth * 0.38 + model.structure * 0.26) + midMask * model.metric * 0.16, 0, 1);
+      const [tr, tg, tb] = thermalPaletteColor(thermalValue, model.palette);
+      const alpha = clamp(model.metric * 0.38 + model.depth * 0.22 + model.isolate * 0.18, 0, 0.72);
+      r = mixChannel(r, tr, alpha);
+      g = mixChannel(g, tg, alpha);
+      b = mixChannel(b, tb, alpha);
     }
 
-    if (wolfMask) {
-      const wolfAmount = clamp(wolfMask * energy * 1.04, 0, 0.96);
-      const wolfDepth = clamp(luma * 0.36 + localDetail * 1.06 + localEdge * 0.9, 0, 1);
-      const wolfPalette = palette === "full-range-rgb" ? "inverted-red-rgb" : thermalHotPalette(palette);
-      const [wr, wg, wb] = thermalPaletteColor(wolfDepth, wolfPalette);
-      const ridge = smartWolfRidgeMask(x, y, wolfCandidate);
-      const muzzle = smartWolfMuzzleMask(x, y, wolfCandidate);
-      const ears = smartWolfEarMask(x, y, wolfCandidate, "left") + smartWolfEarMask(x, y, wolfCandidate, "right");
-      const contourBoost = clamp(localEdge * 96 + ridge * 58 + muzzle * 42 + ears * 36, 0, 170) * wolfAmount;
-      const wolfContrast = 1 + wolfAmount * 0.72;
-      r = (r - 128) * wolfContrast + 128;
-      g = (g - 128) * (1 + wolfAmount * 0.52) + 128;
-      b = (b - 128) * (1 + wolfAmount * 0.46) + 128;
-      r = mixChannel(r + contourBoost, wr, wolfAmount * 0.46);
-      g = mixChannel(g + contourBoost * 0.62, wg, wolfAmount * 0.38);
-      b = mixChannel(b + contourBoost * 0.4, wb, wolfAmount * 0.36);
-      if (ridge || muzzle) {
-        r += ridge * 34 * wolfAmount + muzzle * 20 * wolfAmount;
-        g += ridge * 22 * wolfAmount;
-        b += muzzle * 16 * wolfAmount;
-      }
+    if (model.isolate > 0.01) {
+      const levels = Math.max(3, Math.round(11 - model.isolate * 7));
+      const step = 255 / (levels - 1);
+      const qr = Math.round(r / step) * step;
+      const qg = Math.round(g / step) * step;
+      const qb = Math.round(b / step) * step;
+      const groupAlpha = clamp(model.isolate * (0.35 + edge * 0.3 + model.smoothing * 0.22), 0, 0.88);
+      r = mixChannel(r, qr, groupAlpha);
+      g = mixChannel(g, qg, groupAlpha);
+      b = mixChannel(b, qb, groupAlpha);
     }
 
-    if (foregroundMask) {
-      const fgAmount = clamp(foregroundMask * energy * 0.86, 0, 0.92);
-      const faceDepth = clamp(luma * 0.54 + localDetail * 0.86 + localEdge * 0.7, 0, 1);
-      const [fr, fg, fb] = thermalPaletteColor(faceDepth, palette);
-      const saturationLift = 1 + fgAmount * 0.78;
-      r = y709 + (r - y709) * saturationLift;
-      g = y709 + (g - y709) * saturationLift;
-      b = y709 + (b - y709) * saturationLift;
-      r = (r - 128) * (1 + fgAmount * 0.52) + 128 + localEdge * 58 * fgAmount;
-      g = (g - 128) * (1 + fgAmount * 0.46) + 128 + localEdge * 44 * fgAmount;
-      b = (b - 128) * (1 + fgAmount * 0.44) + 128 + localEdge * 32 * fgAmount;
-      r = mixChannel(r, fr, fgAmount * 0.32);
-      g = mixChannel(g, fg, fgAmount * 0.32);
-      b = mixChannel(b, fb, fgAmount * 0.32);
+    if (model.blackpoint > 0.01) {
+      const crush = clamp(model.blackpoint * (0.25 + shadowMask * 0.85), 0, 0.92);
+      r *= 1 - crush;
+      g *= 1 - crush * 0.94;
+      b *= 1 - crush * 0.88;
+    }
+
+    if (model.whitepoint > 0.01) {
+      const push = clamp(model.whitepoint * (0.18 + highlightMask * 0.52), 0, 0.72);
+      r = mixChannel(r, 255, push * 0.38);
+      g = mixChannel(g, 255, push * 0.34);
+      b = mixChannel(b, 255, push * 0.3);
+    }
+
+    if (model.amplify > 0.01) {
+      const amp = 1 + model.amplify * (0.42 + edge * 0.35);
+      const lum = r * 0.2126 + g * 0.7152 + b * 0.0722;
+      r = lum + (r - lum) * amp;
+      g = lum + (g - lum) * amp;
+      b = lum + (b - lum) * amp;
+    }
+
+    if (model.invert > 0.01) {
+      const invertMask = clamp(model.invert * (0.36 + midMask * 0.28 + edge * 0.36 + model.metric * 0.14), 0, 0.92);
+      r = mixChannel(r, 255 - r, invertMask);
+      g = mixChannel(g, 255 - g, invertMask * (0.92 + model.depth * 0.08));
+      b = mixChannel(b, 255 - b, invertMask * (0.86 + model.field * 0.12));
     }
 
     data[index] = clamp(r, 0, 255);
@@ -4454,455 +4391,57 @@ function applySmartFaceWeightingToContext(context, width, height, settings, effe
   context.putImageData(frame, 0, 0);
 }
 
-function buildSmartFaceAnalysis(data, width, height) {
-  const cols = SMART_FACE_ANALYSIS_WIDTH;
-  const rows = clamp(Math.round((height / Math.max(width, 1)) * cols), 20, 54);
-  const sums = new Float32Array(cols * rows);
-  const counts = new Uint16Array(cols * rows);
-  const step = width * height > 80_000 ? 2 : 1;
-  for (let y = 0; y < height; y += step) {
-    const gy = clamp(Math.floor((y / height) * rows), 0, rows - 1);
-    for (let x = 0; x < width; x += step) {
-      const gx = clamp(Math.floor((x / width) * cols), 0, cols - 1);
-      const index = (y * width + x) * 4;
-      const luma = (data[index] * 0.2126 + data[index + 1] * 0.7152 + data[index + 2] * 0.0722) / 255;
-      const gridIndex = gy * cols + gx;
-      sums[gridIndex] += luma;
-      counts[gridIndex] += 1;
-    }
-  }
-
-  const luma = new Float32Array(cols * rows);
-  for (let index = 0; index < luma.length; index += 1) {
-    luma[index] = counts[index] ? sums[index] / counts[index] : 0;
-  }
-
-  const edges = new Float32Array(cols * rows);
-  for (let y = 0; y < rows; y += 1) {
-    for (let x = 0; x < cols; x += 1) {
-      const index = y * cols + x;
-      const center = luma[index];
-      const left = x > 0 ? luma[index - 1] : center;
-      const right = x < cols - 1 ? luma[index + 1] : center;
-      const up = y > 0 ? luma[index - cols] : center;
-      const down = y < rows - 1 ? luma[index + cols] : center;
-      edges[index] = clamp(Math.abs(right - left) + Math.abs(down - up), 0, 1);
-    }
-  }
-  return { cols, rows, width, height, luma, edges };
-}
-
-function findSmartFaceCandidate(analysis, mode, excludedBox = null) {
-  const { cols, rows } = analysis;
-  let best = null;
-  const widthRatios = mode === "foreground" ? [0.28, 0.34, 0.42, 0.5] : [0.24, 0.3, 0.38, 0.48];
-  const aspectRatios = [1.05, 1.24, 1.42];
-  widthRatios.forEach((widthRatio) => {
-    const candidateWidth = Math.max(8, Math.round(cols * widthRatio));
-    aspectRatios.forEach((aspect) => {
-      const candidateHeight = Math.max(10, Math.round(candidateWidth * aspect));
-      const stepX = Math.max(2, Math.round(candidateWidth / 4));
-      const stepY = Math.max(2, Math.round(candidateHeight / 4));
-      for (let y = 1; y <= rows - candidateHeight - 1; y += stepY) {
-        for (let x = 1; x <= cols - candidateWidth - 1; x += stepX) {
-          const box = { x, y, width: candidateWidth, height: candidateHeight };
-          if (mode === "foreground" && !smartForegroundWindow(box, cols, rows)) continue;
-          if (mode === "background" && excludedBox && smartBoxOverlapRatio(box, excludedBox.gridBox) > 0.28) continue;
-          const score = smartFaceCandidateScore(analysis, box, mode);
-          if (!best || score > best.score) best = { ...box, score };
-        }
-      }
-    });
+function smartSignalPixelModel(settings = {}, effect = {}, smartSignalEnabled = {}) {
+  const model = {
+    energy: 0,
+    depth: 0,
+    field: 0,
+    range: 0,
+    metric: 0,
+    weight: 0,
+    details: 0,
+    midtones: 0,
+    invert: 0,
+    structure: 0,
+    blackpoint: 0,
+    whitepoint: 0,
+    lift: 0,
+    amplify: 0,
+    exposure: 0,
+    isolate: 0,
+    smoothing: 0,
+    palette: isThermalRenderMode(settings, effect) ? settings.thermalPalette || "full-range-rgb" : "full-range-rgb"
+  };
+  SMART_SIGNAL_PROCESSORS.forEach((processor) => {
+    if (!smartSignalEnabled?.[processor.id]) return;
+    const strength = smartSignalProcessorStrength(settings, processor);
+    const isolation = smartSignalSetting(settings, processor, "Isolation") / 100;
+    const smoothing = smartSignalSetting(settings, processor, "Smoothing") / 100;
+    model.energy += strength;
+    model.smoothing += smoothing * strength;
+    if (processor.id === "depth") model.depth += strength;
+    else if (processor.id === "field") model.field += strength;
+    else if (processor.id === "range") model.range += strength;
+    else if (processor.id === "metricMapping") model.metric += strength;
+    else if (processor.id === "weight") model.weight += strength;
+    else if (processor.id === "details") model.details += strength;
+    else if (processor.id === "midtones") model.midtones += strength;
+    else if (processor.id === "invert") model.invert += strength;
+    else if (processor.id === "structure") model.structure += strength;
+    else if (processor.id === "blackpoint") model.blackpoint += strength;
+    else if (processor.id === "whitepoint") model.whitepoint += strength;
+    else if (processor.id === "lift") model.lift += strength;
+    else if (processor.id === "amplify") model.amplify += strength;
+    else if (processor.id === "exposure") model.exposure += strength;
+    else if (processor.id === "isolateGroupedPixels") model.isolate += strength;
+    if (isolation > 0.45) model.isolate += isolation * strength * 0.38;
   });
-  const threshold = mode === "foreground" ? 0.32 : 0.28;
-  if (!best || best.score < threshold) return null;
-  return gridFaceBoxToPixels(best, analysis, mode);
-}
-
-function smartForegroundWindow(box, cols, rows) {
-  const centerX = (box.x + box.width / 2) / cols;
-  const centerY = (box.y + box.height / 2) / rows;
-  return centerX > 0.18 && centerX < 0.82 && centerY > 0.18 && centerY < 0.84;
-}
-
-function smartFaceCandidateScore(analysis, box, mode) {
-  const { cols, rows, luma, edges } = analysis;
-  const sample = (x, y) => {
-    const sx = clamp(Math.round(x), 0, cols - 1);
-    const sy = clamp(Math.round(y), 0, rows - 1);
-    return luma[sy * cols + sx] || 0;
-  };
-  const edge = (x, y) => {
-    const sx = clamp(Math.round(x), 0, cols - 1);
-    const sy = clamp(Math.round(y), 0, rows - 1);
-    return edges[sy * cols + sx] || 0;
-  };
-  const mean = smartRegionAverage(analysis, box, "luma");
-  const texture = smartRegionAverage(analysis, box, "edges");
-  let symmetryTotal = 0;
-  let symmetryCount = 0;
-  const pairSamples = 6;
-  for (let yStep = 1; yStep <= pairSamples; yStep += 1) {
-    const py = box.y + (box.height * yStep) / (pairSamples + 1);
-    for (let xStep = 1; xStep <= Math.floor(pairSamples / 2); xStep += 1) {
-      const px = (box.width * xStep) / (pairSamples + 1);
-      symmetryTotal += Math.abs(sample(box.x + px, py) - sample(box.x + box.width - px, py));
-      symmetryCount += 1;
-    }
-  }
-  const symmetry = clamp(1 - (symmetryTotal / Math.max(1, symmetryCount)) * 2.2, 0, 1);
-  const eyeY = box.y + box.height * SMART_FACE_MESH_PROFILE.eyeY;
-  const eyeOffset = box.width * SMART_FACE_MESH_PROFILE.eyeOffsetX;
-  const leftEye = sample(box.x + box.width / 2 - eyeOffset, eyeY);
-  const rightEye = sample(box.x + box.width / 2 + eyeOffset, eyeY);
-  const eyeEdge =
-    edge(box.x + box.width / 2 - eyeOffset, eyeY) +
-    edge(box.x + box.width / 2 + eyeOffset, eyeY);
-  const eyeDark = clamp((mean - (leftEye + rightEye) / 2) * 4.2, 0, 1);
-  const eyeBright = clamp(((leftEye + rightEye) / 2 - mean) * 2.8, 0, 1);
-  const eyeScore = clamp(Math.max(eyeDark, eyeBright * 0.74) + eyeEdge * 0.58, 0, 1);
-  const muzzleY = box.y + box.height * SMART_FACE_MESH_PROFILE.muzzleY;
-  const noseY = box.y + box.height * SMART_FACE_MESH_PROFILE.noseY;
-  const muzzle = smartRegionAverage(
-    analysis,
-    {
-      x: box.x + box.width * 0.32,
-      y: muzzleY - box.height * 0.08,
-      width: box.width * 0.36,
-      height: box.height * 0.22
-    },
-    "edges"
-  );
-  const noseDark = clamp((mean - sample(box.x + box.width / 2, noseY)) * 3.4, 0, 1);
-  const shape = smartCandidateShapeScore(box);
-  const centerX = (box.x + box.width / 2) / cols;
-  const centerY = (box.y + box.height / 2) / rows;
-  const centrality = clamp(1 - Math.hypot(centerX - 0.5, centerY - 0.5) * 1.65, 0, 1);
-  const backgroundPreference = mode === "background" ? clamp(Math.hypot(centerX - 0.5, centerY - 0.5) * 1.2 + 0.24, 0, 1) : centrality;
-  return (
-    symmetry * 0.26 +
-    eyeScore * 0.25 +
-    clamp(muzzle * 1.8 + noseDark * 0.55, 0, 1) * 0.2 +
-    clamp(texture * 2.6, 0, 1) * 0.16 +
-    shape * 0.07 +
-    backgroundPreference * 0.06
-  );
-}
-
-function smartRegionAverage(analysis, box, field) {
-  const { cols, rows, luma, edges } = analysis;
-  const source = field === "edges" ? edges : luma;
-  const startX = clamp(Math.floor(box.x), 0, cols - 1);
-  const endX = clamp(Math.ceil(box.x + box.width), 0, cols);
-  const startY = clamp(Math.floor(box.y), 0, rows - 1);
-  const endY = clamp(Math.ceil(box.y + box.height), 0, rows);
-  let total = 0;
-  let count = 0;
-  for (let y = startY; y < endY; y += 1) {
-    for (let x = startX; x < endX; x += 1) {
-      total += source[y * cols + x] || 0;
-      count += 1;
-    }
-  }
-  return count ? total / count : 0;
-}
-
-function smartCandidateShapeScore(box) {
-  const aspect = box.height / Math.max(1, box.width);
-  return clamp(1 - Math.abs(aspect - 1.24) / 0.72, 0, 1);
-}
-
-function smartBoxOverlapRatio(a, b) {
-  if (!a || !b) return 0;
-  const left = Math.max(a.x, b.x);
-  const top = Math.max(a.y, b.y);
-  const right = Math.min(a.x + a.width, b.x + b.width);
-  const bottom = Math.min(a.y + a.height, b.y + b.height);
-  const area = Math.max(0, right - left) * Math.max(0, bottom - top);
-  return area / Math.max(1, Math.min(a.width * a.height, b.width * b.height));
-}
-
-function gridFaceBoxToPixels(box, analysis, mode) {
-  const x = (box.x / analysis.cols) * analysis.width;
-  const y = (box.y / analysis.rows) * analysis.height;
-  const width = (box.width / analysis.cols) * analysis.width;
-  const height = (box.height / analysis.rows) * analysis.height;
-  return {
-    x,
-    y,
-    width,
-    height,
-    confidence: clamp(box.score, mode === "foreground" ? 0.38 : 0.32, mode === "foreground" ? 0.92 : 0.78),
-    gridBox: box,
-    mode
-  };
-}
-
-function fallbackSmartFaceBox(width, height, mode) {
-  if (mode === "background") {
-    return {
-      x: width * 0.04,
-      y: height * 0.05,
-      width: width * 0.92,
-      height: height * 0.9,
-      confidence: 0.34,
-      gridBox: null,
-      mode
-    };
-  }
-  return {
-    x: width * 0.23,
-    y: height * 0.13,
-    width: width * 0.54,
-    height: height * 0.72,
-    confidence: 0.38,
-    gridBox: null,
-    mode
-  };
-}
-
-function findSmartWolfCandidate(analysis, foregroundBox = null, backgroundBox = null) {
-  const { cols, rows } = analysis;
-  let best = null;
-  const widthRatios = [0.34, 0.42, 0.5, 0.58, 0.68];
-  const aspectRatios = [1.0, 1.16, 1.32, 1.48];
-  widthRatios.forEach((widthRatio) => {
-    const candidateWidth = Math.max(12, Math.round(cols * widthRatio));
-    aspectRatios.forEach((aspect) => {
-      const candidateHeight = Math.max(12, Math.round(candidateWidth * aspect));
-      const stepX = Math.max(2, Math.round(candidateWidth / 5));
-      const stepY = Math.max(2, Math.round(candidateHeight / 5));
-      for (let y = 0; y <= rows - candidateHeight - 1; y += stepY) {
-        for (let x = 0; x <= cols - candidateWidth - 1; x += stepX) {
-          const box = { x, y, width: candidateWidth, height: candidateHeight };
-          const score = smartWolfCandidateScore(analysis, box, foregroundBox, backgroundBox);
-          if (!best || score > best.score) best = { ...box, score };
-        }
-      }
-    });
+  Object.keys(model).forEach((key) => {
+    if (typeof model[key] === "number") model[key] = clamp(model[key], 0, key === "energy" ? 8 : 1.8);
   });
-  if (!best || best.score < 0.34) return null;
-  return gridWolfBoxToPixels(best, analysis);
+  model.smoothing = clamp(model.smoothing, 0, 1);
+  return model;
 }
-
-function smartWolfCandidateScore(analysis, box, foregroundBox = null, backgroundBox = null) {
-  const { cols, rows, luma, edges } = analysis;
-  const sample = (x, y) => {
-    const sx = clamp(Math.round(x), 0, cols - 1);
-    const sy = clamp(Math.round(y), 0, rows - 1);
-    return luma[sy * cols + sx] || 0;
-  };
-  const edge = (x, y) => {
-    const sx = clamp(Math.round(x), 0, cols - 1);
-    const sy = clamp(Math.round(y), 0, rows - 1);
-    return edges[sy * cols + sx] || 0;
-  };
-  const mean = smartRegionAverage(analysis, box, "luma");
-  const texture = smartRegionAverage(analysis, box, "edges");
-  const centerX = box.x + box.width * 0.5;
-  const topY = box.y + box.height * SMART_WOLF_MESH_PROFILE.earY;
-  const leftEar = smartRegionAverage(
-    analysis,
-    {
-      x: box.x + box.width * 0.05,
-      y: topY,
-      width: box.width * 0.26,
-      height: box.height * SMART_WOLF_MESH_PROFILE.earHeight
-    },
-    "edges"
-  );
-  const rightEar = smartRegionAverage(
-    analysis,
-    {
-      x: box.x + box.width * 0.69,
-      y: topY,
-      width: box.width * 0.26,
-      height: box.height * SMART_WOLF_MESH_PROFILE.earHeight
-    },
-    "edges"
-  );
-  const earBalance = clamp(1 - Math.abs(leftEar - rightEar) * 2.8, 0, 1);
-  const earScore = clamp((leftEar + rightEar) * 1.9 + earBalance * 0.34, 0, 1);
-  let symmetryTotal = 0;
-  let symmetryCount = 0;
-  for (let yStep = 1; yStep <= 8; yStep += 1) {
-    const py = box.y + (box.height * yStep) / 9;
-    for (let xStep = 1; xStep <= 4; xStep += 1) {
-      const px = (box.width * xStep) / 10;
-      symmetryTotal += Math.abs(sample(box.x + px, py) - sample(box.x + box.width - px, py));
-      symmetryCount += 1;
-    }
-  }
-  const symmetry = clamp(1 - (symmetryTotal / Math.max(1, symmetryCount)) * 2.55, 0, 1);
-  const eyeY = box.y + box.height * SMART_WOLF_MESH_PROFILE.eyeY;
-  const eyeOffset = box.width * SMART_WOLF_MESH_PROFILE.eyeOffsetX;
-  const leftEye = sample(centerX - eyeOffset, eyeY);
-  const rightEye = sample(centerX + eyeOffset, eyeY);
-  const eyeScore = clamp(
-    (edge(centerX - eyeOffset, eyeY) + edge(centerX + eyeOffset, eyeY)) * 0.62 + Math.abs(mean - (leftEye + rightEye) / 2) * 2.6,
-    0,
-    1
-  );
-  const muzzleBox = {
-    x: box.x + box.width * 0.34,
-    y: box.y + box.height * (SMART_WOLF_MESH_PROFILE.muzzleY - 0.1),
-    width: box.width * 0.32,
-    height: box.height * 0.28
-  };
-  const muzzleTexture = smartRegionAverage(analysis, muzzleBox, "edges");
-  const noseDark = clamp((mean - sample(centerX, box.y + box.height * SMART_WOLF_MESH_PROFILE.noseY)) * 4.2, 0, 1);
-  const ridge = clamp(
-    edge(centerX, box.y + box.height * 0.22) + edge(centerX, box.y + box.height * 0.5) + edge(centerX, box.y + box.height * 0.72),
-    0,
-    1
-  );
-  const aspect = clamp(1 - Math.abs(box.height / Math.max(1, box.width) - 1.22) / 0.72, 0, 1);
-  const centerPreference = clamp(1 - Math.hypot(centerX / cols - 0.5, (box.y + box.height * 0.48) / rows - 0.5) * 1.25, 0, 1);
-  const foregroundClear = foregroundBox?.gridBox ? 1 - smartBoxOverlapRatio(box, foregroundBox.gridBox) * 0.24 : 1;
-  const backgroundAffinity = backgroundBox?.gridBox ? clamp(0.72 + smartBoxOverlapRatio(box, backgroundBox.gridBox) * 0.28, 0.72, 1) : 0.86;
-  return (
-    earScore * 0.22 +
-    symmetry * 0.19 +
-    eyeScore * 0.17 +
-    clamp(muzzleTexture * 1.95 + noseDark * 0.62, 0, 1) * 0.18 +
-    ridge * 0.1 +
-    clamp(texture * 2.25, 0, 1) * 0.08 +
-    aspect * 0.03 +
-    centerPreference * 0.03
-  ) * foregroundClear * backgroundAffinity;
-}
-
-function gridWolfBoxToPixels(box, analysis) {
-  const x = (box.x / analysis.cols) * analysis.width;
-  const y = (box.y / analysis.rows) * analysis.height;
-  const width = (box.width / analysis.cols) * analysis.width;
-  const height = (box.height / analysis.rows) * analysis.height;
-  return {
-    x,
-    y,
-    width,
-    height,
-    confidence: clamp(box.score, 0.42, 0.96),
-    gridBox: box,
-    mode: "wolf"
-  };
-}
-
-function fallbackSmartWolfBox(width, height) {
-  return {
-    x: width * 0.12,
-    y: height * 0.03,
-    width: width * 0.76,
-    height: height * 0.84,
-    confidence: 0.36,
-    gridBox: null,
-    mode: "wolf"
-  };
-}
-
-function smartFaceOvalMask(x, y, box) {
-  if (!box) return 0;
-  const rx = Math.max(1, box.width * 0.5);
-  const ry = Math.max(1, box.height * 0.52);
-  const cx = box.x + box.width * 0.5;
-  const cy = box.y + box.height * 0.52;
-  const normalized = ((x - cx) * (x - cx)) / (rx * rx) + ((y - cy) * (y - cy)) / (ry * ry);
-  if (normalized >= 1) return 0;
-  return Math.pow(1 - normalized, 0.72);
-}
-
-function smartBackgroundFaceMask(x, y, backgroundBox, foregroundBox, width, height) {
-  const boxMask = smartFaceOvalMask(x, y, backgroundBox);
-  const foregroundClear = foregroundBox ? 1 - smartFaceOvalMask(x, y, foregroundBox) * 0.86 : 1;
-  const edgeField = clamp(Math.min(x, width - x, y, height - y) / Math.max(1, Math.min(width, height) * 0.18), 0, 1);
-  return clamp(Math.max(boxMask, 0.28) * foregroundClear * edgeField, 0, 1);
-}
-
-function smartWolfMeshMask(x, y, box) {
-  return clamp(
-    smartWolfHeadMask(x, y, box) * 0.82 +
-      smartWolfEarMask(x, y, box, "left") * 0.74 +
-      smartWolfEarMask(x, y, box, "right") * 0.74 +
-      smartWolfMuzzleMask(x, y, box) * 0.86 +
-      smartWolfRidgeMask(x, y, box) * 0.44,
-    0,
-    1
-  );
-}
-
-function smartWolfHeadMask(x, y, box) {
-  if (!box) return 0;
-  const rx = Math.max(1, box.width * 0.36);
-  const ry = Math.max(1, box.height * 0.43);
-  const cx = box.x + box.width * 0.5;
-  const cy = box.y + box.height * 0.49;
-  const normalized = ((x - cx) * (x - cx)) / (rx * rx) + ((y - cy) * (y - cy)) / (ry * ry);
-  if (normalized >= 1) return 0;
-  return Math.pow(1 - normalized, 0.62);
-}
-
-function smartWolfEarMask(x, y, box, side) {
-  if (!box) return 0;
-  const left = side === "left";
-  const baseY = box.y + box.height * 0.32;
-  const tipY = box.y + box.height * 0.02;
-  const baseOuterX = box.x + box.width * (left ? 0.1 : 0.9);
-  const baseInnerX = box.x + box.width * (left ? 0.34 : 0.66);
-  const tipX = box.x + box.width * (left ? 0.18 : 0.82);
-  return smartWolfTriangleMask(x, y, tipX, tipY, baseOuterX, baseY, baseInnerX, baseY);
-}
-
-function smartWolfMuzzleMask(x, y, box) {
-  if (!box) return 0;
-  const rx = Math.max(1, box.width * 0.18);
-  const ry = Math.max(1, box.height * 0.22);
-  const cx = box.x + box.width * 0.5;
-  const cy = box.y + box.height * 0.7;
-  const normalized = ((x - cx) * (x - cx)) / (rx * rx) + ((y - cy) * (y - cy)) / (ry * ry);
-  if (normalized >= 1) return 0;
-  return Math.pow(1 - normalized, 0.54);
-}
-
-function smartWolfRidgeMask(x, y, box) {
-  if (!box) return 0;
-  const cx = box.x + box.width * 0.5;
-  const y1 = box.y + box.height * 0.12;
-  const y2 = box.y + box.height * 0.82;
-  if (y < y1 || y > y2) return 0;
-  const distance = Math.abs(x - cx) / Math.max(1, box.width * 0.055);
-  const verticalFalloff = clamp(1 - Math.abs((y - (y1 + y2) / 2) / ((y2 - y1) / 2)) * 0.25, 0.72, 1);
-  return clamp(1 - distance, 0, 1) * verticalFalloff;
-}
-
-function smartWolfTriangleMask(x, y, x1, y1, x2, y2, x3, y3) {
-  const denominator = (y2 - y3) * (x1 - x3) + (x3 - x2) * (y1 - y3);
-  if (!denominator) return 0;
-  const a = ((y2 - y3) * (x - x3) + (x3 - x2) * (y - y3)) / denominator;
-  const b = ((y3 - y1) * (x - x3) + (x1 - x3) * (y - y3)) / denominator;
-  const c = 1 - a - b;
-  if (a < 0 || b < 0 || c < 0) return 0;
-  return Math.pow(Math.min(a, b, c) * 3, 0.55);
-}
-
-function smartFaceEffectEnergy(settings = {}, effect = {}, model = {}) {
-  const sliderEnergy =
-    Math.abs(setting(settings, "contrast", 100) - 100) * 0.8 +
-    Math.abs(setting(settings, "saturation", 100) - 100) * 0.7 +
-    Math.abs(setting(settings, "exposure")) * 1.8 +
-    setting(settings, "clarity") +
-    setting(settings, "edgeEnhance") +
-    setting(settings, "thermalBlend") +
-    setting(settings, "thermalContour") +
-    setting(settings, "heatEdge") +
-    setting(settings, "glow") * 0.6 +
-    setting(settings, "bloom") * 0.6 +
-    setting(settings, "colorSeparation") * 0.7 +
-    SMART_DARK_EDGE_ADJUSTMENTS.reduce((total, [key]) => total + setting(settings, key) * 0.12, 0) +
-    INVERSION_ADJUSTMENTS.reduce((total, [key]) => total + setting(settings, key) * 0.24, 0);
-  const presetEnergy = effect?.category?.includes("Thermal") || effect?.category === "XLS Camera" ? 44 : 16;
-  return clamp(0.46 + (sliderEnergy + presetEnergy + model.thermalAmount * 70 + model.xlsAmount * 44) / 260, 0.48, 1.22);
-}
-
 function applyPixelateToContext(context, width, height, amount) {
   if (!context.canvas || amount <= 0) return;
   const blockSize = clamp(Math.round(2 + amount * 24), 2, 28);
@@ -6226,12 +5765,10 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, Number(value) || 0));
 }
 
-function normalizeTorchLevel(value) {
-  return Math.round(clamp(value, 1, TORCH_LEVEL_COUNT));
-}
-
-function torchLevelRatio(value) {
-  return normalizeTorchLevel(value) / TORCH_LEVEL_COUNT;
+function distanceFromCenter(x, y) {
+  const dx = x - 0.5;
+  const dy = y - 0.5;
+  return clamp(Math.sqrt(dx * dx + dy * dy) * Math.SQRT2, 0, 1);
 }
 
 export default CameraStudio;

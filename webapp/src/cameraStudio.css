@@ -725,112 +725,6 @@
   font-weight: 850;
 }
 
-.studio-torch.active {
-  color: #031017;
-  border-color: transparent;
-  background: linear-gradient(180deg, #fff4a6, #ffbf2e);
-  box-shadow: 0 0 22px rgba(255, 211, 76, 0.28);
-  font-weight: 850;
-}
-
-.torch-brightness-panel {
-  display: grid;
-  gap: 11px;
-  padding: 14px;
-  border: 1px solid rgba(245, 248, 251, 0.16);
-  border-radius: 8px;
-  background:
-    radial-gradient(circle at 100% 0%, rgba(var(--studio-accent-rgb), 0.12), transparent 34%),
-    linear-gradient(145deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02)),
-    rgba(2, 5, 8, 0.7);
-}
-
-.torch-brightness-panel.active {
-  border-color: rgba(255, 211, 76, 0.4);
-  box-shadow: inset 0 0 22px rgba(255, 211, 76, 0.08);
-}
-
-.torch-brightness-heading {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: center;
-}
-
-.torch-brightness-heading span {
-  display: inline-flex;
-  gap: 8px;
-  align-items: center;
-  color: #f5f8fb;
-}
-
-.torch-brightness-heading strong {
-  font-size: 13px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.torch-brightness-heading output {
-  min-width: 56px;
-  padding: 6px 9px;
-  border: 1px solid rgba(245, 248, 251, 0.18);
-  border-radius: 999px;
-  color: #f5f8fb;
-  background: rgba(0, 0, 0, 0.38);
-  font-size: 12px;
-  font-weight: 850;
-  text-align: center;
-}
-
-.torch-level-grid {
-  display: grid;
-  grid-template-columns: repeat(10, minmax(0, 1fr));
-  gap: 3px;
-  padding: 7px;
-  border: 1px solid rgba(245, 248, 251, 0.16);
-  border-radius: 999px;
-  background:
-    linear-gradient(90deg, rgba(82, 82, 82, 0.8), rgba(255, 255, 255, 0.88), rgba(122, 122, 122, 0.82)),
-    rgba(0, 0, 0, 0.42);
-}
-
-.torch-level-button {
-  min-width: 0;
-  min-height: 42px;
-  padding: 0;
-  border: 0;
-  border-radius: 999px;
-  color: rgba(245, 248, 251, 0.78);
-  background: rgba(3, 5, 8, 0.72);
-  font-size: 10px;
-  font-weight: 900;
-}
-
-.torch-level-button.active {
-  color: #031017;
-  background:
-    linear-gradient(180deg, #ffffff, #a9adb1 48%, #ffffff 52%, #6f7375),
-    #f5f8fb;
-}
-
-.torch-level-button[aria-pressed="true"] {
-  box-shadow:
-    0 0 0 2px rgba(255, 211, 76, 0.52),
-    0 0 18px rgba(245, 248, 251, 0.2);
-}
-
-.torch-brightness-panel input[type="range"] {
-  width: 100%;
-  accent-color: var(--studio-accent-strong);
-}
-
-.torch-brightness-panel p {
-  margin: 0;
-  color: #aeb9c5;
-  font-size: 12px;
-  line-height: 1.45;
-}
-
 .studio-pause-button.active,
 .equation-toggle.active {
   color: #031017;
@@ -986,10 +880,6 @@
 
 .snapshot-review {
   color: var(--studio-accent-strong);
-}
-
-.torch-note {
-  color: #ffd98b;
 }
 
 .recording-panel,
@@ -1383,55 +1273,6 @@
   box-shadow:
     inset 0 0 22px rgba(var(--studio-accent-rgb), 0.12),
     0 0 0 1px rgba(var(--studio-accent-rgb), 0.26);
-}
-
-.smart-face-panel {
-  display: grid;
-  gap: 10px;
-  margin: 12px 14px 0;
-  padding: 12px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background:
-    radial-gradient(circle at 0% 0%, rgba(var(--studio-accent-rgb), 0.18), transparent 38%) padding-box,
-    linear-gradient(180deg, rgba(11, 20, 28, 0.84), rgba(2, 5, 8, 0.9)) padding-box,
-    var(--studio-container-border-gradient) border-box;
-}
-
-.smart-face-panel > div:first-child {
-  display: grid;
-  gap: 4px;
-}
-
-.smart-face-panel > div:first-child strong {
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.smart-face-panel > div:first-child small {
-  color: #aeb9c5;
-  font-size: 11px;
-  line-height: 1.35;
-}
-
-.smart-face-disclaimer {
-  margin: 0;
-  padding: 10px;
-  border: 1px solid rgba(var(--studio-accent-rgb), 0.24);
-  border-radius: 8px;
-  color: #d9e2ea;
-  background:
-    linear-gradient(120deg, rgba(var(--studio-accent-rgb), 0.12), transparent 72%),
-    rgba(0, 0, 0, 0.28);
-  font-size: 11px;
-  line-height: 1.45;
-}
-
-.smart-face-toggle-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
 }
 
 .smart-dark-edge-group {
@@ -2307,19 +2148,9 @@
     aspect-ratio: 4 / 3;
   }
 
-  .torch-level-grid {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    border-radius: 24px;
-  }
-
-  .torch-level-button {
-    min-height: 36px;
-  }
-
   .effect-preset-grid,
   .studio-action-row,
   .adjustment-scope-toggles,
-  .smart-face-toggle-grid,
   .equation-engine-controls,
   .equation-toggle-row,
   .equation-pipeline-grid,

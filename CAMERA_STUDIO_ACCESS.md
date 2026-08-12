@@ -22,13 +22,13 @@ The Camera Studio is opened from the main console with the `Studio` button. It r
 - `Start Camera` opens the browser camera permission prompt.
 - `Stop Camera` stops all active video tracks.
 - `Flip Camera` toggles between front and rear camera requests after a stream is active.
-- `Rear Flashlight` requests the rear camera and toggles the device torch when the active video track exposes `torch` support through browser media capabilities. The studio includes a 10-level brightness control that requests a torch intensity level where the browser/device supports it, and falls back to on/off torch behavior where it does not.
 - `Snapshot` downloads a local PNG with the current CSS/video effect stack painted into the image and adds it to the local capture shelf.
 - `Start MP4` records a processed 1080P or 2K canvas stream as `.mp4` where the browser supports MP4 MediaRecorder.
 - `Stop Recording` ends the current MP4 recording before the 3-minute cap.
 - Four RGBW mixer groups drive live gradient color layers and the main filter math: Main, Secondary, Third, and Highlights.
 - Ten inversion controls add Classic RGB Invert, Luma Negative, Channel Swap Invert, Spectral Invert, Thermal Black-Hot Invert, Red Channel Invert, Green Channel Invert, Blue Channel Invert, Shadow Range Invert, and Highlight Range Invert.
-- The adjustment surface is grouped into 10 dropdown sections. It includes 12 core photo sliders, 10 inversion sliders, and 100 advanced effect sliders for exposure-style controls, color channels, bloom/halation, scanlines, IR/UVA/thermal washes, and other photobooth effects.
+- The adjustment surface is grouped into dropdown sections. It includes 12 core photo sliders, 10 inversion sliders, smart darker-edge controls, 15 smart signal engines with 10 sliders each, and 100 advanced effect sliders for exposure-style controls, color channels, bloom/halation, scanlines, IR/UVA/thermal washes, and other photobooth effects.
+- The smart signal engines are local image-processing tools only. They do not identify people, match identities, store biometrics, or use face/wolf recognition.
 
 ## YouTube Channel Window
 
@@ -40,7 +40,7 @@ The Camera Studio is opened from the main console with the `Studio` button. It r
 Current trusted hash:
 
 ```text
-183d71611e8b55c363ced595d93c8e1ca88a4237b2bf233718273c1fd5c9d994
+5d24654cf27da2785c1bfcf4af2449005fcf4895fed21df42828a9188969c5cd
 ```
 
 ## Rotating The Code
