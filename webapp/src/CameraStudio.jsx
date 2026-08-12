@@ -682,6 +682,29 @@ const SMART_SIGNAL_PROCESSOR_SLIDERS = [
   ["Blend", "Blend", 0, 100, "%", 64]
 ];
 
+const SMART_ISOLATE_GROUPED_PIXEL_SLIDERS = [
+  ["Amount", "Engine Power", 0, 100, "%", 72],
+  ["Sensitivity", "Scene Sensitivity", 0, 100, "%", 66],
+  ["Radius", "Neighborhood Radius", 0, 100, "%", 58],
+  ["Contrast", "Defect Contrast", 0, 100, "%", 70],
+  ["Shadow", "Shadow Defect Bias", 0, 100, "%", 52],
+  ["Highlight", "Highlight Defect Bias", 0, 100, "%", 58],
+  ["Midtone", "Midtone Defect Bias", 0, 100, "%", 56],
+  ["Isolation", "Grouping Isolation", 0, 100, "%", 74],
+  ["Smoothing", "Shape Smoothing", 0, 100, "%", 48],
+  ["Blend", "Render Blend", 0, 100, "%", 78],
+  ["ColorTarget", "Pixel Color Target", 0, 100, "%", 62],
+  ["PixelSize", "Pixel Size", 0, 100, "%", 46],
+  ["PixelWeight", "Pixel Weight", 0, 100, "%", 64],
+  ["PixelDensity", "Pixel Density", 0, 100, "%", 68],
+  ["DefectSignal", "Defect Sensitivity", 0, 100, "%", 82],
+  ["DistortionResponse", "Distortion Response", 0, 100, "%", 76],
+  ["Uniformity", "Grouping Uniformity", 0, 100, "%", 70],
+  ["EdgeRepair", "Edge Repair", 0, 100, "%", 62],
+  ["ChromaLock", "Chroma Lock", 0, 100, "%", 58],
+  ["ArtifactSuppression", "Artifact Suppression", 0, 100, "%", 54]
+];
+
 const SMART_SIGNAL_PROCESSORS = [
   ["depth", "Depth", "Local contrast, shadow depth, and false-depth heat separation."],
   ["field", "Field", "Field-of-view emphasis with center-to-edge tonal drift and glow shaping."],
@@ -697,17 +720,22 @@ const SMART_SIGNAL_PROCESSORS = [
   ["lift", "Lift", "Low-light lift and faint-signal reveal without flattening the whole image."],
   ["amplify", "Amplify", "Overall signal amplification for color, contrast, glow, and thermal response."],
   ["exposure", "Exposure", "Smart exposure gain that prioritizes visible effect movement."],
-  ["isolateGroupedPixels", "Isolate Grouped Pixels", "Groups similar color, shadow, depth, range, shade, and size into more uniform rendered shapes."],
+  [
+    "isolateGroupedPixels",
+    "Isolate Grouped Pixels",
+    "AI-Orchestrated Defect / Distortion Isolation that groups similar pixel color, size, weight, density, shade, and range so scene defects behave together.",
+    SMART_ISOLATE_GROUPED_PIXEL_SLIDERS
+  ],
   ["hotspotTrace", "Hotspot Trace", "Finds local heat-like peaks and pushes them into visible color-isotherm ridges."],
   ["spectralBloom", "Spectral Bloom", "Expands faint glow and color energy around bright and midtone signals."],
   ["edgeFusion", "Edge Fusion", "Binds edge detail and color channel separation into sharper layered boundaries."],
   ["toneQuantizer", "Tone Quantizer", "Compresses continuous tones into readable stepped spectral bands."],
   ["chromaticPressure", "Chromatic Pressure", "Applies directional RGB pressure so similar presets split into stronger color identities."]
-].map(([id, title, description]) => ({
+].map(([id, title, description, controls = SMART_SIGNAL_PROCESSOR_SLIDERS]) => ({
   id,
   title,
   description,
-  controls: SMART_SIGNAL_PROCESSOR_SLIDERS.map(([suffix, label, min, max, unit, initial]) => [
+  controls: controls.map(([suffix, label, min, max, unit, initial]) => [
     smartSignalControlKey(id, suffix),
     label,
     min,
@@ -3234,8 +3262,9 @@ function CameraStudio() {
   function renderSmartSignalGroup(group) {
     const processor = group.processor;
     const enabled = Boolean(smartSignalEnabled[processor.id]);
+    const isIsolateEngine = processor.id === "isolateGroupedPixels";
     return (
-      <div className="smart-dark-edge-group smart-signal-group">
+      <div className={`smart-dark-edge-group smart-signal-group${isIsolateEngine ? " smart-isolate-engine-group" : ""}`}>
         <button
           type="button"
           className={enabled ? "adjustment-scope-toggle active" : "adjustment-scope-toggle"}
@@ -3249,14 +3278,28 @@ function CameraStudio() {
         >
           <ShieldCheck size={15} />
           <span>
-            <strong>Smart {processor.title}</strong>
+            <strong>{isIsolateEngine ? "Smart Isolate Grouped Pixels" : `Smart ${processor.title}`}</strong>
             <small>
               {enabled
-                ? "Active on live camera, HUD, snapshots, recordings, and overlay exports."
-                : "Off: this smart signal pass is bypassed while slider values remain ready."}
+                ? isIsolateEngine
+                  ? "AI-orchestrated local defect/distortion grouping is active across live camera, HUD, snapshots, recordings, and overlay exports."
+                  : "Active on live camera, HUD, snapshots, recordings, and overlay exports."
+                : isIsolateEngine
+                  ? "Off: defect/distortion grouping is bypassed while color, size, weight, and density controls remain ready."
+                  : "Off: this smart signal pass is bypassed while slider values remain ready."}
             </small>
           </span>
         </button>
+        {isIsolateEngine && (
+          <div className="smart-isolate-engine-brief" aria-label="AI-orchestrated isolate grouped pixels description">
+            <strong>AI-Orchestrated Defect / Distortion Isolation</strong>
+            <p>
+              Local scene analysis targets repeated defects, compression blocks, subtle distortions, same-color pixel clusters,
+              density patches, and shade/range groups. No remote AI call or biometric identity analysis is used; the engine
+              deterministically weighs nearby pixels and pushes similar artifacts to behave together.
+            </p>
+          </div>
+        )}
         <div className="adjustment-list smart-dark-edge-list">
           {processor.controls.map((control) => renderAdjustmentSlider(control, "smart-dark-edge-adjustment smart-signal-adjustment"))}
         </div>
@@ -3494,7 +3537,7 @@ function CameraStudio() {
           <ul>
             <li>{CAMERA_EFFECTS.length} local visual presets compiled at 500% intensity for IR-style, UVA-style, full-spectrum thermal, XLS, inversion, tritone, quadtone, channel spectrograph, black-field, channel sweep, cinematic, monochrome, duotone, retro, and color-lab looks.</li>
             <li>Four RGBW gradient mixers for Main, Secondary, Third, and Highlights color layers that drive overlays, filter math, and the selected app accent aesthetic.</li>
-            <li>Grouped adjustment dropdowns with 11 core photo controls, 10 color inversion tools, 20 inversion presets, 10 smart darker-edge controls, 20 smart signal engines with 10 sliders each, Thermal Studio A-O hotspot recoloring, 100 advanced sliders, equation-generated filter names/descriptions, and live/overlay adjustment toggles.</li>
+            <li>Grouped adjustment dropdowns with 11 core photo controls, 10 color inversion tools, 20 inversion presets, 10 smart darker-edge controls, 20 smart signal engines, an expanded AI-orchestrated Smart Isolate Grouped Pixels defect/distortion module with 20 controls, Thermal Studio A-O hotspot recoloring, 100 advanced sliders, equation-generated filter names/descriptions, and live/overlay adjustment toggles.</li>
             <li>Processed PNG snapshots and 1080P or 2K MP4 recordings with local camera effects applied.</li>
             <li>Separate 1-3 layer image/video compositor with opacity, splice masks, blend modes, transforms, full adjustment-stack support, and clean PNG export.</li>
             <li>Clean exports hide app-added preview chrome, labels, and watermark overlays so only the processed image or video remains.</li>
@@ -5072,6 +5115,55 @@ function smartSignalProcessorStrength(settings = {}, processor) {
   return clamp(amount * (0.62 + sensitivity * 0.72) * (0.42 + blend * 0.9) * 1.42, 0, 1.8);
 }
 
+function buildIsolateGroupedPixelModel(settings = {}, processor) {
+  const strength = smartSignalProcessorStrength(settings, processor);
+  const colorTarget = smartSignalSetting(settings, processor, "ColorTarget") / 100;
+  const pixelSize = smartSignalSetting(settings, processor, "PixelSize") / 100;
+  const pixelWeight = smartSignalSetting(settings, processor, "PixelWeight") / 100;
+  const pixelDensity = smartSignalSetting(settings, processor, "PixelDensity") / 100;
+  const defectSignal = smartSignalSetting(settings, processor, "DefectSignal") / 100;
+  const distortionResponse = smartSignalSetting(settings, processor, "DistortionResponse") / 100;
+  const uniformity = smartSignalSetting(settings, processor, "Uniformity") / 100;
+  const edgeRepair = smartSignalSetting(settings, processor, "EdgeRepair") / 100;
+  const chromaLock = smartSignalSetting(settings, processor, "ChromaLock") / 100;
+  const artifactSuppression = smartSignalSetting(settings, processor, "ArtifactSuppression") / 100;
+  const radius = smartSignalSetting(settings, processor, "Radius") / 100;
+  const sensitivity = smartSignalSetting(settings, processor, "Sensitivity") / 100;
+  const contrast = smartSignalSetting(settings, processor, "Contrast") / 100;
+  const shadow = smartSignalSetting(settings, processor, "Shadow") / 100;
+  const highlight = smartSignalSetting(settings, processor, "Highlight") / 100;
+  const midtone = smartSignalSetting(settings, processor, "Midtone") / 100;
+  const isolation = smartSignalSetting(settings, processor, "Isolation") / 100;
+  const smoothing = smartSignalSetting(settings, processor, "Smoothing") / 100;
+  const blend = smartSignalSetting(settings, processor, "Blend") / 100;
+  return {
+    active: strength > 0.01,
+    strength,
+    colorTarget,
+    pixelSize,
+    pixelWeight,
+    pixelDensity,
+    defectSignal,
+    distortionResponse,
+    uniformity,
+    edgeRepair,
+    chromaLock,
+    artifactSuppression,
+    radius,
+    sensitivity,
+    contrast,
+    shadow,
+    highlight,
+    midtone,
+    isolation,
+    smoothing,
+    blend,
+    blockSize: clamp(Math.round(1 + pixelSize * 7 + radius * 5), 2, 14),
+    densitySignal: clamp(pixelDensity * (0.5 + strength * 0.32), 0, 1.4),
+    defectThreshold: clamp(0.08 + (1 - sensitivity) * 0.2 - defectSignal * 0.045, 0.035, 0.28)
+  };
+}
+
 function applySmartSignalProcessorEffects(context, width, height, settings, effect, smartSignalEnabled = {}, options = {}) {
   const enabled = normalizeSmartSignalToggles(smartSignalEnabled);
   if (!hasEnabledSmartSignalProcessor(enabled) || !context.canvas || !width || !height) return;
@@ -5173,6 +5265,25 @@ function applySmartSignalProcessorEffectsToContext(context, width, height, setti
       b = mixChannel(b, qb, groupAlpha);
     }
 
+    if (model.isolateEngine?.active) {
+      [r, g, b] = applyIsolateGroupedPixelEngine(
+        r,
+        g,
+        b,
+        luma,
+        localAverage,
+        edge,
+        midMask,
+        shadowMask,
+        highlightMask,
+        x,
+        y,
+        width,
+        height,
+        model.isolateEngine
+      );
+    }
+
     if (model.hotspot > 0.01) {
       const hotspotMask = clamp((luma - localAverage) * 2.2 + highlightMask * 0.75 + edge * 0.55, 0, 1);
       const [hr, hg, hb] = thermalPaletteColor(clamp(0.62 + hotspotMask * 0.38, 0, 1), "flare-spectrum");
@@ -5249,6 +5360,96 @@ function applySmartSignalProcessorEffectsToContext(context, width, height, setti
   context.putImageData(frame, 0, 0);
 }
 
+function applyIsolateGroupedPixelEngine(r, g, b, luma, localAverage, edge, midMask, shadowMask, highlightMask, x, y, width, height, model) {
+  const gray = r * 0.2126 + g * 0.7152 + b * 0.0722;
+  const normalizedR = r / 255;
+  const normalizedG = g / 255;
+  const normalizedB = b / 255;
+  const colorSpread = (Math.abs(normalizedR - normalizedG) + Math.abs(normalizedG - normalizedB) + Math.abs(normalizedB - normalizedR)) / 2;
+  const targetPhase = model.colorTarget * Math.PI * 2;
+  const targetR = 0.5 + Math.sin(targetPhase) * 0.5;
+  const targetG = 0.5 + Math.sin(targetPhase + Math.PI * 0.6667) * 0.5;
+  const targetB = 0.5 + Math.sin(targetPhase + Math.PI * 1.3333) * 0.5;
+  const targetDistance = (Math.abs(normalizedR - targetR) + Math.abs(normalizedG - targetG) + Math.abs(normalizedB - targetB)) / 3;
+  const colorMatch = clamp(1 - targetDistance * (1.2 + model.chromaLock * 1.1), 0, 1);
+  const blockX = Math.floor(x / model.blockSize);
+  const blockY = Math.floor(y / model.blockSize);
+  const blockHash = ((blockX * 37 + blockY * 61 + Math.floor(model.pixelSize * 97)) % 113) / 112;
+  const diagonalHash = ((Math.floor((x + y) / Math.max(2, model.blockSize)) * 19 + blockX * 7) % 53) / 52;
+  const isolateGroupedPixelsDensitySignal = clamp(
+    model.densitySignal * (0.32 + blockHash * 0.52 + diagonalHash * 0.22) +
+      colorSpread * model.pixelDensity * 0.28 +
+      edge * model.pixelWeight * 0.18,
+    0,
+    1.45
+  );
+  const isolateGroupedPixelsDefectSignal = clamp(
+    Math.abs(luma - localAverage) * (2.8 + model.defectSignal * 3.8) +
+      edge * (0.86 + model.distortionResponse * 1.75 + model.edgeRepair * 0.28) +
+      colorSpread * (0.44 + model.colorTarget * 0.74) +
+      shadowMask * model.shadow * 0.42 +
+      highlightMask * model.highlight * 0.44 +
+      midMask * model.midtone * 0.28 +
+      isolateGroupedPixelsDensitySignal * 0.26 -
+      model.defectThreshold,
+    0,
+    1.35
+  );
+  const activation = clamp(
+    (isolateGroupedPixelsDefectSignal * (0.72 + model.sensitivity * 0.44) + colorMatch * model.colorTarget * 0.26) *
+      model.strength,
+    0,
+    1
+  );
+  if (activation <= 0.004) return [r, g, b];
+
+  const levels = Math.max(2, Math.round(14 - model.uniformity * 8 - model.isolation * 4));
+  const step = 255 / Math.max(1, levels - 1);
+  const groupGray = Math.round(gray / step) * step;
+  const quantR = Math.round(r / step) * step;
+  const quantG = Math.round(g / step) * step;
+  const quantB = Math.round(b / step) * step;
+  const groupAlpha = clamp(activation * (0.28 + model.isolation * 0.34 + model.uniformity * 0.28 + model.pixelWeight * 0.18), 0, 0.92);
+  const chromaPreserve = clamp(1 - model.chromaLock * 0.72, 0.18, 1);
+  let targetGroupedR = mixChannel(groupGray, quantR, chromaPreserve);
+  let targetGroupedG = mixChannel(groupGray, quantG, chromaPreserve);
+  let targetGroupedB = mixChannel(groupGray, quantB, chromaPreserve);
+
+  const densityLift = 1 + isolateGroupedPixelsDensitySignal * model.pixelDensity * 0.22;
+  targetGroupedR = gray + (targetGroupedR - gray) * densityLift;
+  targetGroupedG = gray + (targetGroupedG - gray) * densityLift;
+  targetGroupedB = gray + (targetGroupedB - gray) * densityLift;
+
+  r = mixChannel(r, targetGroupedR, groupAlpha);
+  g = mixChannel(g, targetGroupedG, groupAlpha);
+  b = mixChannel(b, targetGroupedB, groupAlpha);
+
+  const defectDarken = clamp(activation * model.distortionResponse * (shadowMask * 0.28 + edge * 0.22), 0, 0.5);
+  r *= 1 - defectDarken;
+  g *= 1 - defectDarken * 0.94;
+  b *= 1 - defectDarken * 0.88;
+
+  const repairAlpha = clamp(activation * model.edgeRepair * (0.2 + edge * 0.58), 0, 0.62);
+  const repaired = localAverage * 255;
+  r = mixChannel(r, repaired + (r - gray) * (1 + model.pixelWeight * 0.2), repairAlpha * 0.42);
+  g = mixChannel(g, repaired + (g - gray) * (1 + model.pixelWeight * 0.16), repairAlpha * 0.38);
+  b = mixChannel(b, repaired + (b - gray) * (1 + model.pixelWeight * 0.12), repairAlpha * 0.34);
+
+  const artifactAlpha = clamp(activation * model.artifactSuppression * (0.16 + model.smoothing * 0.36), 0, 0.48);
+  const spectralValue = clamp(luma + edge * 0.38 + isolateGroupedPixelsDefectSignal * 0.24 + colorMatch * 0.12, 0, 1);
+  const [sr, sg, sb] = thermalPaletteColor(spectralValue, model.colorTarget > 0.62 ? "red-lime" : "edge-spectrum");
+  r = mixChannel(r, sr, artifactAlpha);
+  g = mixChannel(g, sg, artifactAlpha * 0.94);
+  b = mixChannel(b, sb, artifactAlpha * 0.88);
+
+  const radialRepair = clamp(distanceFromCenter(x / Math.max(1, width - 1), y / Math.max(1, height - 1)) * model.smoothing * activation * 0.12, 0, 0.16);
+  r = mixChannel(r, gray, radialRepair);
+  g = mixChannel(g, gray, radialRepair);
+  b = mixChannel(b, gray, radialRepair);
+
+  return [r, g, b];
+}
+
 function smartSignalPixelModel(settings = {}, effect = {}, smartSignalEnabled = {}) {
   const model = {
     energy: 0,
@@ -5272,6 +5473,7 @@ function smartSignalPixelModel(settings = {}, effect = {}, smartSignalEnabled = 
     amplify: 0,
     exposure: 0,
     isolate: 0,
+    isolateEngine: null,
     smoothing: 0,
     palette: isThermalRenderMode(settings, effect) ? settings.thermalPalette || "full-range-rgb" : "full-range-rgb"
   };
@@ -5301,7 +5503,14 @@ function smartSignalPixelModel(settings = {}, effect = {}, smartSignalEnabled = 
     else if (processor.id === "lift") model.lift += strength;
     else if (processor.id === "amplify") model.amplify += strength;
     else if (processor.id === "exposure") model.exposure += strength;
-    else if (processor.id === "isolateGroupedPixels") model.isolate += strength;
+    else if (processor.id === "isolateGroupedPixels") {
+      const isolateEngine = buildIsolateGroupedPixelModel(settings, processor);
+      model.isolateEngine = isolateEngine;
+      model.isolate += strength + isolateEngine.isolation * strength * 0.6;
+      model.structure += isolateEngine.defectSignal * strength * 0.22;
+      model.details += isolateEngine.pixelWeight * strength * 0.2;
+      model.smoothing += isolateEngine.smoothing * strength * 0.34;
+    }
     if (isolation > 0.45) model.isolate += isolation * strength * 0.38;
   });
   Object.keys(model).forEach((key) => {
