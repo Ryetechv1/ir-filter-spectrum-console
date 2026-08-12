@@ -228,6 +228,55 @@ const RGBW_CHANNELS = [
   { key: "W", label: "White", min: 0, max: 255, color: "#f5f8fb" }
 ];
 
+const THERMAL_STUDIO_BANDS = "ABCDEFGHIJKLMNO".split("").map((letter, index) => ({
+  letter,
+  target: index / 14,
+  label:
+    index < 3
+      ? "Shadow thermogram"
+      : index < 6
+        ? "Cold palette band"
+        : index < 9
+          ? "Mid isotherm"
+          : index < 12
+            ? "Warm hotspot"
+            : "Peak hotspot"
+}));
+
+const THERMAL_STUDIO_COLOR_OPTIONS = [
+  { id: "black", label: "Black", color: [0, 0, 0] },
+  { id: "deep-blue", label: "Deep Blue", color: [0, 18, 170] },
+  { id: "blue", label: "Blue", color: [0, 88, 255] },
+  { id: "cyan", label: "Cyan", color: [0, 224, 255] },
+  { id: "teal", label: "Teal", color: [0, 214, 170] },
+  { id: "green", label: "Green", color: [32, 255, 92] },
+  { id: "lime", label: "Lime", color: [176, 255, 0] },
+  { id: "yellow", label: "Yellow", color: [255, 238, 0] },
+  { id: "amber", label: "Amber", color: [255, 168, 0] },
+  { id: "orange", label: "Orange", color: [255, 94, 0] },
+  { id: "red", label: "Red", color: [255, 0, 0] },
+  { id: "magenta", label: "Magenta", color: [255, 0, 180] },
+  { id: "violet", label: "Violet", color: [160, 72, 255] },
+  { id: "white", label: "White", color: [255, 255, 255] },
+  { id: "thermal-rgb", label: "Thermal RGB", palette: "full-range-rgb" },
+  { id: "rgbwb", label: "RGBWB Full Spectrum", palette: "rgb-spectrum" }
+];
+
+const THERMAL_STUDIO_COLOR_LOOKUP = new Map(THERMAL_STUDIO_COLOR_OPTIONS.map((option) => [option.id, option]));
+const THERMAL_STUDIO_NUMERIC_ADJUSTMENTS = [
+  ["thermalStudioMaster", "Thermal Studio Master", 0, 100, "%", 0],
+  ...THERMAL_STUDIO_BANDS.flatMap((band) => [
+    [`thermalHotspot${band.letter}Strength`, `${band.letter} Strength`, 0, 100, "%", 0],
+    [`thermalHotspot${band.letter}Width`, `${band.letter} Isotherm Width`, 2, 40, "%", 12]
+  ])
+];
+const THERMAL_STUDIO_COLOR_DEFAULTS = Object.fromEntries(
+  THERMAL_STUDIO_BANDS.map((band, index) => [
+    `thermalHotspot${band.letter}Color`,
+    THERMAL_STUDIO_COLOR_OPTIONS[(index + 1) % THERMAL_STUDIO_COLOR_OPTIONS.length].id
+  ])
+);
+
 const INVERSION_ADJUSTMENTS = [
   ["classicInvert", "Classic RGB Invert", 0, 100, "%", 0],
   ["lumaInvert", "Luma Negative", 0, 100, "%", 0],
@@ -304,6 +353,289 @@ const INVERSION_STYLE_VARIANTS = [
   }
 ];
 
+const EXTRA_INVERSION_STYLE_VARIANTS = [
+  {
+    name: "Infrared Negative Split",
+    color: "rgba(255, 42, 76, 0.26)",
+    blendMode: "difference",
+    settings: { classicInvert: 86, redInvert: 72, infraredWash: 34, contrast: 164, saturation: 176, colorSeparation: 32, heatEdge: 18 }
+  },
+  {
+    name: "Cyan Luma Ghost",
+    color: "rgba(0, 224, 255, 0.3)",
+    blendMode: "exclusion",
+    settings: { lumaInvert: 90, blueInvert: 64, xrayGhost: 28, exposure: 8, contrast: 152, saturation: 132, chromaticGlow: 20 }
+  },
+  {
+    name: "Red Spectral Reverse",
+    color: "rgba(255, 0, 0, 0.32)",
+    blendMode: "difference",
+    settings: { spectralInvert: 92, redInvert: 100, thermalPalette: "inverted-red-rgb", thermalBlend: 62, thermalContour: 56, contrast: 202, saturation: 238 }
+  },
+  {
+    name: "Green Shadow Negative",
+    color: "rgba(62, 255, 90, 0.28)",
+    blendMode: "difference",
+    settings: { shadowInvert: 100, greenInvert: 92, nightScope: 24, shadowDepth: 28, blackPoint: 18, contrast: 178, greenChannel: 184 }
+  },
+  {
+    name: "Blue Highlight Reversal",
+    color: "rgba(68, 142, 255, 0.3)",
+    blendMode: "exclusion",
+    settings: { highlightInvert: 96, blueInvert: 94, ultravioletWash: 28, highlightRecovery: 34, blueChannel: 188, contrast: 164, saturation: 182 }
+  },
+  {
+    name: "Tri-Channel Negative",
+    color: "rgba(255, 0, 210, 0.3)",
+    blendMode: "difference",
+    settings: { channelInvert: 100, redInvert: 66, greenInvert: 78, blueInvert: 90, colorSeparation: 48, prismSplit: 28, contrast: 176, saturation: 230 }
+  },
+  {
+    name: "Thermal Red Black Invert",
+    color: "rgba(255, 50, 0, 0.34)",
+    blendMode: "color-dodge",
+    settings: { thermalPalette: "carbon-fire", thermalInvert: 100, thermalBlend: 96, thermalContour: 86, heatEdge: 84, shadowCrush: 24, contrast: 210, saturation: 218 }
+  },
+  {
+    name: "White Edge Negative",
+    color: "rgba(255, 255, 255, 0.22)",
+    blendMode: "difference",
+    settings: { lumaInvert: 82, highlightInvert: 74, edgeEnhance: 34, fineSharpen: 22, grayscale: 38, contrast: 188, whites: 20 }
+  },
+  {
+    name: "Magenta Depth Reverse",
+    color: "rgba(255, 36, 214, 0.28)",
+    blendMode: "exclusion",
+    settings: { spectralInvert: 88, channelInvert: 78, purpleShift: 38, negativeDepth: 34, localContrast: 22, thermalContour: 42, saturation: 236 }
+  },
+  {
+    name: "Blacklight Negative Bloom",
+    color: "rgba(170, 72, 255, 0.34)",
+    blendMode: "screen",
+    settings: { classicInvert: 74, ultravioletWash: 40, uvaFluorescence: 36, auraBloom: 32, chromaticGlow: 28, glow: 18, contrast: 154, saturation: 210 }
+  }
+];
+
+const XLS_CAMERA_VARIANTS = [
+  {
+    name: "XLS Spectral Camera",
+    color: "rgba(90, 255, 214, 0.32)",
+    blendMode: "screen",
+    settings: { brightness: 112, contrast: 168, saturation: 205, hue: 20, thermalPalette: "xls", thermalBlend: 82, thermalContour: 70, heatEdge: 58, xrayGhost: 42, nearIrBoost: 34, ultravioletWash: 28, infraredWash: 24, edgeEnhance: 22, glow: 12 }
+  },
+  {
+    name: "XLS Ghost Plate",
+    color: "rgba(178, 255, 236, 0.3)",
+    blendMode: "screen",
+    settings: { thermalPalette: "ghost-thermal", thermalBlend: 88, thermalContour: 72, heatEdge: 52, xrayGhost: 68, grayscale: 26, contrast: 176, saturation: 132, softFocus: 8 }
+  },
+  {
+    name: "XLS Bone Cyan",
+    color: "rgba(0, 238, 255, 0.32)",
+    blendMode: "color-dodge",
+    settings: { thermalPalette: "xls", thermalBlend: 94, thermalContour: 86, heatEdge: 74, xrayGhost: 82, cyanBalance: 30, blueChannel: 172, contrast: 194, edgeEnhance: 30 }
+  },
+  {
+    name: "XLS Violet Signal",
+    color: "rgba(170, 80, 255, 0.34)",
+    blendMode: "screen",
+    settings: { thermalPalette: "ultraviolet-heat", thermalBlend: 92, thermalContour: 78, heatEdge: 66, xrayGhost: 64, ultravioletWash: 42, purpleShift: 34, chromaticGlow: 24, saturation: 244 }
+  },
+  {
+    name: "XLS Amber Scan",
+    color: "rgba(255, 174, 36, 0.32)",
+    blendMode: "overlay",
+    settings: { thermalPalette: "copper-hot", thermalBlend: 92, thermalContour: 74, heatEdge: 68, xrayGhost: 50, infraredWash: 38, temperature: 34, contrast: 184, saturation: 192 }
+  },
+  {
+    name: "XLS Green Field",
+    color: "rgba(38, 255, 112, 0.3)",
+    blendMode: "screen",
+    settings: { thermalPalette: "emerald-heat", thermalBlend: 94, thermalContour: 80, heatEdge: 76, xrayGhost: 56, nearIrBoost: 44, nightScope: 22, greenChannel: 180, contrast: 188 }
+  },
+  {
+    name: "XLS Red Isolate",
+    color: "rgba(255, 38, 0, 0.34)",
+    blendMode: "color-dodge",
+    settings: { thermalPalette: "inverted-red-rgb", thermalBlend: 100, thermalContour: 90, heatEdge: 88, xrayGhost: 46, redInvert: 42, redChannel: 190, shadowCrush: 18, saturation: 260 }
+  },
+  {
+    name: "XLS Night Glass",
+    color: "rgba(52, 116, 255, 0.28)",
+    blendMode: "screen",
+    settings: { thermalPalette: "deep-sea-predator", thermalBlend: 90, thermalContour: 82, heatEdge: 74, xrayGhost: 62, exposure: -10, shadowDepth: 28, scanlines: 14, contrast: 202 }
+  },
+  {
+    name: "XLS Mineral X-Ray",
+    color: "rgba(132, 255, 208, 0.3)",
+    blendMode: "screen",
+    settings: { thermalPalette: "object-heat-isolate", thermalBlend: 96, thermalContour: 88, heatEdge: 82, xrayGhost: 72, mineralPop: 34, chlorophyllGlow: 18, colorSeparation: 28, saturation: 240 }
+  },
+  {
+    name: "XLS Thermal Wire",
+    color: "rgba(255, 238, 90, 0.3)",
+    blendMode: "overlay",
+    settings: { thermalPalette: "edge-spectrum", thermalBlend: 96, thermalContour: 100, heatEdge: 96, xrayGhost: 42, edgeEnhance: 44, fineSharpen: 28, localContrast: 26, contrast: 208 }
+  },
+  {
+    name: "XLS Deep Negative",
+    color: "rgba(30, 32, 52, 0.38)",
+    blendMode: "difference",
+    settings: { thermalPalette: "black-hot", thermalBlend: 92, thermalContour: 84, heatEdge: 78, xrayGhost: 76, lumaInvert: 52, negativeDepth: 42, shadowDepth: 34, contrast: 210 }
+  }
+];
+
+const TRI_TONE_VARIANTS = buildPresetVariants(
+  [
+    "Crimson Lime Cyan", "Amber Violet Teal", "Blue Ember Gold", "Rose Copper Aqua", "Green Magenta Ash",
+    "Solar Violet Sea", "Ruby Mint Cobalt", "Tangerine Indigo Frost", "Peacock Red Pearl", "Ultraviolet Olive Flame",
+    "Signal Pink Emerald", "Copper Cyan Night", "Lime Blood Iris", "Aqua Rust Orchid", "Gold Blue Smoke",
+    "Scarlet Jade Ice", "Violet Honey Steel", "Teal Magma Pearl", "Chrome Rose Moss", "Spectral Triad"
+  ],
+  "TriTone",
+  ["#ff345c", "#ff9c24", "#36f59b", "#23d9ff", "#9c5cff", "#fff06a"],
+  (index) => ({
+    brightness: 100 + (index % 4) * 4,
+    contrast: 124 + (index % 5) * 7,
+    saturation: 158 + (index % 6) * 12,
+    hue: ((index * 31) % 220) - 110,
+    duotone: 42 + (index % 5) * 8,
+    splitTone: ((index * 17) % 120) - 60,
+    colorHarmony: 16 + (index % 6) * 9,
+    colorSeparation: 12 + (index % 5) * 7,
+    redChannel: 80 + ((index * 37) % 115),
+    greenChannel: 78 + ((index * 53) % 118),
+    blueChannel: 82 + ((index * 71) % 116),
+    glow: index % 3 === 0 ? 8 : 0
+  })
+);
+
+const QUAD_TONE_VARIANTS = buildPresetVariants(
+  [
+    "Four Band Prism", "Ruby Amber Cyan Violet", "Forest Gold Blue Rose", "Carbon Pearl Heat", "Neon Quartertone",
+    "Aqua Red Lime Black", "Copper Violet Mint Ice", "Magenta Slate Solar", "Blue Honey Ember", "Emerald Chrome Pink",
+    "Signal Quadrant", "White Core Quad", "Black Core Quad", "Red Green Blue White", "Iris Gold Teal",
+    "Frost Lava Moss", "Ultraviolet Quad", "Cobalt Rose Lime", "Tonal Mosaic", "Spectral Quadrature"
+  ],
+  "QuadTone",
+  ["#ffffff", "#ff4a2a", "#ffc400", "#24ffa6", "#22c7ff", "#c45cff"],
+  (index) => ({
+    brightness: 96 + (index % 7) * 5,
+    contrast: 132 + (index % 6) * 8,
+    saturation: 170 + (index % 5) * 14,
+    hue: ((index * 43) % 260) - 130,
+    duotone: 54 + (index % 4) * 9,
+    splitTone: ((index * 29) % 150) - 75,
+    colorHarmony: 24 + (index % 5) * 10,
+    posterize: 6 + (index % 4) * 5,
+    colorSeparation: 18 + (index % 6) * 6,
+    overlayStrength: 18 + (index % 5) * 8,
+    redHueShift: ((index * 13) % 80) - 40,
+    greenHueShift: ((index * 19) % 80) - 40,
+    blueHueShift: ((index * 23) % 80) - 40
+  })
+);
+
+const CHANNEL_SPECTROGRAPH_VARIANTS = buildPresetVariants(
+  [
+    "RGB Trace Lines", "Cyan Frequency", "Red Channel Seism", "Green Channel Graph", "Blue Channel Echo",
+    "Prism Oscilloscope", "Spectral Barcode", "Luma Frequency", "Channel Topography", "Chromatic Telemetry",
+    "Signal Comb", "Photon Graph", "Tri-Channel Ridge", "Scanline Spectrum", "Waveform Heat",
+    "Color Phase Map", "Edge Spectrograph", "Aura Graph", "Sensor Sweep Grid", "Full Band Plot"
+  ],
+  "Channel Spectrograph",
+  ["#00e5ff", "#ff375f", "#70ff4d", "#506bff", "#ffd43b", "#ff4de1"],
+  (index) => ({
+    brightness: 98 + (index % 4) * 5,
+    contrast: 146 + (index % 7) * 9,
+    saturation: 148 + (index % 6) * 15,
+    colorSeparation: 34 + (index % 6) * 8,
+    chromaticAberration: 16 + (index % 5) * 9,
+    prismSplit: 18 + (index % 5) * 8,
+    scanlines: 10 + (index % 6) * 8,
+    edgeEnhance: 16 + (index % 5) * 6,
+    thermalContour: index % 3 === 0 ? 28 + (index % 4) * 8 : 0,
+    redChannel: 60 + ((index * 47) % 155),
+    greenChannel: 60 + ((index * 61) % 155),
+    blueChannel: 60 + ((index * 73) % 155)
+  })
+);
+
+const BLACK_VARIANTS = buildPresetVariants(
+  [
+    "Black Void", "Carbon Signal", "Obsidian Heat", "Noir Depth", "Raven Field",
+    "Black Glass", "Deep Shadow Map", "Ink Sensor", "Eclipse Plate", "Void Glow",
+    "Graphite Burn", "Blacklight Dark", "Night Carbon", "Abyss Edge", "Shadow Furnace",
+    "Black Pearl Signal", "Darkroom Bloom", "Pitch Trace", "Coal Frequency", "Absolute Black"
+  ],
+  "Black",
+  ["#050507", "#151515", "#2b1a1a", "#0e1924", "#180b24", "#332a20"],
+  (index) => ({
+    brightness: 72 + (index % 4) * 6,
+    contrast: 170 + (index % 7) * 8,
+    saturation: index % 5 === 0 ? 110 : 18 + (index % 5) * 14,
+    exposure: -18 - (index % 5) * 4,
+    blackPoint: 20 + (index % 6) * 9,
+    shadowDepth: 28 + (index % 5) * 10,
+    shadowCrush: 18 + (index % 6) * 9,
+    localContrast: 18 + (index % 5) * 8,
+    edgeEnhance: 8 + (index % 5) * 6,
+    grayscale: index % 3 === 0 ? 72 : 28,
+    thermalContour: index % 4 === 0 ? 36 : 0,
+    heatEdge: index % 4 === 0 ? 28 : 0,
+    glow: index % 6 === 0 ? 8 : 0
+  })
+);
+
+const CHANNEL_SWEEP_VARIANTS = buildPresetVariants(
+  [
+    "Red Sweep", "Green Sweep", "Blue Sweep", "Cyan Sweep", "Magenta Sweep",
+    "Yellow Sweep", "RGBW Sweep", "Heat Sweep", "Shadow Sweep", "Highlight Sweep",
+    "Left Phase Sweep", "Right Phase Sweep", "Channel Wave", "Color Rotary", "Signal Pan",
+    "Chromatic Conveyor", "Bandpass Sweep", "Phase Ladder", "Spectral Scroll", "Full Channel Sweep"
+  ],
+  "Channel Sweep",
+  ["#ff334f", "#48ff78", "#38a7ff", "#26f5ff", "#ff42dc", "#ffe842"],
+  (index) => ({
+    brightness: 102 + (index % 4) * 3,
+    contrast: 132 + (index % 6) * 8,
+    saturation: 180 + (index % 5) * 12,
+    hue: ((index * 51) % 360) - 180,
+    redChannel: 44 + ((index * 83) % 190),
+    greenChannel: 44 + ((index * 97) % 190),
+    blueChannel: 44 + ((index * 109) % 190),
+    redHueShift: ((index * 17) % 120) - 60,
+    greenHueShift: ((index * 31) % 120) - 60,
+    blueHueShift: ((index * 47) % 120) - 60,
+    chromaticAberration: 10 + (index % 5) * 9,
+    glitchShift: 8 + (index % 6) * 8,
+    colorSeparation: 20 + (index % 7) * 7,
+    scanlines: index % 2 ? 10 + (index % 4) * 6 : 0
+  })
+);
+
+function buildPresetVariants(names, category, swatches, settingsFactory) {
+  return names.map((name, index) => {
+    const color = swatches[index % swatches.length];
+    const alpha = 0.22 + (index % 5) * 0.025;
+    return {
+      name,
+      color: hexToRgba(color, alpha),
+      blendMode: ["screen", "overlay", "soft-light", "color-dodge", "exclusion"][index % 5],
+      settings: settingsFactory(index, category, name)
+    };
+  });
+}
+
+function hexToRgba(hex, alpha = 1) {
+  const clean = String(hex || "#ffffff").replace("#", "");
+  const value = clean.length === 3 ? clean.split("").map((char) => char + char).join("") : clean.padEnd(6, "f").slice(0, 6);
+  const red = parseInt(value.slice(0, 2), 16);
+  const green = parseInt(value.slice(2, 4), 16);
+  const blue = parseInt(value.slice(4, 6), 16);
+  return `rgba(${red}, ${green}, ${blue}, ${clamp(alpha, 0, 1)})`;
+}
+
 const CORE_ADJUSTMENTS = [
   ["brightness", "Brightness", 20, 220, "%"],
   ["contrast", "Contrast", 20, 220, "%"],
@@ -365,7 +697,12 @@ const SMART_SIGNAL_PROCESSORS = [
   ["lift", "Lift", "Low-light lift and faint-signal reveal without flattening the whole image."],
   ["amplify", "Amplify", "Overall signal amplification for color, contrast, glow, and thermal response."],
   ["exposure", "Exposure", "Smart exposure gain that prioritizes visible effect movement."],
-  ["isolateGroupedPixels", "Isolate Grouped Pixels", "Groups similar color, shadow, depth, range, shade, and size into more uniform rendered shapes."]
+  ["isolateGroupedPixels", "Isolate Grouped Pixels", "Groups similar color, shadow, depth, range, shade, and size into more uniform rendered shapes."],
+  ["hotspotTrace", "Hotspot Trace", "Finds local heat-like peaks and pushes them into visible color-isotherm ridges."],
+  ["spectralBloom", "Spectral Bloom", "Expands faint glow and color energy around bright and midtone signals."],
+  ["edgeFusion", "Edge Fusion", "Binds edge detail and color channel separation into sharper layered boundaries."],
+  ["toneQuantizer", "Tone Quantizer", "Compresses continuous tones into readable stepped spectral bands."],
+  ["chromaticPressure", "Chromatic Pressure", "Applies directional RGB pressure so similar presets split into stronger color identities."]
 ].map(([id, title, description]) => ({
   id,
   title,
@@ -510,6 +847,8 @@ const DEFAULT_SETTINGS = {
   ...Object.fromEntries(INVERSION_ADJUSTMENTS.map(([key, , , , , initial = 0]) => [key, initial])),
   ...Object.fromEntries(SMART_DARK_EDGE_ADJUSTMENTS.map(([key, , , , , initial = 0]) => [key, initial])),
   ...Object.fromEntries(SMART_SIGNAL_ADJUSTMENTS.map(([key, , , , , initial = 0]) => [key, initial])),
+  ...Object.fromEntries(THERMAL_STUDIO_NUMERIC_ADJUSTMENTS.map(([key, , , , , initial = 0]) => [key, initial])),
+  ...THERMAL_STUDIO_COLOR_DEFAULTS,
   ...Object.fromEntries(ADVANCED_ADJUSTMENTS.map(([key, , , , , initial = 0]) => [key, initial])),
   ...Object.fromEntries(
     RGBW_MIXERS.flatMap((group) =>
@@ -522,6 +861,8 @@ const STACKED_SETTING_KEYS = new Set([
   ...INVERSION_ADJUSTMENTS.map(([key]) => key),
   ...SMART_DARK_EDGE_ADJUSTMENTS.map(([key]) => key),
   ...SMART_SIGNAL_ADJUSTMENTS.map(([key]) => key),
+  ...THERMAL_STUDIO_NUMERIC_ADJUSTMENTS.map(([key]) => key),
+  ...THERMAL_STUDIO_BANDS.map((band) => `thermalHotspot${band.letter}Color`),
   ...RGBW_MIXERS.flatMap((group) => RGBW_CHANNELS.map((channel) => `${group.key}${channel.key}`))
 ]);
 
@@ -547,6 +888,14 @@ const ADJUSTMENT_GROUPS = [
     controls: INVERSION_ADJUSTMENTS,
     controlClassName: "inversion-adjustment",
     open: true
+  },
+  {
+    id: "thermal-studio",
+    title: "Thermal Studio",
+    description: "A-O hotspot/isotherm recolor controls with full-spectrum RGBWB palette targets for thermogram band design.",
+    type: "thermal-studio",
+    controls: THERMAL_STUDIO_NUMERIC_ADJUSTMENTS,
+    open: false
   },
   {
     id: "smart-dark-edge",
@@ -704,7 +1053,7 @@ const ADJUSTMENT_GROUPS = [
 ];
 
 const ADJUSTMENT_LOOKUP = new Map(
-  [...CORE_ADJUSTMENTS, ...FINISH_ADJUSTMENTS, ...INVERSION_ADJUSTMENTS, ...SMART_DARK_EDGE_ADJUSTMENTS, ...SMART_SIGNAL_ADJUSTMENTS, ...ADVANCED_ADJUSTMENTS].map((control) => [
+  [...CORE_ADJUSTMENTS, ...FINISH_ADJUSTMENTS, ...INVERSION_ADJUSTMENTS, ...SMART_DARK_EDGE_ADJUSTMENTS, ...SMART_SIGNAL_ADJUSTMENTS, ...THERMAL_STUDIO_NUMERIC_ADJUSTMENTS, ...ADVANCED_ADJUSTMENTS].map((control) => [
     control[0],
     control
   ])
@@ -761,6 +1110,41 @@ const EFFECT_FAMILIES = [
     settings: { brightness: 104, contrast: 121, saturation: 132, duotone: 46, tint: 20 }
   },
   {
+    category: "TriTone",
+    variants: TRI_TONE_VARIANTS,
+    color: "rgba(255, 94, 168, 0.24)",
+    blendMode: "soft-light",
+    settings: { brightness: 104, contrast: 128, saturation: 172, duotone: 54, splitTone: 22, colorHarmony: 22 }
+  },
+  {
+    category: "QuadTone",
+    variants: QUAD_TONE_VARIANTS,
+    color: "rgba(255, 220, 88, 0.22)",
+    blendMode: "overlay",
+    settings: { brightness: 102, contrast: 136, saturation: 184, duotone: 60, splitTone: 30, posterize: 8, overlayStrength: 18 }
+  },
+  {
+    category: "Channel Spectrograph",
+    variants: CHANNEL_SPECTROGRAPH_VARIANTS,
+    color: "rgba(34, 220, 255, 0.24)",
+    blendMode: "screen",
+    settings: { brightness: 100, contrast: 148, saturation: 166, colorSeparation: 34, chromaticAberration: 18, scanlines: 12, edgeEnhance: 18 }
+  },
+  {
+    category: "Black",
+    variants: BLACK_VARIANTS,
+    color: "rgba(10, 10, 14, 0.38)",
+    blendMode: "multiply",
+    settings: { brightness: 84, contrast: 176, saturation: 42, blackPoint: 26, shadowDepth: 32, shadowCrush: 24, localContrast: 18 }
+  },
+  {
+    category: "Channel Sweep",
+    variants: CHANNEL_SWEEP_VARIANTS,
+    color: "rgba(255, 86, 34, 0.24)",
+    blendMode: "screen",
+    settings: { brightness: 102, contrast: 136, saturation: 186, colorSeparation: 26, chromaticAberration: 16, glitchShift: 10, hue: 18 }
+  },
+  {
     category: "Retro Film",
     names: ["Kodachrome Mood", "Sepia Plate", "Faded 90s", "Polaroid Warm", "Dusty Blue", "Home Movie", "Analog Push", "Contact Sheet", "Golden Fade", "Expired Roll"],
     color: "rgba(255,198,98,0.18)",
@@ -776,7 +1160,7 @@ const EFFECT_FAMILIES = [
   },
   {
     category: "Color Inversion Matrix",
-    variants: INVERSION_STYLE_VARIANTS,
+    variants: [...INVERSION_STYLE_VARIANTS, ...EXTRA_INVERSION_STYLE_VARIANTS],
     color: "rgba(245,248,251,0.18)",
     blendMode: "difference",
     settings: { brightness: 104, contrast: 146, saturation: 150, colorSeparation: 18, invert: 12 }
@@ -1034,7 +1418,7 @@ const EFFECT_FAMILIES = [
   },
   {
     category: "XLS Camera",
-    names: ["XLS Spectral Camera"],
+    variants: XLS_CAMERA_VARIANTS,
     color: "rgba(90, 255, 214, 0.32)",
     blendMode: "screen",
     settings: { brightness: 112, contrast: 168, saturation: 205, hue: 20, thermalPalette: "xls", thermalBlend: 82, thermalContour: 70, heatEdge: 58, xrayGhost: 42, nearIrBoost: 34, ultravioletWash: 28, infraredWash: 24, edgeEnhance: 22, glow: 12 }
@@ -1239,6 +1623,18 @@ function retouchPresetSettings(category, name, index, baseSettings = {}) {
     tuned.colorSeparation = Math.max(tuned.colorSeparation ?? 0, 10 + index * 2);
     tuned.contrast = Math.max(tuned.contrast ?? 100, 138 + index * 3);
   }
+  if (category === "XLS Camera") {
+    tuned.thermalBlend = Math.max(tuned.thermalBlend ?? 0, 74 + (index % 5) * 5);
+    tuned.thermalContour = Math.max(tuned.thermalContour ?? 0, 62 + (index % 6) * 5);
+    tuned.heatEdge = Math.max(tuned.heatEdge ?? 0, 50 + (index % 7) * 5);
+    tuned.xrayGhost = Math.max(tuned.xrayGhost ?? 0, 38 + (index % 6) * 6);
+    tuned.edgeEnhance = Math.max(tuned.edgeEnhance ?? 0, 18 + (index % 5) * 5);
+  }
+  if (["TriTone", "QuadTone", "Channel Spectrograph", "Black", "Channel Sweep"].includes(category)) {
+    tuned.colorSeparation = Math.max(tuned.colorSeparation ?? 0, 12 + (index % 7) * 5);
+    tuned.localContrast = Math.max(tuned.localContrast ?? 0, 8 + (index % 5) * 4);
+    tuned.vibrance = Math.max(tuned.vibrance ?? 0, 10 + (index % 6) * 6);
+  }
   if (name === "UVA Bloom") {
     Object.assign(tuned, {
       uvaFluorescence: Math.max(tuned.uvaFluorescence ?? 0, 22),
@@ -1377,7 +1773,8 @@ const EQUATION_MUTATION_KEYS = [
   "shadowInvert",
   "highlightInvert",
   ...SMART_DARK_EDGE_ADJUSTMENTS.map(([key]) => key),
-  ...SMART_SIGNAL_ADJUSTMENTS.map(([key]) => key)
+  ...SMART_SIGNAL_ADJUSTMENTS.map(([key]) => key),
+  ...THERMAL_STUDIO_NUMERIC_ADJUSTMENTS.map(([key]) => key)
 ];
 const EQUATION_STYLE_CATEGORY_KEYS = new Map([
   ["Clean Studio", ["ambientLift", "highlightRecovery", "whiteBalance", "skinSmooth"]],
@@ -1387,15 +1784,21 @@ const EQUATION_STYLE_CATEGORY_KEYS = new Map([
   ["Cyber Neon", ["glow", "bloom", "chromaticGlow", "colorSeparation", "prismSplit"]],
   ["Black & White", ["grayscale", "contrast", "grain", "threshold", "clarity"]],
   ["Duotone", ["duotone", "splitTone", "tint", "colorHarmony", "colorDodge"]],
+  ["TriTone", ["duotone", "splitTone", "colorHarmony", "colorSeparation", "redChannel", "greenChannel", "blueChannel"]],
+  ["QuadTone", ["duotone", "splitTone", "posterize", "overlayStrength", "colorHarmony", "colorSeparation"]],
+  ["Channel Spectrograph", ["colorSeparation", "chromaticAberration", "prismSplit", "scanlines", "edgeEnhance", "thermalContour"]],
+  ["Black", ["blackPoint", "shadowDepth", "shadowCrush", "localContrast", "grayscale", "thermalContour", "heatEdge"]],
+  ["Channel Sweep", ["redChannel", "greenChannel", "blueChannel", "redHueShift", "greenHueShift", "blueHueShift", "chromaticAberration", "glitchShift", "colorSeparation"]],
   ["Retro Film", ["sepia", "grain", "dust", "scratches", "matte", "halation"]],
   ["Night Vision", ["nightScope", "nearIrBoost", "glow", "scanlines", "negativeDepth"]],
   ["Color Inversion Matrix", ["classicInvert", "lumaInvert", "channelInvert", "spectralInvert", "thermalInvert", "redInvert", "greenInvert", "blueInvert", "shadowInvert", "highlightInvert", "invert", "colorSeparation"]],
   ["Thermal Looks", ["thermalBlend", "thermalContour", "heatEdge", "edgeEnhance", "localContrast", "darkEdgeThermalBind", "darkEdgeBlackClamp"]],
   ["Thermal Variations", ["thermalBlend", "thermalContour", "heatEdge", "edgeEnhance", "shadowCrush", "localContrast", "darkEdgeAmount", "darkEdgeShadowDepth"]],
-  ["XLS Camera", ["thermalBlend", "thermalContour", "heatEdge", "xrayGhost", "nearIrBoost", "ultravioletWash", "infraredWash"]],
+  ["XLS Camera", ["thermalBlend", "thermalContour", "heatEdge", "xrayGhost", "nearIrBoost", "ultravioletWash", "infraredWash", "edgeEnhance"]],
   ["Exposure Tools", ["exposure", "highlightRecovery", "ambientLift", "shadowDepth", "localContrast"]],
   ["Color Lab", ["hue", "tint", "vibrance", "colorSeparation", "colorHarmony", "colorizeStrength"]],
   ["Detail, Texture & Noise", ["clarity", "dehaze", "edgeEnhance", "localContrast", "darkEdgeAmount", "darkEdgeDetailAmplify", "darkEdgeContrast"]],
+  ["Thermal Studio", THERMAL_STUDIO_NUMERIC_ADJUSTMENTS.map(([key]) => key)],
   ["Smart Signal Engines", SMART_SIGNAL_ADJUSTMENTS.map(([key]) => key)]
 ]);
 const EQUATION_CORE_STYLE_KEYS = ["brightness", "contrast", "exposure", "saturation", "hue", "temperature", "tint", "glow"];
@@ -1656,6 +2059,16 @@ function settingRange(key) {
     return { min: 0, max: 255 };
   }
   return { min: 0, max: 100 };
+}
+
+function isNumericSettingKey(key) {
+  return ADJUSTMENT_LOOKUP.has(key) || RGBW_MIXERS.some((group) => RGBW_CHANNELS.some((channel) => `${group.key}${channel.key}` === key));
+}
+
+function thermalStudioColorPreview(colorId, target = 0.5) {
+  const option = THERMAL_STUDIO_COLOR_LOOKUP.get(colorId) || THERMAL_STUDIO_COLOR_LOOKUP.get("thermal-rgb");
+  const color = option?.palette ? thermalPaletteColor(target, option.palette) : option?.color || [255, 255, 255];
+  return `rgb(${Math.round(color[0])}, ${Math.round(color[1])}, ${Math.round(color[2])})`;
 }
 
 function seededHash(value) {
@@ -2275,7 +2688,7 @@ function CameraStudio() {
   }
 
   function updateSetting(key, value) {
-    setManualSettings((current) => ({ ...current, [key]: Number(value) }));
+    setManualSettings((current) => ({ ...current, [key]: isNumericSettingKey(key) ? Number(value) : value }));
   }
 
   function setAdjustmentGroupOpen(groupId, open) {
@@ -2618,6 +3031,55 @@ function CameraStudio() {
     );
   }
 
+  function renderThermalStudioGroup() {
+    const master = manualSettings.thermalStudioMaster ?? DEFAULT_SETTINGS.thermalStudioMaster ?? 0;
+    return (
+      <div className="thermal-studio-board" aria-label="Thermal Studio hotspot recolor bands">
+        {renderAdjustmentSlider(ADJUSTMENT_LOOKUP.get("thermalStudioMaster"), "thermal-studio-master")}
+        <div className="thermal-hotspot-grid">
+          {THERMAL_STUDIO_BANDS.map((band) => {
+            const colorKey = `thermalHotspot${band.letter}Color`;
+            const colorId = manualSettings[colorKey] || DEFAULT_SETTINGS[colorKey];
+            const color = thermalStudioColorPreview(colorId, band.target);
+            return (
+              <section className="thermal-hotspot-card" key={band.letter}>
+                <div className="thermal-hotspot-heading">
+                  <strong>{band.letter}</strong>
+                  <span>
+                    {band.label}
+                    <small>{Math.round(band.target * 100)}% depth</small>
+                  </span>
+                  <em style={{ background: color }} />
+                </div>
+                <label className="thermal-color-select">
+                  Palette / hotspot color
+                  <select
+                    value={colorId}
+                    onChange={(event) => updateSetting(colorKey, event.target.value)}
+                    style={{ "--thermal-hotspot-color": color }}
+                  >
+                    {THERMAL_STUDIO_COLOR_OPTIONS.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {renderAdjustmentSlider(ADJUSTMENT_LOOKUP.get(`thermalHotspot${band.letter}Strength`), "thermal-hotspot-slider")}
+                {renderAdjustmentSlider(ADJUSTMENT_LOOKUP.get(`thermalHotspot${band.letter}Width`), "thermal-hotspot-slider")}
+              </section>
+            );
+          })}
+        </div>
+        <p className="thermal-studio-note">
+          {master
+            ? "Active: A-O recolor bands apply to thermal depth/isotherm regions in live camera, HUD, snapshots, recordings, and overlay exports."
+            : "Set Thermal Studio Master above 0% and raise any A-O band strength to recolor specific thermogram/hotspot ranges."}
+        </p>
+      </div>
+    );
+  }
+
   function renderEquationEnginePanel() {
     const rows = [
       ["A", "Value pipeline", equationModel.A],
@@ -2749,6 +3211,8 @@ function CameraStudio() {
         {isOpen &&
           (group.type === "rgbw"
             ? renderRgbwMixerGroup()
+            : group.type === "thermal-studio"
+              ? renderThermalStudioGroup()
             : group.type === "smart-dark-edge"
               ? renderSmartDarkEdgeGroup(group)
               : group.type === "smart-signal"
@@ -3028,9 +3492,9 @@ function CameraStudio() {
             </p>
           </div>
           <ul>
-            <li>{CAMERA_EFFECTS.length} local visual presets compiled at 500% intensity for IR-style, UVA-style, full-spectrum thermal, XLS, cinematic, monochrome, duotone, retro, and color-lab looks.</li>
+            <li>{CAMERA_EFFECTS.length} local visual presets compiled at 500% intensity for IR-style, UVA-style, full-spectrum thermal, XLS, inversion, tritone, quadtone, channel spectrograph, black-field, channel sweep, cinematic, monochrome, duotone, retro, and color-lab looks.</li>
             <li>Four RGBW gradient mixers for Main, Secondary, Third, and Highlights color layers that drive overlays, filter math, and the selected app accent aesthetic.</li>
-            <li>Grouped adjustment dropdowns with 11 core photo controls, 10 color inversion tools, 10 smart darker-edge controls, 15 smart signal engines with 10 sliders each, 100 advanced sliders, equation-generated filter names/descriptions, and live/overlay adjustment toggles.</li>
+            <li>Grouped adjustment dropdowns with 11 core photo controls, 10 color inversion tools, 20 inversion presets, 10 smart darker-edge controls, 20 smart signal engines with 10 sliders each, Thermal Studio A-O hotspot recoloring, 100 advanced sliders, equation-generated filter names/descriptions, and live/overlay adjustment toggles.</li>
             <li>Processed PNG snapshots and 1080P or 2K MP4 recordings with local camera effects applied.</li>
             <li>Separate 1-3 layer image/video compositor with opacity, splice masks, blend modes, transforms, full adjustment-stack support, and clean PNG export.</li>
             <li>Clean exports hide app-added preview chrome, labels, and watermark overlays so only the processed image or video remains.</li>
@@ -4062,10 +4526,12 @@ function advancedCameraPixelModel(settings, effect) {
     Math.abs(effectSetting(settings, "midtoneLift", 0, PIXEL_EFFECT_GAIN));
   const thermalAmount = clamp(((thermalSignal + thermalPresetSignal) * THERMAL_SIGNAL_GAIN) / 210, 0, 1);
   const xlsAmount = clamp(xlsSignal / 135, 0, 1);
+  const thermalStudioActive = buildThermalStudioModel(settings).active;
   return {
     palette: paletteName || (xlsAmount > thermalAmount ? "xls" : "classic"),
     thermalAmount,
     xlsAmount,
+    thermalStudioActive,
     posterizeAmount,
     pixelateAmount,
     noiseReductionAmount,
@@ -4082,14 +4548,25 @@ function hasAdvancedCameraPixelEffects(settings, effect, smartDarkEdgeEnabled = 
       model.pixelateAmount ||
       model.noiseReductionAmount ||
       model.colorBalanceAmount ||
+      model.thermalStudioActive ||
       smartDarkEdgeEnabled ||
       hasEnabledSmartSignalProcessor(smartSignalEnabled)
   );
 }
 
 function applyAdvancedCameraPixelEffects(context, width, height, settings, effect, options = {}) {
-  const { palette, thermalAmount, xlsAmount } = advancedCameraPixelModel(settings, effect);
-  if (!thermalAmount && !xlsAmount) return;
+  const effectModel = advancedCameraPixelModel(settings, effect);
+  if (
+    !effectModel.thermalAmount &&
+    !effectModel.xlsAmount &&
+    !effectModel.posterizeAmount &&
+    !effectModel.pixelateAmount &&
+    !effectModel.noiseReductionAmount &&
+    !effectModel.colorBalanceAmount &&
+    !effectModel.thermalStudioActive
+  ) {
+    return;
+  }
   const pixelBudget = options.pixelBudget || THERMAL_EFFECT_PIXEL_BUDGET;
 
   if (context.canvas && width * height > pixelBudget) {
@@ -4107,7 +4584,7 @@ function applyAdvancedCameraPixelEffects(context, width, height, settings, effec
     workContext.clearRect(0, 0, workWidth, workHeight);
     workContext.drawImage(context.canvas, 0, 0, width, height, 0, 0, workWidth, workHeight);
     workContext.restore();
-    applyAdvancedCameraPixelEffectsToContext(workContext, workWidth, workHeight, settings, { palette, thermalAmount, xlsAmount });
+    applyAdvancedCameraPixelEffectsToContext(workContext, workWidth, workHeight, settings, effectModel);
     context.save();
     context.imageSmoothingEnabled = true;
     context.imageSmoothingQuality = "high";
@@ -4117,7 +4594,7 @@ function applyAdvancedCameraPixelEffects(context, width, height, settings, effec
     return;
   }
 
-  applyAdvancedCameraPixelEffectsToContext(context, width, height, settings, { palette, thermalAmount, xlsAmount });
+  applyAdvancedCameraPixelEffectsToContext(context, width, height, settings, effectModel);
 }
 
 function applyAdvancedCameraPixelEffectsToContext(context, width, height, settings, effectModel) {
@@ -4147,6 +4624,7 @@ function applyAdvancedCameraPixelEffectsToContext(context, width, height, settin
   const hotPalette = thermalHotPalette(palette);
   const keepWhiteBackground = thermalAllowsWhiteBackground(palette);
   const expandedRgbRange = thermalUsesExpandedRgbRange(palette);
+  const thermalStudioModel = buildThermalStudioModel(settings);
   const lumaAt = (pixelIndex) =>
     (source[pixelIndex] * 0.2126 + source[pixelIndex + 1] * 0.7152 + source[pixelIndex + 2] * 0.0722) / 255;
 
@@ -4202,6 +4680,17 @@ function applyAdvancedCameraPixelEffectsToContext(context, width, height, settin
       r = mixChannel(r, tr, thermalAmount);
       g = mixChannel(g, tg, thermalAmount);
       b = mixChannel(b, tb, thermalAmount);
+    }
+
+    if (thermalStudioModel.active) {
+      const studioColor = thermalStudioBandColor(mappedLuma, thermalStudioModel);
+      if (studioColor) {
+        const [sr, sg, sb, alpha] = studioColor;
+        const detailBoost = clamp(0.68 + localTexture * 0.3 + gradientEdge * 0.24, 0.5, 1.18);
+        r = mixChannel(r, sr, alpha * detailBoost);
+        g = mixChannel(g, sg, alpha * detailBoost);
+        b = mixChannel(b, sb, alpha * detailBoost);
+      }
     }
 
     if (xlsAmount) {
@@ -4525,6 +5014,49 @@ function smartDarkEdgeSignal(settings = {}, effect = {}) {
   return clamp(sliderSignal * 1.15 + effectSignal + presetSignal, 0, 1.45);
 }
 
+function buildThermalStudioModel(settings = {}) {
+  const master = clamp(setting(settings, "thermalStudioMaster") / 100, 0, 1);
+  if (!master) return { active: false, bands: [] };
+  const bands = THERMAL_STUDIO_BANDS.map((band) => {
+    const strength = clamp(setting(settings, `thermalHotspot${band.letter}Strength`) / 100, 0, 1);
+    if (!strength) return null;
+    return {
+      ...band,
+      strength,
+      width: clamp(setting(settings, `thermalHotspot${band.letter}Width`, 12) / 100, 0.02, 0.4),
+      colorId: settings[`thermalHotspot${band.letter}Color`] || THERMAL_STUDIO_COLOR_DEFAULTS[`thermalHotspot${band.letter}Color`]
+    };
+  }).filter(Boolean);
+  return {
+    active: Boolean(bands.length),
+    master,
+    bands
+  };
+}
+
+function thermalStudioBandColor(value, model) {
+  if (!model?.active) return null;
+  let best = null;
+  let bestScore = 0;
+  model.bands.forEach((band) => {
+    const distance = Math.abs(value - band.target);
+    const score = clamp(1 - distance / Math.max(0.02, band.width), 0, 1) * band.strength;
+    if (score > bestScore) {
+      bestScore = score;
+      best = band;
+    }
+  });
+  if (!best || bestScore <= 0.01) return null;
+  const color = thermalStudioColorForBand(best, value);
+  return [...color, clamp(model.master * bestScore * 0.82, 0, 0.92)];
+}
+
+function thermalStudioColorForBand(band, value) {
+  const option = THERMAL_STUDIO_COLOR_LOOKUP.get(band.colorId) || THERMAL_STUDIO_COLOR_LOOKUP.get("thermal-rgb");
+  if (option?.palette) return thermalPaletteColor(value, option.palette);
+  return option?.color || [255, 255, 255];
+}
+
 function hasEnabledSmartSignalProcessor(smartSignalEnabled = {}) {
   return SMART_SIGNAL_PROCESSORS.some((processor) => Boolean(smartSignalEnabled?.[processor.id]));
 }
@@ -4641,6 +5173,46 @@ function applySmartSignalProcessorEffectsToContext(context, width, height, setti
       b = mixChannel(b, qb, groupAlpha);
     }
 
+    if (model.hotspot > 0.01) {
+      const hotspotMask = clamp((luma - localAverage) * 2.2 + highlightMask * 0.75 + edge * 0.55, 0, 1);
+      const [hr, hg, hb] = thermalPaletteColor(clamp(0.62 + hotspotMask * 0.38, 0, 1), "flare-spectrum");
+      const alpha = clamp(model.hotspot * hotspotMask * (0.36 + model.range * 0.14), 0, 0.82);
+      r = mixChannel(r, hr, alpha);
+      g = mixChannel(g, hg, alpha);
+      b = mixChannel(b, hb, alpha);
+    }
+
+    if (model.spectralBloom > 0.01) {
+      const bloomMask = clamp(highlightMask * 0.62 + midMask * 0.28 + edge * 0.18, 0, 1);
+      r += (72 + model.chromaticPressure * 34) * model.spectralBloom * bloomMask;
+      g += (38 + model.depth * 28) * model.spectralBloom * bloomMask;
+      b += (96 + model.field * 30) * model.spectralBloom * bloomMask;
+    }
+
+    if (model.edgeFusion > 0.01) {
+      const fusion = clamp(edge * model.edgeFusion * (0.48 + model.details * 0.18), 0, 0.88);
+      const [fr, fg, fb] = thermalPaletteColor(clamp(luma + edge * 0.62, 0, 1), "edge-spectrum");
+      r = mixChannel(r, fr, fusion);
+      g = mixChannel(g, fg, fusion * 0.95);
+      b = mixChannel(b, fb, fusion * 0.9);
+    }
+
+    if (model.quantizer > 0.01) {
+      const levels = Math.max(3, Math.round(14 - model.quantizer * 9));
+      const step = 255 / (levels - 1);
+      const alpha = clamp(model.quantizer * (0.28 + model.smoothing * 0.18), 0, 0.72);
+      r = mixChannel(r, Math.round(r / step) * step, alpha);
+      g = mixChannel(g, Math.round(g / step) * step, alpha);
+      b = mixChannel(b, Math.round(b / step) * step, alpha);
+    }
+
+    if (model.chromaticPressure > 0.01) {
+      const pressure = model.chromaticPressure * (0.48 + edge * 0.32 + midMask * 0.18);
+      r += (r - gray) * pressure + 34 * pressure * Math.sin((x / Math.max(1, width)) * Math.PI * 2);
+      g += (g - gray) * pressure + 24 * pressure * Math.cos((y / Math.max(1, height)) * Math.PI * 2);
+      b += (b - gray) * pressure + 30 * pressure * Math.sin(((x + y) / Math.max(1, width + height)) * Math.PI * 4);
+    }
+
     if (model.blackpoint > 0.01) {
       const crush = clamp(model.blackpoint * (0.25 + shadowMask * 0.85), 0, 0.92);
       r *= 1 - crush;
@@ -4689,6 +5261,11 @@ function smartSignalPixelModel(settings = {}, effect = {}, smartSignalEnabled = 
     midtones: 0,
     invert: 0,
     structure: 0,
+    hotspot: 0,
+    spectralBloom: 0,
+    edgeFusion: 0,
+    quantizer: 0,
+    chromaticPressure: 0,
     blackpoint: 0,
     whitepoint: 0,
     lift: 0,
@@ -4714,6 +5291,11 @@ function smartSignalPixelModel(settings = {}, effect = {}, smartSignalEnabled = 
     else if (processor.id === "midtones") model.midtones += strength;
     else if (processor.id === "invert") model.invert += strength;
     else if (processor.id === "structure") model.structure += strength;
+    else if (processor.id === "hotspotTrace") model.hotspot += strength;
+    else if (processor.id === "spectralBloom") model.spectralBloom += strength;
+    else if (processor.id === "edgeFusion") model.edgeFusion += strength;
+    else if (processor.id === "toneQuantizer") model.quantizer += strength;
+    else if (processor.id === "chromaticPressure") model.chromaticPressure += strength;
     else if (processor.id === "blackpoint") model.blackpoint += strength;
     else if (processor.id === "whitepoint") model.whitepoint += strength;
     else if (processor.id === "lift") model.lift += strength;
