@@ -1685,13 +1685,7 @@ function CameraStudio() {
             scaleCap: PREVIEW_CANVAS_SCALE_CAP,
             pixelBudget: THERMAL_EFFECT_PIXEL_BUDGET
           });
-          if (cameraHudVisible) {
-            drawCameraOutputCanvas(hudCanvasRef.current, null, source, renderState, {
-              includePreviewChrome: false,
-              scaleCap: HUD_CANVAS_SCALE_CAP,
-              pixelBudget: HUD_THERMAL_EFFECT_PIXEL_BUDGET
-            });
-          }
+          if (cameraHudVisible) syncCameraHudFromPreview();
           lastPausedVersion = renderVersion;
           lastDraw = timestamp;
         }
@@ -1750,7 +1744,7 @@ function CameraStudio() {
       const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 1;
       const visibleHeight = Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0);
       const visibilityRatio = clamp(visibleHeight / Math.max(rect.height, 1), 0, 1);
-      const nextVisible = window.scrollY > 80 && visibilityRatio < 0.68;
+      const nextVisible = window.scrollY > 80 && rect.top < 0 && visibilityRatio < 0.28;
       if (cameraHudVisibleRef.current !== nextVisible) {
         cameraHudVisibleRef.current = nextVisible;
         setCameraHudVisible(nextVisible);
@@ -1869,6 +1863,20 @@ function CameraStudio() {
 
   function currentCameraRenderSource() {
     return cameraFeedPausedRef.current && pausedFrameCanvasRef.current ? pausedFrameCanvasRef.current : videoRef.current;
+  }
+
+  function syncCameraHudFromPreview() {
+    const previewCanvas = previewCanvasRef.current;
+    const hudCanvas = hudCanvasRef.current;
+    if (!previewCanvas || !hudCanvas || !previewCanvas.width || !previewCanvas.height) return false;
+    if (hudCanvas.width !== previewCanvas.width) hudCanvas.width = previewCanvas.width;
+    if (hudCanvas.height !== previewCanvas.height) hudCanvas.height = previewCanvas.height;
+    const context = hudCanvas.getContext("2d", { alpha: false });
+    if (!context) return false;
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
+    context.drawImage(previewCanvas, 0, 0);
+    return true;
   }
 
   function capturePausedCameraFrame(video) {
