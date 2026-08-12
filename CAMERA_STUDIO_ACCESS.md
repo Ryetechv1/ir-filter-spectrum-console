@@ -25,6 +25,7 @@ The Camera Studio is opened from the main console with the `Studio` button. It r
 - `Snapshot` downloads a local PNG with the current CSS/video effect stack painted into the image and adds it to the local capture shelf.
 - `Start MP4` records a processed 1080P or 2K canvas stream as `.mp4` where the browser supports MP4 MediaRecorder.
 - `Stop Recording` ends the current MP4 recording before the 3-minute cap.
+- All visual effect presets are compiled through a 500% intensity amplifier. The amplifier boosts numeric preset settings away from their neutral value and increases preset overlay alpha while clamping to each control's safe range.
 - Four RGBW mixer groups drive live gradient color layers and the main filter math: Main, Secondary, Third, and Highlights.
 - Ten inversion controls add Classic RGB Invert, Luma Negative, Channel Swap Invert, Spectral Invert, Thermal Black-Hot Invert, Red Channel Invert, Green Channel Invert, Blue Channel Invert, Shadow Range Invert, and Highlight Range Invert.
 - The adjustment surface is grouped into dropdown sections. It includes 12 core photo sliders, 10 inversion sliders, smart darker-edge controls, 15 smart signal engines with 10 sliders each, and 100 advanced effect sliders for exposure-style controls, color channels, bloom/halation, scanlines, IR/UVA/thermal washes, and other photobooth effects.

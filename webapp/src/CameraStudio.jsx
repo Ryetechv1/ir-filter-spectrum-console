@@ -196,6 +196,7 @@ const EFFECT_OUTPUT_GAIN = 1.74;
 const PIXEL_EFFECT_GAIN = 2.05;
 const THERMAL_SIGNAL_GAIN = 1.42;
 const RGBW_MIXER_GAIN = 1.72;
+const PRESET_INTENSITY_MULTIPLIER = 5;
 const SMART_SIGNAL_PIXEL_BUDGET = 74_000;
 const SMART_DARK_EDGE_LABEL = "Smart darker edge amplifier";
 let thermalWorkCanvas;
@@ -1052,27 +1053,57 @@ const EFFECT_FAMILIES = [
   }
 ];
 
+function amplifyPresetSettings(settings = {}) {
+  return Object.fromEntries(
+    Object.entries(settings).map(([key, value]) => [key, amplifyPresetSettingValue(key, value)])
+  );
+}
+
+function amplifyPresetSettingValue(key, value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return value;
+  const range = settingRange(key);
+  const neutral = Number(DEFAULT_SETTINGS[key] ?? 0);
+  const amplified = neutral + (numeric - neutral) * PRESET_INTENSITY_MULTIPLIER;
+  return Math.round(clamp(amplified, range.min, range.max));
+}
+
+function amplifyPresetOverlayColor(color) {
+  if (typeof color !== "string") return color;
+  return color.replace(/rgba\(([^,]+),([^,]+),([^,]+),([^)]+)\)/i, (_match, red, green, blue, alpha) => {
+    const boostedAlpha = clamp(Number(alpha) * PRESET_INTENSITY_MULTIPLIER, 0, 0.96);
+    return `rgba(${red.trim()}, ${green.trim()}, ${blue.trim()}, ${Number(boostedAlpha.toFixed(3))})`;
+  });
+}
+
 const CAMERA_EFFECTS = EFFECT_FAMILIES.flatMap((family, familyIndex) =>
   (family.variants || family.names.map((name) => ({ name }))).map((variant, index) => {
     const baseSettings = { ...family.settings, ...(variant.settings || {}) };
     const wave = index - 4.5;
+    const variedSettings = {
+      ...baseSettings,
+      brightness: clamp((baseSettings.brightness ?? 100) + Math.round(wave * 1.5), 20, 220),
+      contrast: clamp((baseSettings.contrast ?? 100) + Math.round((index % 5) * 3), 20, 220),
+      saturation: clamp((baseSettings.saturation ?? 100) + Math.round((index % 4) * 5), 0, 260),
+      hue: clamp((baseSettings.hue ?? 0) + ((familyIndex * 17 + index * 9) % 82) - 41, -180, 180),
+      vignette: clamp((baseSettings.vignette ?? 0) + (baseSettings.vignette == null ? 0 : (index % 3) * 5), 0, 90),
+      grain: clamp((baseSettings.grain ?? 0) + (baseSettings.grain == null ? 0 : (index % 4) * 2), 0, 80),
+      glow: clamp((baseSettings.glow ?? 0) + (baseSettings.glow == null ? 0 : (index % 3) * 3), 0, 60)
+    };
+    const amplifiedSettings = amplifyPresetSettings(variedSettings);
     return {
       id: `${family.category.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${index}`,
       name: variant.name,
       category: family.category,
-      overlayColor: variant.color || family.color,
+      overlayColor: amplifyPresetOverlayColor(variant.color || family.color),
       blendMode: variant.blendMode || family.blendMode,
+      enabled: true,
       favorite: index === 0 || index === 5,
+      highIntensity: true,
+      intensityMultiplier: PRESET_INTENSITY_MULTIPLIER,
       settings: {
         ...DEFAULT_SETTINGS,
-        ...baseSettings,
-        brightness: clamp((baseSettings.brightness ?? 100) + Math.round(wave * 1.5), 20, 220),
-        contrast: clamp((baseSettings.contrast ?? 100) + Math.round((index % 5) * 3), 20, 220),
-        saturation: clamp((baseSettings.saturation ?? 100) + Math.round((index % 4) * 5), 0, 260),
-        hue: clamp((baseSettings.hue ?? 0) + ((familyIndex * 17 + index * 9) % 82) - 41, -180, 180),
-        vignette: clamp((baseSettings.vignette ?? 0) + (baseSettings.vignette == null ? 0 : (index % 3) * 5), 0, 90),
-        grain: clamp((baseSettings.grain ?? 0) + (baseSettings.grain == null ? 0 : (index % 4) * 2), 0, 80),
-        glow: clamp((baseSettings.glow ?? 0) + (baseSettings.glow == null ? 0 : (index % 3) * 3), 0, 60)
+        ...amplifiedSettings
       }
     };
   })
@@ -1281,7 +1312,10 @@ function createEquationModel(value, baseEffect = CAMERA_EFFECTS[0], baseSettings
       category: `Algorithmic Equation / ${selectedStyle.category}`,
       overlayColor: selectedStyle.overlayColor || overlayColor,
       blendMode,
+      enabled: true,
       favorite: false,
+      highIntensity: true,
+      intensityMultiplier: PRESET_INTENSITY_MULTIPLIER,
       description: generationCopy.description,
       settings: { ...DEFAULT_SETTINGS, ...styleSettings, ...targetSettings }
     },
@@ -2783,7 +2817,7 @@ function CameraStudio() {
             </p>
           </div>
           <ul>
-            <li>{CAMERA_EFFECTS.length} local visual presets for IR-style, UVA-style, full-spectrum thermal, XLS, cinematic, monochrome, duotone, retro, and color-lab looks.</li>
+            <li>{CAMERA_EFFECTS.length} local visual presets compiled at 500% intensity for IR-style, UVA-style, full-spectrum thermal, XLS, cinematic, monochrome, duotone, retro, and color-lab looks.</li>
             <li>Four RGBW gradient mixers for Main, Secondary, Third, and Highlights color layers that drive overlays, filter math, and the selected app accent aesthetic.</li>
             <li>Grouped adjustment dropdowns with 12 core photo controls, 10 color inversion tools, 10 smart darker-edge controls, 15 smart signal engines with 10 sliders each, 100 advanced sliders, equation-generated filter names/descriptions, and live/overlay adjustment toggles.</li>
             <li>Processed PNG snapshots and 1080P or 2K MP4 recordings with local camera effects applied.</li>
