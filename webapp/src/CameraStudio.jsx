@@ -39,6 +39,7 @@ const YOUTUBE_UPLOADS_PLAYLIST_URL = `https://www.youtube.com/playlist?list=${YO
 const YOUTUBE_UPLOADS_PLAYER_URL = `https://www.youtube.com/embed/videoseries?list=${YOUTUBE_UPLOADS_PLAYLIST_ID}&rel=0&modestbranding=1&playsinline=1`;
 const SUPERNATURAL_DATABASE_URL = "https://sites.google.com/view/official-supernatural-database";
 const studioAssetUrl = (path) => `${import.meta.env.BASE_URL}${path.replace(/^\/+/, "")}`;
+const ACCESS_EMBLEM_URL = studioAssetUrl("assets/spectral-access-emblem.png");
 const YOUTUBE_RECENT_UPLOADS = [
   {
     id: "5_T2LfeRDEY",
@@ -5484,7 +5485,7 @@ function CameraStudio() {
       {!authorized && (
         <div className="camera-access-overlay">
           <form className="camera-access-card" onSubmit={unlockStudio}>
-            <LockKeyhole size={42} />
+            <img className="camera-access-emblem" src={ACCESS_EMBLEM_URL} alt="Supernatural World spectral emblem" />
             <h2>Access Code Required</h2>
             <p>Enter the unique trusted code from the code holder. Camera permission is requested only after unlock.</p>
             <input
@@ -8518,7 +8519,7 @@ function paintPreviewChrome(context, width, height, options = {}) {
   context.fill();
   context.shadowBlur = 0;
   context.fillStyle = "#f5f8fb";
-  context.font = `800 ${Math.max(13, 15 * scale)}px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+  context.font = `800 ${Math.max(13, 15 * scale)}px Fiona, "Fiona", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
   context.textBaseline = "middle";
   context.fillText("LIVE", badgeX + 17 * scale, badgeY - 5 * scale);
 
@@ -8534,7 +8535,7 @@ function paintPreviewChrome(context, width, height, options = {}) {
   context.lineTo(width, metaTop + 0.5 * scale);
   context.stroke();
   context.fillStyle = "#d8e3eb";
-  context.font = `500 ${Math.max(13, 13 * scale)}px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+  context.font = `500 ${Math.max(13, 13 * scale)}px Fiona, "Fiona", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
   if (compact) {
     const left = 16 * scale;
     labels.slice(0, 3).forEach((label, index) => {

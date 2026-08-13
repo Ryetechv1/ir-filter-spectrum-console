@@ -13,6 +13,7 @@
   min-height: 100vh;
   color: #f5f8fb;
   background: linear-gradient(180deg, #080c11 0%, #030508 100%);
+  font-family: var(--app-font-stack);
 }
 
 .camera-studio-shell *,
@@ -1925,6 +1926,17 @@
   text-align: center;
 }
 
+.camera-access-emblem {
+  justify-self: center;
+  display: block;
+  width: clamp(94px, 28vw, 148px);
+  aspect-ratio: 749 / 1030;
+  object-fit: contain;
+  filter:
+    drop-shadow(0 0 18px rgba(var(--studio-accent-rgb), 0.34))
+    drop-shadow(0 10px 24px rgba(0, 0, 0, 0.42));
+}
+
 .camera-access-card > svg {
   justify-self: center;
   color: var(--studio-accent-strong);
@@ -2874,6 +2886,10 @@
     gap: 12px;
     width: min(280px, calc(100vw - 56px));
     padding: 24px 18px;
+  }
+
+  .camera-access-emblem {
+    width: 92px;
   }
 
   .camera-frame,
