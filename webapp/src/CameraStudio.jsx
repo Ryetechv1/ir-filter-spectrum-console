@@ -3871,7 +3871,9 @@ function CameraStudio() {
         </label>
 
         <p className="flashlight-warning">
-          Strobe and dimmer pulse modes can be uncomfortable or unsafe for photosensitive viewers. True LED brightness depends on device/browser torch support; this studio uses duty-cycle dimming when direct brightness control is unavailable.
+          Strobe and dimmer pulse modes can be uncomfortable or unsafe for photosensitive viewers. Browser torch APIs usually expose only on/off,
+          so this studio uses duty-cycle dimming in the web app. For true smooth iPhone torch levels from 0.1 to 1.0, use the native SwiftUI
+          AVFoundation integration in <code>integrations/ios_torch_dimmer</code>.
         </p>
 
         <div className="torch-debug-log" aria-label="Flashlight debug log">
@@ -4438,7 +4440,7 @@ function CameraStudio() {
             <li>{CAMERA_EFFECTS.length} local visual presets compiled at 500% intensity for IR-style, UVA-style, full-spectrum thermal, XLS, inversion, tritone, quadtone, channel spectrograph, black-field, channel sweep, cinematic, monochrome, duotone, retro, and color-lab looks.</li>
             <li>Four RGBW gradient mixers for Main, Secondary, Third, and Highlights color layers that drive overlays, filter math, and the selected app accent aesthetic.</li>
             <li>Grouped adjustment dropdowns with 11 core photo controls, 10 color inversion tools, 20 inversion presets, 10 smart darker-edge controls, 20 smart signal engines, 42 local Spatial Recognition Studio controls with live Point Cloud/TIN surface mapping, an expanded AI-orchestrated Smart Isolate Grouped Pixels DWT/noise defect-distortion module with 31 controls, Thermal Studio A-O hotspot recoloring, 100 advanced sliders, equation-generated filter names/descriptions, and live/overlay adjustment toggles.</li>
-            <li>Flashlight Studio includes Hold Torch, Lock Rear Torch, Strobe, Dimmer Pulse, interval timing, and brightness-duty controls where the rear-camera torch API is exposed by the device.</li>
+            <li>Flashlight Studio includes Hold Torch, Lock Rear Torch, Strobe, Dimmer Pulse, interval timing, browser brightness-duty controls, and a native iOS AVFoundation torch-dimmer handoff for true smooth 0.1-1.0 iPhone torch levels.</li>
             <li>Processed PNG snapshots and 1080P or 2K MP4 recordings with local camera effects applied, including browser download plus desktop folder-save support when permission is granted.</li>
             <li>Separate 1-3 layer image/video compositor with opacity, splice masks, blend modes, transforms, full adjustment-stack support, and clean PNG export.</li>
             <li>Clean exports hide app-added preview chrome, labels, and watermark overlays so only the processed image or video remains.</li>
