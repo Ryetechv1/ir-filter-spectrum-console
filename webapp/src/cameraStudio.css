@@ -724,12 +724,22 @@
 }
 
 .studio-pause-button.active,
+.studio-torch.active,
 .equation-toggle.active {
   color: #031017;
   border-color: transparent;
   background: linear-gradient(180deg, #f5f8fb, #9aa5af);
   box-shadow: 0 0 22px rgba(245, 248, 251, 0.18);
   font-weight: 850;
+}
+
+.studio-torch.active {
+  background: linear-gradient(180deg, #fff5a8, #ffbf2e 52%, #ff7b00);
+  box-shadow: 0 0 24px rgba(255, 191, 46, 0.36);
+}
+
+.torch-note {
+  color: #ffd98b;
 }
 
 .equation-engine-panel {

@@ -22,6 +22,7 @@ import {
   Upload,
   Video,
   Youtube,
+  Zap,
   X
 } from "lucide-react";
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
@@ -2184,6 +2185,8 @@ function CameraStudio() {
   const [recordingElapsed, setRecordingElapsed] = useState(0);
   const [recordingMimeType, setRecordingMimeType] = useState("");
   const [captureShelf, setCaptureShelf] = useState([]);
+  const [torchActive, setTorchActive] = useState(false);
+  const [torchSupported, setTorchSupported] = useState(false);
   const [youtubeWindowOpen, setYoutubeWindowOpen] = useState(false);
   const [databaseWindowOpen, setDatabaseWindowOpen] = useState(false);
   const [primeResultsWindowOpen, setPrimeResultsWindowOpen] = useState(false);
@@ -2424,6 +2427,20 @@ function CameraStudio() {
     }
   }, [cameraActive, cameraHudVisible, cameraFacing]);
 
+  const updateTorchCapability = useCallback((stream) => {
+    const videoTrack = stream?.getVideoTracks?.()[0];
+    let supported = false;
+    try {
+      const capabilities = videoTrack?.getCapabilities?.() || {};
+      supported = Boolean(capabilities.torch);
+    } catch {
+      supported = false;
+    }
+    setTorchSupported(supported);
+    setTorchActive(false);
+    return supported;
+  }, []);
+
   const attachCameraStream = useCallback(async (stream, nextFacing = cameraFacing) => {
     streamRef.current = stream;
     if (videoRef.current) {
@@ -2436,8 +2453,13 @@ function CameraStudio() {
     }
     setCameraFacing(nextFacing);
     setCameraActive(true);
-    setCameraStatus("Camera active. The video is local to this device and is not uploaded.");
-  }, [cameraFacing]);
+    const torchReady = updateTorchCapability(stream);
+    if (nextFacing === "environment" && torchReady) {
+      setCameraStatus("Rear camera active. Flashlight control is available and stays local to this device.");
+    } else {
+      setCameraStatus("Camera active. The video is local to this device and is not uploaded.");
+    }
+  }, [cameraFacing, updateTorchCapability]);
 
   const addCaptureToShelf = useCallback((capture) => {
     setCaptureShelf((current) => {
@@ -2463,6 +2485,10 @@ function CameraStudio() {
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
+      const videoTrack = streamRef.current.getVideoTracks?.()[0];
+      if (torchActive && videoTrack?.applyConstraints) {
+        videoTrack.applyConstraints({ advanced: [{ torch: false }] }).catch(() => undefined);
+      }
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     }
@@ -2472,7 +2498,9 @@ function CameraStudio() {
     cameraFeedPausedRef.current = false;
     setCameraFeedPaused(false);
     setCameraActive(false);
-  }, []);
+    setTorchActive(false);
+    setTorchSupported(false);
+  }, [torchActive]);
 
   const startCamera = useCallback(async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -2507,6 +2535,38 @@ function CameraStudio() {
       setCameraStatus(`Camera flip failed: ${error.message || error}`);
     }
   }, [attachCameraStream, cameraFacing, stopCamera]);
+
+  const toggleTorch = useCallback(async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraStatus("Flashlight access is not supported in this browser.");
+      return;
+    }
+    try {
+      let stream = streamRef.current;
+      if (!stream || cameraFacing !== "environment") {
+        stopCamera();
+        setCameraStatus("Requesting rear camera for flashlight access...");
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } } });
+        await attachCameraStream(stream, "environment");
+      }
+      const videoTrack = stream.getVideoTracks?.()[0];
+      const capabilities = videoTrack?.getCapabilities?.() || {};
+      if (!capabilities.torch) {
+        setTorchSupported(false);
+        setTorchActive(false);
+        setCameraStatus("This device/browser does not expose rear-camera flashlight control for this stream.");
+        return;
+      }
+      const nextTorch = !torchActive;
+      await videoTrack.applyConstraints({ advanced: [{ torch: nextTorch }] });
+      setTorchSupported(true);
+      setTorchActive(nextTorch);
+      setCameraStatus(nextTorch ? "Rear camera flashlight is on. Stream remains local to this device." : "Rear camera flashlight is off.");
+    } catch (error) {
+      setTorchActive(false);
+      setCameraStatus(`Flashlight toggle failed: ${error.message || error}`);
+    }
+  }, [attachCameraStream, cameraFacing, stopCamera, torchActive]);
 
   function currentCameraRenderSource() {
     return cameraFeedPausedRef.current && pausedFrameCanvasRef.current ? pausedFrameCanvasRef.current : videoRef.current;
@@ -3650,6 +3710,17 @@ function CameraStudio() {
               <FlipHorizontal size={18} />
               Flip Camera
             </button>
+            <button
+              type="button"
+              className={torchActive ? "studio-torch active" : "studio-torch"}
+              onClick={toggleTorch}
+              disabled={!authorized}
+              aria-pressed={torchActive}
+              title={torchSupported ? "Toggle the rear camera flashlight" : "Requests rear camera torch support where the browser/device allows it"}
+            >
+              <Zap size={18} />
+              {torchActive ? "Flashlight On" : "Rear Flashlight"}
+            </button>
             <button type="button" className="studio-snapshot" onClick={captureSnapshot} disabled={!cameraActive}>
               <Download size={19} />
               Snapshot
@@ -3698,6 +3769,9 @@ function CameraStudio() {
           </section>
 
           <p className="studio-status">{cameraStatus}</p>
+          {cameraActive && cameraFacing === "environment" && !torchSupported && (
+            <p className="studio-status torch-note">Flashlight control appears unsupported for the current rear-camera stream.</p>
+          )}
           {snapshotUrl && (
             <a className="snapshot-review" href={snapshotUrl} target="_blank" rel="noreferrer">
               Open last local snapshot
