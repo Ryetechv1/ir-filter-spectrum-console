@@ -206,6 +206,7 @@ const SPATIAL_LOW_LIGHT_VISIBILITY_GAIN = 2.85;
 const SPATIAL_LOW_LIGHT_POINT_GAIN = 2.4;
 const SPATIAL_FIELD_VISIBILITY_SCALE = 1;
 const SPATIAL_MESH_VISIBILITY_SCALE = 1;
+const SPATIAL_MAX_MODEL_SIGNAL = 10;
 const SMART_DARK_EDGE_LABEL = "Smart darker edge amplifier";
 const SPATIAL_RECOGNITION_LABEL = "Spatial recognition field mapper";
 const TORCH_LOG_LIMIT = 14;
@@ -6264,6 +6265,14 @@ function spatialUniformParallaxOffset(width, height, model, scale = 1) {
   };
 }
 
+function spatialVisualPower(model) {
+  return clamp(model.master / SPATIAL_MAX_MODEL_SIGNAL, 0, 1);
+}
+
+function spatialModelRatio(value, max = SPATIAL_MAX_MODEL_SIGNAL) {
+  return clamp(value / max, 0, 1);
+}
+
 function applySpatialRecognitionEffectsToContext(context, width, height, settings, effect, model) {
   let frame;
   try {
@@ -6273,6 +6282,18 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
   }
   const data = frame.data;
   const source = new Uint8ClampedArray(data);
+  const masterVisual = spatialVisualPower(model);
+  const sensitivityVisual = spatialModelRatio(model.sensitivity);
+  const depthVisual = spatialModelRatio(model.depth);
+  const thermalVisual = spatialModelRatio(model.thermalLock);
+  const edgeVisual = spatialModelRatio(model.edgeWeight);
+  const microVisual = spatialModelRatio(model.microContrast, 8);
+  const occlusionVisual = spatialModelRatio(model.occlusion, 8);
+  const splitVisual = spatialModelRatio(model.colorSplit, 8);
+  const colorDepthVisual = spatialModelRatio(model.colorDepth, 8);
+  const smoothVisual = spatialModelRatio(model.smoothing, 5);
+  const gradientVisual = spatialModelRatio(model.gradientLift, 7);
+  const lowLightVisual = spatialModelRatio(model.lowLightSensitivity);
   const lumaAt = (pixelIndex) =>
     (source[pixelIndex] * 0.2126 + source[pixelIndex + 1] * 0.7152 + source[pixelIndex + 2] * 0.0722) / 255;
   for (let index = 0; index < data.length; index += 4) {
@@ -6326,7 +6347,7 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
         farField * 0.14 +
         specularSignal * 0.12 -
         shadowSignal * model.occlusion * 0.18 +
-        model.sensitivity * 0.12,
+        sensitivityVisual * 0.18,
       0,
       1
     );
@@ -6336,17 +6357,17 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
     const cohesion = clamp(1 + model.objectCohesion * (0.34 - localDeviation * 0.22), 0.78, 1.38);
     const depthMask = clamp(
       (edge * 0.42 + localDeviation * 1.58 + contourMask * 0.68 + specularSignal * 0.18 + shadowSignal * 0.16 + lowLightSignal * 0.72) *
-        model.master *
+        masterVisual *
         cohesion,
       0,
-      0.95
+      0.72
     );
     const alpha = clamp(
       depthMask *
-        (0.26 + model.depth * 0.34 + model.sensitivity * 0.26 + model.thermalLock * 0.16 + lowLightSignal * 0.42) *
+        (0.14 + depthVisual * 0.3 + sensitivityVisual * 0.24 + thermalVisual * 0.16 + lowLightSignal * 0.22) *
         SPATIAL_FIELD_VISIBILITY_SCALE,
       0,
-      0.92
+      0.58
     );
     let r = data[index];
     let g = data[index + 1];
@@ -6358,9 +6379,9 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
     if (model.microContrast > 0.01) {
       const contrastLift =
         clamp(
-          edge * model.microContrast * model.master * 1.15 + normalSignal * model.surfaceNormal * 0.32 + lowLightSignal * model.lowLightSensitivity * 0.58,
+          edge * microVisual * masterVisual * 1.4 + normalSignal * spatialModelRatio(model.surfaceNormal, 8) * 0.34 + lowLightSignal * lowLightVisual * 0.62,
           0,
-          3.2
+          1.9
         ) * SPATIAL_FIELD_VISIBILITY_SCALE;
       r = (r - 128) * (1 + contrastLift) + 128;
       g = (g - 128) * (1 + contrastLift * 0.9) + 128;
@@ -6368,7 +6389,7 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
     }
 
     if (model.occlusion > 0.01) {
-      const darken = clamp((shadowSignal + farField * 0.22) * model.occlusion * model.master * 68 * SPATIAL_FIELD_VISIBILITY_SCALE, 0, 96);
+      const darken = clamp((shadowSignal + farField * 0.22) * occlusionVisual * masterVisual * 92 * SPATIAL_FIELD_VISIBILITY_SCALE, 0, 84);
       r -= darken;
       g -= darken * 0.9;
       b -= darken * 0.82;
@@ -6376,9 +6397,9 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
 
     if (model.colorSplit > 0.01) {
       const split = clamp(
-        (edge + contourMask + specularSignal * 0.45) * model.colorSplit * model.master * (42 + model.colorDepth * 36) * SPATIAL_FIELD_VISIBILITY_SCALE,
+        (edge + contourMask + specularSignal * 0.45) * splitVisual * masterVisual * (34 + colorDepthVisual * 56) * SPATIAL_FIELD_VISIBILITY_SCALE,
         0,
-        72
+        58
       );
       r += split;
       g += split * Math.sin((x / Math.max(1, width)) * Math.PI + model.motionTrace) * (0.28 + model.vectorTension * 0.2);
@@ -6386,7 +6407,7 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
     }
 
     if (model.smoothing > 0.01) {
-      const smoothAlpha = clamp(model.smoothing * (0.06 + (1 - edge) * 0.12 + model.depthBlur * 0.08) * model.master * SPATIAL_FIELD_VISIBILITY_SCALE, 0, 0.28);
+      const smoothAlpha = clamp(smoothVisual * (0.06 + (1 - edge) * 0.12 + spatialModelRatio(model.depthBlur, 4) * 0.08) * masterVisual * SPATIAL_FIELD_VISIBILITY_SCALE, 0, 0.2);
       const localGray = localAverage * 255;
       r = mixChannel(r, localGray, smoothAlpha);
       g = mixChannel(g, localGray, smoothAlpha * 0.9);
@@ -6396,9 +6417,9 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
     if (model.gradientLift > 0.01) {
       const lift =
         (planeDepth * 0.72 + normalSignal * 0.16 + nearField * 0.12 - farField * 0.1 + highlightSignal * 0.22 + lowLightSignal * 0.44) *
-        model.gradientLift *
-        model.master *
-        34 *
+        gradientVisual *
+        masterVisual *
+        36 *
         SPATIAL_FIELD_VISIBILITY_SCALE;
       r += lift * 0.62;
       g += lift * 0.82;
@@ -6406,7 +6427,7 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
     }
 
     if (lowLightSignal > 0.01) {
-      const lowLightAlpha = clamp(lowLightSignal * model.master * 0.045 * SPATIAL_FIELD_VISIBILITY_SCALE, 0, 0.46);
+      const lowLightAlpha = clamp(lowLightSignal * masterVisual * (0.04 + lowLightVisual * 0.08) * SPATIAL_FIELD_VISIBILITY_SCALE, 0, 0.2);
       r = mixChannel(r, dr, lowLightAlpha);
       g = mixChannel(g, dg, lowLightAlpha * 0.94);
       b = mixChannel(b, db, lowLightAlpha * 0.88);
@@ -6419,9 +6440,9 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
   context.putImageData(frame, 0, 0);
   paintLiveSpatialPointCloudAndTin(context, width, height, source, model);
 
-  const meshAlpha = clamp(model.meshOpacity * model.master * 0.32 * SPATIAL_MESH_VISIBILITY_SCALE, 0, 0.42);
+  const meshAlpha = clamp(spatialModelRatio(model.meshOpacity, 4) * masterVisual * 0.32 * SPATIAL_MESH_VISIBILITY_SCALE, 0, 0.34);
   if (meshAlpha > 0.01) {
-    const gridStep = Math.max(7, Math.round(38 - model.pointDensity * 20 - model.contourDensity * 7));
+    const gridStep = Math.max(10, Math.round(38 - spatialModelRatio(model.pointDensity, 8) * 16 - spatialModelRatio(model.contourDensity, 8) * 6));
     const drift = spatialUniformParallaxOffset(width, height, model, 1);
     context.save();
     context.globalCompositeOperation = "screen";
@@ -6444,16 +6465,20 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
     context.restore();
   }
 
-  const pointAlpha = clamp(model.pointDensity * model.master * (0.28 + model.subpixelScan * 0.12) * SPATIAL_MESH_VISIBILITY_SCALE, 0, 0.46);
+  const pointAlpha = clamp(
+    spatialModelRatio(model.pointDensity, 8) * masterVisual * (0.22 + spatialModelRatio(model.subpixelScan, 8) * 0.14) * SPATIAL_MESH_VISIBILITY_SCALE,
+    0,
+    0.28
+  );
   if (pointAlpha > 0.01) {
-    const pointStep = Math.max(5, Math.round(29 - model.pointDensity * 18 - model.subpixelScan * 7));
+    const pointStep = Math.max(8, Math.round(30 - spatialModelRatio(model.pointDensity, 8) * 14 - spatialModelRatio(model.subpixelScan, 8) * 5));
     const drift = spatialUniformParallaxOffset(width, height, model, 0.85);
     context.save();
-    context.globalCompositeOperation = "screen";
+    context.globalCompositeOperation = "source-over";
     context.fillStyle = `rgba(238, 255, 255, ${pointAlpha})`;
     for (let y = pointStep; y < height; y += pointStep) {
       for (let x = pointStep; x < width; x += pointStep) {
-        const size = clamp(1.2 + model.subpixelScan * 1.1 + model.objectCohesion * 0.5, 1.2, 8.2);
+        const size = clamp(0.9 + spatialModelRatio(model.subpixelScan, 8) * 1.4 + spatialModelRatio(model.objectCohesion, 7) * 1.1, 0.9, 4.6);
         context.fillRect(x + drift.x, y + drift.y, size, size);
       }
     }
@@ -6462,26 +6487,42 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
 }
 
 function paintLiveSpatialPointCloudAndTin(context, width, height, source, model) {
+  const masterVisual = spatialVisualPower(model);
+  const livePointVisual = spatialModelRatio(model.livePointCloud, 8);
+  const pointDensityVisual = spatialModelRatio(model.pointDensity, 8);
+  const tinVisual = spatialModelRatio(model.tinOpacity, 7);
+  const wireVisual = spatialModelRatio(model.tinWire, 7);
+  const subpixelVisual = spatialModelRatio(model.subpixelScan, 8);
+  const lowLightVisual = spatialModelRatio(model.lowLightSensitivity);
+  const sensitivityVisual = spatialModelRatio(model.sensitivity);
+  const edgeVisual = spatialModelRatio(model.edgeWeight);
+  const surfaceVisual = spatialModelRatio(model.surfaceMap, 8);
+  const noiseVisual = spatialModelRatio(model.noiseMap, 8);
+  const pointLiftVisual = spatialModelRatio(model.pointLift, 7);
+  const cellDepthVisual = spatialModelRatio(model.cellDepth, 8);
+  const depthVisual = spatialModelRatio(model.depth);
+  const fieldVisual = spatialModelRatio(model.field, 8);
+  const rangeVisual = spatialModelRatio(model.range, 8);
   const pointCloudAlpha = clamp(
-    model.livePointCloud * model.master * (0.34 + model.subpixelScan * 0.16 + model.lowLightSensitivity * 0.022) * SPATIAL_MESH_VISIBILITY_SCALE,
+    livePointVisual * masterVisual * (0.3 + subpixelVisual * 0.18 + lowLightVisual * 0.16) * SPATIAL_MESH_VISIBILITY_SCALE,
     0,
-    0.82
+    0.36
   );
   const tinAlpha = clamp(
-    model.tinOpacity * model.master * (0.28 + model.surfaceMap * 0.12 + model.cellDepth * 0.08 + model.lowLightSensitivity * 0.018) * SPATIAL_MESH_VISIBILITY_SCALE,
+    tinVisual * masterVisual * (0.26 + surfaceVisual * 0.16 + cellDepthVisual * 0.12 + lowLightVisual * 0.14) * SPATIAL_MESH_VISIBILITY_SCALE,
     0,
-    0.7
+    0.34
   );
   const wireAlpha = clamp(
-    model.tinWire * model.master * (0.22 + model.surfaceMap * 0.08 + model.lowLightSensitivity * 0.014) * SPATIAL_MESH_VISIBILITY_SCALE,
+    wireVisual * masterVisual * (0.22 + surfaceVisual * 0.1 + lowLightVisual * 0.1) * SPATIAL_MESH_VISIBILITY_SCALE,
     0,
-    0.62
+    0.3
   );
   if (pointCloudAlpha <= 0.01 && tinAlpha <= 0.01 && wireAlpha <= 0.01) return;
 
   const cellStep = Math.max(
-    5,
-    Math.round(40 - model.cellSize * 17 - model.pointDensity * 7 - model.livePointCloud * 6 - model.subpixelScan * 3 - model.lowLightSensitivity * 1.8)
+    9,
+    Math.round(42 - model.cellSize * 14 - pointDensityVisual * 10 - livePointVisual * 13 - subpixelVisual * 5 - lowLightVisual * 5)
   );
   const sampleRadius = Math.max(1, Math.round(cellStep * 0.45));
   const uniformDrift = spatialUniformParallaxOffset(width, height, model, 0.7 + model.gridWarp * 0.05);
@@ -6511,26 +6552,26 @@ function paintLiveSpatialPointCloudAndTin(context, width, height, source, model)
         0,
         1
       );
-      const lowLightGain = 1 + lowLightSignal * SPATIAL_LOW_LIGHT_POINT_GAIN + darkness * model.sensitivity * 0.22;
-      const edge = clamp((Math.abs(right - left) + Math.abs(down - up)) * lowLightGain + lowLightSignal * model.edgeWeight * 0.06, 0, 1);
-      const noise = clamp(Math.abs(luma - localAverage) * (1.9 + model.noiseMap * 1.8 + lowLightSignal * 5.2) + diagonal * 0.42, 0, 1);
+      const lowLightGain = 1 + lowLightSignal * (0.85 + lowLightVisual * 1.12) + darkness * sensitivityVisual * 0.55;
+      const edge = clamp((Math.abs(right - left) + Math.abs(down - up)) * lowLightGain + lowLightSignal * edgeVisual * 0.38, 0, 1);
+      const noise = clamp(Math.abs(luma - localAverage) * (1.9 + noiseVisual * 2.1 + lowLightSignal * 4.2) + diagonal * 0.42, 0, 1);
       const surface = clamp((Math.abs((right - left) - (down - up)) + diagonal * 0.78 + edge * 0.24) * lowLightGain, 0, 1);
       const xDepth = x / Math.max(1, width - 1);
       const verticalDepth = 1 - y / Math.max(1, height - 1);
       const planeDepth = clamp(verticalDepth * 0.68 + xDepth * 0.18 + localAverage * 0.14, 0, 1);
       const depth = clamp(
-        luma * (0.32 + model.cellDepth * 0.48) +
-          edge * model.edgeWeight * 0.36 +
-          noise * model.noiseMap * 0.34 +
-          surface * model.surfaceMap * 0.38 +
-          lowLightSignal * model.depth * 0.44 +
-          planeDepth * model.field * 0.13 +
-          (edge + noise + surface) * model.range * 0.028 +
-          model.sensitivity * 0.08,
+        luma * (0.32 + cellDepthVisual * 0.48) +
+          edge * edgeVisual * 0.48 +
+          noise * noiseVisual * 0.42 +
+          surface * surfaceVisual * 0.44 +
+          lowLightSignal * depthVisual * 0.5 +
+          planeDepth * fieldVisual * 0.16 +
+          (edge + noise + surface) * rangeVisual * 0.2 +
+          sensitivityVisual * 0.12,
         0,
         1
       );
-      const lift = model.pointLift * cellStep * (0.12 + depth * 0.46 + noise * 0.18);
+      const lift = pointLiftVisual * cellStep * (0.12 + depth * 0.46 + noise * 0.18);
       const px = clamp(x + uniformDrift.x, 0, width);
       const py = clamp(y + uniformDrift.y - lift, 0, height);
       row.push({
@@ -6550,7 +6591,7 @@ function paintLiveSpatialPointCloudAndTin(context, width, height, source, model)
 
   if (tinAlpha > 0.01) {
     context.save();
-    context.globalCompositeOperation = "screen";
+    context.globalCompositeOperation = "source-over";
     for (let rowIndex = 0; rowIndex < rows.length - 1; rowIndex += 1) {
       const row = rows[rowIndex];
       const nextRow = rows[rowIndex + 1];
@@ -6576,7 +6617,7 @@ function paintLiveSpatialPointCloudAndTin(context, width, height, source, model)
   if (wireAlpha > 0.01) {
     context.save();
     context.globalCompositeOperation = "screen";
-    context.lineWidth = Math.max(0.45, cellStep / (16 - model.surfaceMap * 5));
+    context.lineWidth = Math.max(0.45, cellStep / (16 - surfaceVisual * 5));
     context.strokeStyle = `rgba(190, 249, 255, ${wireAlpha})`;
     for (let rowIndex = 0; rowIndex < rows.length - 1; rowIndex += 1) {
       const row = rows[rowIndex];
@@ -6601,22 +6642,22 @@ function paintLiveSpatialPointCloudAndTin(context, width, height, source, model)
 
   if (pointCloudAlpha > 0.01) {
     context.save();
-    context.globalCompositeOperation = "screen";
+    context.globalCompositeOperation = "source-over";
     for (const row of rows) {
       for (const point of row) {
         const signal = clamp(
           point.depth * 0.42 +
             point.edge * 0.28 +
-            point.noise * model.noiseMap * 0.34 +
-            point.surface * model.surfaceMap * 0.26 +
-            point.lowLight * model.lowLightSensitivity * 0.09,
+            point.noise * noiseVisual * 0.4 +
+            point.surface * surfaceVisual * 0.32 +
+            point.lowLight * lowLightVisual * 0.36,
           0,
           1
         );
-        if (signal < clamp(0.08 - model.lowLightSensitivity * 0.009, 0.012, 0.08)) continue;
+        if (signal < clamp(0.08 - lowLightVisual * 0.048, 0.02, 0.08)) continue;
         const [r, g, b] = point.color;
-        const size = clamp(0.8 + signal * 2.8 + model.pointLift * 1.1 + model.subpixelScan * 0.6 + point.lowLight * 1.2, 0.8, 7.4);
-        context.fillStyle = `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${clamp(pointCloudAlpha * (0.3 + signal * 0.85 + point.lowLight * 0.32), 0, 0.88)})`;
+        const size = clamp(0.8 + signal * 2.4 + pointLiftVisual * 2.6 + subpixelVisual * 0.8 + point.lowLight * 1.1, 0.8, 5.2);
+        context.fillStyle = `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${clamp(pointCloudAlpha * (0.28 + signal * 0.72 + point.lowLight * 0.2), 0, 0.38)})`;
         context.fillRect(point.x - size / 2, point.y - size / 2, size, size);
       }
     }
@@ -6630,17 +6671,20 @@ function paintSpatialTinTriangle(context, points, alpha, model) {
   const noise = points.reduce((sum, point) => sum + point.noise, 0) / points.length;
   const surface = points.reduce((sum, point) => sum + point.surface, 0) / points.length;
   const lowLight = points.reduce((sum, point) => sum + (point.lowLight || 0), 0) / points.length;
+  const noiseVisual = spatialModelRatio(model.noiseMap, 8);
+  const surfaceVisual = spatialModelRatio(model.surfaceMap, 8);
+  const lowLightVisual = spatialModelRatio(model.lowLightSensitivity);
   const color = spatialRecognitionDepthColor(
-    clamp(depth + noise * model.noiseMap * 0.12 + surface * model.surfaceMap * 0.08 + lowLight * model.lowLightSensitivity * 0.04, 0, 1),
+    clamp(depth + noise * noiseVisual * 0.16 + surface * surfaceVisual * 0.12 + lowLight * lowLightVisual * 0.18, 0, 1),
     model
   );
   const facetAlpha = clamp(
-    alpha * (0.18 + depth * 0.42 + edge * 0.22 + noise * model.noiseMap * 0.24 + surface * model.surfaceMap * 0.2 + lowLight * 0.38),
+    alpha * (0.14 + depth * 0.34 + edge * 0.18 + noise * noiseVisual * 0.28 + surface * surfaceVisual * 0.24 + lowLight * lowLightVisual * 0.3),
     0,
-    0.68
+    0.34
   );
   if (facetAlpha <= 0.006) return;
-  const blendColor = color.map((channel) => mixChannel(channel, 255, model.facetSmoothing * 0.08));
+  const blendColor = color.map((channel) => mixChannel(channel, 255, spatialModelRatio(model.facetSmoothing, 0.9) * 0.03));
   context.beginPath();
   context.moveTo(points[0].x, points[0].y);
   context.lineTo(points[1].x, points[1].y);
