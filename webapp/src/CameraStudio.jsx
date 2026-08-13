@@ -201,12 +201,6 @@ const RGBW_MIXER_GAIN = 1.72;
 const PRESET_INTENSITY_MULTIPLIER = 5;
 const SMART_SIGNAL_PIXEL_BUDGET = 74_000;
 const SPATIAL_RECOGNITION_PIXEL_BUDGET = 72_000;
-const SPATIAL_LOW_LIGHT_SENSITIVITY_GAIN = 10;
-const SPATIAL_LOW_LIGHT_VISIBILITY_GAIN = 2.85;
-const SPATIAL_LOW_LIGHT_POINT_GAIN = 2.4;
-const SPATIAL_FIELD_VISIBILITY_SCALE = 1;
-const SPATIAL_MESH_VISIBILITY_SCALE = 1;
-const SPATIAL_MAX_MODEL_SIGNAL = 10;
 const SMART_DARK_EDGE_LABEL = "Smart darker edge amplifier";
 const SPATIAL_RECOGNITION_LABEL = "Spatial recognition field mapper";
 const TORCH_LOG_LIMIT = 14;
@@ -255,55 +249,6 @@ const TRUSTED_ACCESS = [
     sha256: "5d24654cf27da2785c1bfcf4af2449005fcf4895fed21df42828a9188969c5cd"
   }
 ];
-
-function normalizeCameraFacingMode(value, fallback = "user") {
-  const mode = String(value || "").toLowerCase();
-  if (mode.includes("environment") || mode.includes("rear") || mode.includes("back")) return "environment";
-  if (mode.includes("user") || mode.includes("front") || mode.includes("selfie")) return "user";
-  return fallback === "environment" ? "environment" : "user";
-}
-
-function inferCameraStreamFacing(stream, requestedFacing = "user") {
-  const fallback = normalizeCameraFacingMode(requestedFacing);
-  try {
-    const track = stream?.getVideoTracks?.()[0];
-    const settings = track?.getSettings?.() || {};
-    const resolved = normalizeCameraFacingMode(settings.facingMode, fallback);
-    return resolved;
-  } catch {
-    return fallback;
-  }
-}
-
-function cameraFacingConstraint(facing) {
-  return { facingMode: { ideal: normalizeCameraFacingMode(facing) } };
-}
-
-function normalizedTorchBrightnessLevel(percent) {
-  return clamp(Number(percent) / 100, TORCH_BRIGHTNESS_MIN / 100, 1);
-}
-
-function hasDirectTorchBrightnessSupport(capabilities = {}, settings = {}) {
-  return ["torchLevel", "brightness", "intensity"].some((key) => key in capabilities || key in settings);
-}
-
-function torchCapabilitySummary(capabilities = {}, settings = {}) {
-  const keys = [...new Set([...Object.keys(capabilities), ...Object.keys(settings)])].filter((key) =>
-    /torch|bright|intensity|fill/i.test(key)
-  );
-  return keys.length ? keys.join(", ") : "torch boolean only";
-}
-
-function torchConstraintAttempts(enabled, level) {
-  if (!enabled) return [{ torch: false }];
-  return [
-    { torch: true, torchLevel: level, brightness: level, intensity: level },
-    { torch: true, torchLevel: level },
-    { torch: true, brightness: level },
-    { torch: true, intensity: level },
-    { torch: true }
-  ];
-}
 
 const RGBW_MIXERS = [
   { key: "main", label: "Main", defaults: { R: 64, G: 196, B: 255, W: 40 } },
@@ -1084,7 +1029,7 @@ const ADJUSTMENT_GROUPS = [
   {
     id: "spatial-recognition",
     title: "Spatial Recognition Studio",
-    description: "Local camera-side pseudo-depth, responsive point-cloud, TIN facets, contour, cell, and field-map recognition derived from visible frame gradients.",
+    description: "Local camera-side pseudo-depth, live point-cloud, TIN facets, contour, cell, and field-map recognition derived from visible frame gradients.",
     type: "spatial-recognition",
     controls: SPATIAL_RECOGNITION_ADJUSTMENTS
   },
@@ -2321,7 +2266,6 @@ function CameraStudio() {
   const torchStrobeIntervalMsRef = useRef(TORCH_STROBE_DEFAULT_MS);
   const torchDimmerEnabledRef = useRef(false);
   const torchBrightnessPercentRef = useRef(TORCH_BRIGHTNESS_DEFAULT);
-  const directTorchBrightnessSupportedRef = useRef(false);
   const captureShelfRef = useRef([]);
   const snapshotSaveDirectoryRef = useRef(null);
   const mediaLayersRef = useRef([]);
@@ -2354,7 +2298,6 @@ function CameraStudio() {
   const [torchStrobeIntervalMs, setTorchStrobeIntervalMs] = useState(TORCH_STROBE_DEFAULT_MS);
   const [torchDimmerEnabled, setTorchDimmerEnabled] = useState(false);
   const [torchBrightnessPercent, setTorchBrightnessPercent] = useState(TORCH_BRIGHTNESS_DEFAULT);
-  const [torchDirectBrightnessSupported, setTorchDirectBrightnessSupported] = useState(false);
   const [torchLog, setTorchLog] = useState([]);
   const [youtubeWindowOpen, setYoutubeWindowOpen] = useState(false);
   const [databaseWindowOpen, setDatabaseWindowOpen] = useState(false);
@@ -2620,89 +2563,47 @@ function CameraStudio() {
   const updateTorchCapability = useCallback((stream) => {
     const videoTrack = stream?.getVideoTracks?.()[0];
     let supported = false;
-    let directBrightnessSupported = false;
     try {
       const capabilities = videoTrack?.getCapabilities?.() || {};
-      const settings = videoTrack?.getSettings?.() || {};
       supported = Boolean(capabilities.torch);
-      directBrightnessSupported = supported && hasDirectTorchBrightnessSupport(capabilities, settings);
-      if (supported) {
-        addTorchLog(`Torch capabilities: ${torchCapabilitySummary(capabilities, settings)}.`, directBrightnessSupported ? "success" : "info");
-      }
     } catch {
       supported = false;
-      directBrightnessSupported = false;
     }
-    directTorchBrightnessSupportedRef.current = directBrightnessSupported;
     setTorchSupported(supported);
-    setTorchDirectBrightnessSupported(directBrightnessSupported);
     setTorchActive(false);
     return supported;
-  }, [addTorchLog]);
+  }, []);
 
   const applyTorchConstraint = useCallback(
-    async (enabled, reason = "manual", levelPercent = torchBrightnessPercentRef.current) => {
+    async (enabled, reason = "manual") => {
       const videoTrack = streamRef.current?.getVideoTracks?.()[0];
       if (!videoTrack?.applyConstraints) {
         setTorchSupported(false);
         setTorchActive(false);
         addTorchLog(`Torch ${enabled ? "on" : "off"} skipped: no active video track for ${reason}.`, "warn");
-        setTorchDirectBrightnessSupported(false);
         return false;
       }
       let supported = false;
-      let directBrightnessSupported = directTorchBrightnessSupportedRef.current;
       try {
         const capabilities = videoTrack.getCapabilities?.() || {};
-        const settings = videoTrack.getSettings?.() || {};
         supported = Boolean(capabilities.torch);
-        directBrightnessSupported = supported && hasDirectTorchBrightnessSupport(capabilities, settings);
-        directTorchBrightnessSupportedRef.current = directBrightnessSupported;
-        setTorchDirectBrightnessSupported(directBrightnessSupported);
       } catch (error) {
         addTorchLog(`Torch capability check failed for ${reason}: ${error.message || error}.`, "error");
       }
       if (!supported) {
         setTorchSupported(false);
         setTorchActive(false);
-        setTorchDirectBrightnessSupported(false);
         addTorchLog(`Torch unsupported on this stream for ${reason}.`, "warn");
         return false;
       }
       try {
-        const level = normalizedTorchBrightnessLevel(levelPercent);
-        const attempts = directBrightnessSupported || !enabled
-          ? torchConstraintAttempts(enabled, level)
-          : [{ torch: enabled }];
-        let lastError = null;
-        let acceptedConstraint = null;
-        for (const advanced of attempts) {
-          try {
-            await videoTrack.applyConstraints({ advanced: [advanced] });
-            acceptedConstraint = advanced;
-            break;
-          } catch (error) {
-            lastError = error;
-          }
-        }
-        if (!acceptedConstraint) throw lastError || new Error("No torch constraint attempt was accepted.");
+        await videoTrack.applyConstraints({ advanced: [{ torch: enabled }] });
         setTorchSupported(true);
         setTorchActive(enabled);
-        if (enabled) {
-          const directLevelAccepted = ["torchLevel", "brightness", "intensity"].some((key) => key in acceptedConstraint);
-          if (!directLevelAccepted) directTorchBrightnessSupportedRef.current = false;
-          setTorchDirectBrightnessSupported(directLevelAccepted);
-          const brightnessLabel = directLevelAccepted
-            ? ` at requested ${Math.round(level * 100)}% direct level`
-            : " with browser on/off torch only";
-          addTorchLog(`Torch enabled${brightnessLabel} (${reason}).`, directLevelAccepted ? "success" : "info");
-        } else {
-          addTorchLog(`Torch disabled (${reason}).`, "info");
-        }
+        addTorchLog(`Torch ${enabled ? "enabled" : "disabled"} (${reason}).`, enabled ? "success" : "info");
         return true;
       } catch (error) {
         setTorchActive(false);
-        setTorchDirectBrightnessSupported(false);
         addTorchLog(`Torch ${enabled ? "enable" : "disable"} failed for ${reason}: ${error.message || error}.`, "error");
         return false;
       }
@@ -2711,7 +2612,6 @@ function CameraStudio() {
   );
 
   const attachCameraStream = useCallback(async (stream, nextFacing = cameraFacing) => {
-    const resolvedFacing = inferCameraStreamFacing(stream, nextFacing);
     streamRef.current = stream;
     if (videoRef.current) {
       videoRef.current.srcObject = stream;
@@ -2721,15 +2621,15 @@ function CameraStudio() {
       hudVideoRef.current.srcObject = stream;
       await Promise.resolve(hudVideoRef.current.play()).catch(() => undefined);
     }
-    setCameraFacing(resolvedFacing);
+    setCameraFacing(nextFacing);
     setCameraActive(true);
     const torchReady = updateTorchCapability(stream);
-    if (resolvedFacing === "environment" && torchReady && (torchHoldModeRef.current || torchLockModeRef.current)) {
+    if (nextFacing === "environment" && torchReady && (torchHoldModeRef.current || torchLockModeRef.current)) {
       window.setTimeout(() => {
         applyTorchConstraint(true, torchLockModeRef.current ? "lock mode reapply" : "hold mode reapply");
       }, 80);
     }
-    if (resolvedFacing === "environment" && torchReady) {
+    if (nextFacing === "environment" && torchReady) {
       setCameraStatus("Rear camera active. Flashlight control is available and stays local to this device.");
     } else {
       setCameraStatus("Camera active. The video is local to this device and is not uploaded.");
@@ -2788,7 +2688,6 @@ function CameraStudio() {
     setCameraActive(false);
     setTorchActive(false);
     setTorchSupported(false);
-    setTorchDirectBrightnessSupported(false);
   }, []);
 
   const startCamera = useCallback(async () => {
@@ -2799,7 +2698,7 @@ function CameraStudio() {
     stopCamera();
     setCameraStatus("Requesting camera permission...");
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: cameraFacingConstraint("user") });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
       await attachCameraStream(stream, "user");
     } catch (error) {
       setCameraActive(false);
@@ -2816,10 +2715,9 @@ function CameraStudio() {
     stopCamera();
     setCameraStatus(`Requesting ${nextFacing === "user" ? "front" : "rear"} camera...`);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: cameraFacingConstraint(nextFacing) });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: nextFacing } });
       await attachCameraStream(stream, nextFacing);
-      const resolvedFacing = inferCameraStreamFacing(stream, nextFacing);
-      setCameraStatus(`${resolvedFacing === "user" ? "Front" : "Rear"} camera active. Local-only stream.`);
+      setCameraStatus(`${nextFacing === "user" ? "Front" : "Rear"} camera active. Local-only stream.`);
     } catch (error) {
       setCameraActive(false);
       setCameraStatus(`Camera flip failed: ${error.message || error}`);
@@ -2936,7 +2834,7 @@ function CameraStudio() {
     setTorchSupported(false);
     setCameraStatus(`Requesting rear camera for ${reason}...`);
     addTorchLog(`Requesting rear camera for ${reason}.`, "info");
-    const stream = await navigator.mediaDevices.getUserMedia({ video: cameraFacingConstraint("environment") });
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } } });
     await attachCameraStream(stream, "environment");
     return stream;
   }, [addTorchLog, attachCameraStream, cameraFacing, clearTorchStrobeTimer, stopRecording]);
@@ -2950,7 +2848,7 @@ function CameraStudio() {
         const onMs = Math.max(24, Math.round(cycleMs * duty));
         const offMs = Math.max(24, cycleMs - onMs);
         torchStrobeOnRef.current = true;
-        await applyTorchConstraint(true, `${label} pulse on`, torchBrightnessPercentRef.current);
+        await applyTorchConstraint(true, `${label} pulse on`);
         if (!activeRef.current) return;
         torchStrobeTimerRef.current = window.setTimeout(async () => {
           if (!activeRef.current) return;
@@ -3620,20 +3518,6 @@ function CameraStudio() {
     if (torchStrobeEnabledRef.current || torchDimmerEnabledRef.current) {
       addTorchLog(`Torch brightness duty updated to ${next}%.`, "info");
       setCameraStatus(`Torch pulse brightness duty updated to ${next}%.`);
-      return;
-    }
-    if (torchActive || torchHoldModeRef.current || torchLockModeRef.current) {
-      applyTorchConstraint(true, "brightness slider", next).then((ok) => {
-        if (!ok) return;
-        if (!directTorchBrightnessSupportedRef.current && next < 98) {
-          setCameraStatus(
-            `Browser torch accepts on/off only. Start Dimmer Pulse for visible ${next}% duty-cycle brightness, or use the native iOS torch dimmer for true smooth float brightness.`
-          );
-          addTorchLog(`Direct brightness appears unavailable; ${next}% is ready for Dimmer Pulse duty-cycle output.`, "warn");
-        } else {
-          setCameraStatus(`Torch brightness request sent at ${next}%.`);
-        }
-      });
     }
   }
 
@@ -3892,8 +3776,7 @@ function CameraStudio() {
           <span>{cameraFacing === "environment" ? "Rear camera" : "Front camera"}</span>
           <span>{torchSupported ? "Torch supported" : "Torch support unknown"}</span>
           <span>{torchActive ? "Light active" : "Light off"}</span>
-          <span>{torchDirectBrightnessSupported ? "Direct level channel" : "Duty-cycle fallback"}</span>
-          <span>{torchBrightnessPercent}% requested brightness</span>
+          <span>{torchBrightnessPercent}% brightness duty</span>
         </div>
 
         <div className="flashlight-mode-grid">
@@ -3988,10 +3871,7 @@ function CameraStudio() {
         </label>
 
         <p className="flashlight-warning">
-          Strobe and dimmer pulse modes can be uncomfortable or unsafe for photosensitive viewers. The web app now tests direct float-like
-          torch constraints first; if the browser only exposes on/off torch, the Dimmer Pulse button uses duty-cycle dimming instead. For true
-          smooth iPhone torch levels from 0.1 to 1.0, use the native SwiftUI AVFoundation integration in{" "}
-          <code>integrations/ios_torch_dimmer</code>.
+          Strobe and dimmer pulse modes can be uncomfortable or unsafe for photosensitive viewers. True LED brightness depends on device/browser torch support; this studio uses duty-cycle dimming when direct brightness control is unavailable.
         </p>
 
         <div className="torch-debug-log" aria-label="Flashlight debug log">
@@ -4241,8 +4121,8 @@ function CameraStudio() {
           </div>
           <p className="dwt-window-note">
             Spatial Recognition estimates depth-like field structure from visible luminance, local edge gradients, color separation,
-            noise, and contour density. Its live Point Cloud and TIN modes map camera cells into responsive surface,
-            noise, and depth geometry while staying layered on top of the current preset.
+            noise, and contour density. Its live Point Cloud and TIN modes map camera cells into surface, noise, and depth geometry
+            while staying layered on top of the current preset.
           </p>
 
           <div className="dwt-status-grid spatial-status-grid" aria-label="Spatial recognition status">
@@ -4302,7 +4182,7 @@ function CameraStudio() {
             <strong>{SPATIAL_RECOGNITION_LABEL}</strong>
             <small>
               {spatialRecognitionEnabled
-                ? "Fine low-visibility point-cloud, TIN facets, contour, and pseudo-depth mapping is active on preview, HUD, snapshots, recordings, and overlays."
+                ? "Spatial point-cloud, TIN facets, contour, and pseudo-depth mapping is active on preview, HUD, snapshots, recordings, and overlays."
                 : "Off: spatial mapping is bypassed while depth, TIN, mesh, contour, and point-cloud controls remain ready."}
             </small>
           </span>
@@ -4311,10 +4191,8 @@ function CameraStudio() {
           <strong>Local Spatial Field Mapping</strong>
           <p>
             Adapted from the imported SpatialViewport/pointCloudWorker prototype without adding Three.js dependencies. The camera canvas
-            decimates frame pixels into responsive live cells, larger point-cloud samples, and stronger TIN triangle facets so desktop,
-            mobile, HUD, exports, and media layers all share the same surface/noise/depth result.
-            Spatial Power now weights frame detail instead of creating a central radial light point, and Parallax Drift moves as one
-            even translated layer across the whole preview.
+            decimates frame pixels into live cells, point-cloud samples, and TIN triangle facets so desktop, mobile, HUD, exports, and
+            media layers all share the same surface/noise/depth result.
           </p>
           <button type="button" className="dwt-inline-button" onClick={() => setSpatialWindowOpen(true)}>
             <Layers size={14} />
@@ -4559,8 +4437,8 @@ function CameraStudio() {
           <ul>
             <li>{CAMERA_EFFECTS.length} local visual presets compiled at 500% intensity for IR-style, UVA-style, full-spectrum thermal, XLS, inversion, tritone, quadtone, channel spectrograph, black-field, channel sweep, cinematic, monochrome, duotone, retro, and color-lab looks.</li>
             <li>Four RGBW gradient mixers for Main, Secondary, Third, and Highlights color layers that drive overlays, filter math, and the selected app accent aesthetic.</li>
-            <li>Grouped adjustment dropdowns with 11 core photo controls, 10 color inversion tools, 20 inversion presets, 10 smart darker-edge controls, 20 smart signal engines, 42 local Spatial Recognition Studio controls with 1000% low-light sensitivity and restored responsive front/rear live Point Cloud/TIN surface mapping, an expanded AI-orchestrated Smart Isolate Grouped Pixels DWT/noise defect-distortion module with 31 controls, Thermal Studio A-O hotspot recoloring, 100 advanced sliders, equation-generated filter names/descriptions, and live/overlay adjustment toggles.</li>
-            <li>Flashlight Studio includes Hold Torch, Lock Rear Torch, Strobe, Dimmer Pulse, interval timing, direct torch-level probing, browser brightness-duty fallback controls, and a native iOS AVFoundation torch-dimmer handoff for true smooth 0.1-1.0 iPhone torch levels.</li>
+            <li>Grouped adjustment dropdowns with 11 core photo controls, 10 color inversion tools, 20 inversion presets, 10 smart darker-edge controls, 20 smart signal engines, 42 local Spatial Recognition Studio controls with live Point Cloud/TIN surface mapping, an expanded AI-orchestrated Smart Isolate Grouped Pixels DWT/noise defect-distortion module with 31 controls, Thermal Studio A-O hotspot recoloring, 100 advanced sliders, equation-generated filter names/descriptions, and live/overlay adjustment toggles.</li>
+            <li>Flashlight Studio includes Hold Torch, Lock Rear Torch, Strobe, Dimmer Pulse, interval timing, and brightness-duty controls where the rear-camera torch API is exposed by the device.</li>
             <li>Processed PNG snapshots and 1080P or 2K MP4 recordings with local camera effects applied, including browser download plus desktop folder-save support when permission is granted.</li>
             <li>Separate 1-3 layer image/video compositor with opacity, splice masks, blend modes, transforms, full adjustment-stack support, and clean PNG export.</li>
             <li>Clean exports hide app-added preview chrome, labels, and watermark overlays so only the processed image or video remains.</li>
@@ -6163,62 +6041,59 @@ function hasSpatialRecognitionSignal(settings = {}, effect = {}, enabled = false
 }
 
 function buildSpatialRecognitionModel(settings = {}, effect = {}, enabled = false) {
-  const master = enabled ? clamp((setting(settings, "spatialMaster") / 100) * SPATIAL_LOW_LIGHT_SENSITIVITY_GAIN, 0, 10) : 0;
+  const master = enabled ? clamp(setting(settings, "spatialMaster") / 100, 0, 1) : 0;
   const thermalBias = isThermalRenderMode(settings, effect) ? 0.16 : 0;
   const edgeBias = effectSetting(settings, "edgeEnhance", 0, PIXEL_EFFECT_GAIN) / 220;
-  const thermalLock = clamp((setting(settings, "spatialThermalLock") / 100 + thermalBias * 0.8) * SPATIAL_LOW_LIGHT_SENSITIVITY_GAIN, 0, 10);
+  const thermalLock = clamp(setting(settings, "spatialThermalLock") / 100 + thermalBias * 0.8, 0, 1.35);
   const sensitivityBoost =
     (setting(settings, "spatialMicroContrast") +
       setting(settings, "spatialSubpixelScan") +
       setting(settings, "spatialSpecularSense") +
       setting(settings, "spatialShadowSense")) /
     1600;
-  const amplified = (key, extra = 0, max = 10) =>
-    clamp((setting(settings, key) / 100 + extra) * SPATIAL_LOW_LIGHT_SENSITIVITY_GAIN, 0, max);
   return {
     active: master > 0.01,
     master,
-    sensitivity: amplified("spatialSensitivity", thermalBias * 0.24 + sensitivityBoost, 10),
-    depth: amplified("spatialDepth", thermalBias + thermalLock * 0.012, 10),
-    field: amplified("spatialField", setting(settings, "spatialVectorTension") / 420, 8),
-    range: amplified("spatialRange", setting(settings, "spatialObjectCohesion") / 460, 8),
-    pointDensity: amplified("spatialPointDensity", setting(settings, "spatialSubpixelScan") / 420, 8),
-    edgeWeight: amplified("spatialEdgeWeight", edgeBias + setting(settings, "spatialDepthSharpen") / 420, 10),
-    meshOpacity: amplified("spatialMeshOpacity", 0, 4),
-    contourOpacity: amplified("spatialContourOpacity", setting(settings, "spatialContourDensity") / 360, 7),
-    parallax: amplified("spatialParallax", setting(settings, "spatialMotionTrace") / 520, 7),
-    colorSplit: amplified("spatialColorSplit", setting(settings, "spatialColorDepth") / 310, 8),
-    smoothing: amplified("spatialSmoothing", setting(settings, "spatialDepthBlur") / 480, 5),
-    microContrast: amplified("spatialMicroContrast", 0, 8),
-    gradientLift: amplified("spatialGradientLift", 0, 7),
-    nearFieldBias: amplified("spatialNearFieldBias", 0, 7),
-    farFieldBias: amplified("spatialFarFieldBias", 0, 7),
-    occlusion: amplified("spatialOcclusion", 0, 8),
-    depthSharpen: amplified("spatialDepthSharpen", 0, 8),
-    depthBlur: amplified("spatialDepthBlur", 0, 4),
-    contourDensity: amplified("spatialContourDensity", 0, 8),
-    contourThreshold: clamp(setting(settings, "spatialContourThreshold") / 180, 0, 0.55),
-    vectorTension: amplified("spatialVectorTension", 0, 7),
-    surfaceNormal: amplified("spatialSurfaceNormal", 0, 8),
-    specularSense: amplified("spatialSpecularSense", 0, 8),
-    shadowSense: amplified("spatialShadowSense", 0, 10),
-    highlightSense: amplified("spatialHighlightSense", 0, 8),
-    colorDepth: amplified("spatialColorDepth", 0, 8),
-    noiseReject: clamp(setting(settings, "spatialNoiseReject") / 180, 0, 0.55),
-    objectCohesion: amplified("spatialObjectCohesion", 0, 7),
-    motionTrace: amplified("spatialMotionTrace", 0, 6),
-    subpixelScan: amplified("spatialSubpixelScan", 0, 8),
-    livePointCloud: amplified("spatialLivePointCloud", 0, 8),
-    tinOpacity: amplified("spatialTinOpacity", 0, 7),
-    tinWire: amplified("spatialTinWire", 0, 7),
+    sensitivity: clamp(setting(settings, "spatialSensitivity") / 100 + thermalBias * 0.24 + sensitivityBoost, 0, 1.55),
+    depth: clamp(setting(settings, "spatialDepth") / 100 + thermalBias + thermalLock * 0.12, 0, 1.65),
+    field: clamp(setting(settings, "spatialField") / 100 + setting(settings, "spatialVectorTension") / 420, 0, 1.35),
+    range: clamp(setting(settings, "spatialRange") / 100 + setting(settings, "spatialObjectCohesion") / 460, 0, 1.45),
+    pointDensity: clamp(setting(settings, "spatialPointDensity") / 100 + setting(settings, "spatialSubpixelScan") / 420, 0, 1.25),
+    edgeWeight: clamp(setting(settings, "spatialEdgeWeight") / 100 + edgeBias + setting(settings, "spatialDepthSharpen") / 420, 0, 1.7),
+    meshOpacity: clamp(setting(settings, "spatialMeshOpacity") / 100, 0, 1),
+    contourOpacity: clamp(setting(settings, "spatialContourOpacity") / 100 + setting(settings, "spatialContourDensity") / 360, 0, 1.35),
+    parallax: clamp(setting(settings, "spatialParallax") / 100 + setting(settings, "spatialMotionTrace") / 520, 0, 1.22),
+    colorSplit: clamp(setting(settings, "spatialColorSplit") / 100 + setting(settings, "spatialColorDepth") / 310, 0, 1.55),
+    smoothing: clamp(setting(settings, "spatialSmoothing") / 100 + setting(settings, "spatialDepthBlur") / 480, 0, 1.15),
+    microContrast: clamp(setting(settings, "spatialMicroContrast") / 100, 0, 1.25),
+    gradientLift: clamp(setting(settings, "spatialGradientLift") / 100, 0, 1.2),
+    nearFieldBias: clamp(setting(settings, "spatialNearFieldBias") / 100, 0, 1.25),
+    farFieldBias: clamp(setting(settings, "spatialFarFieldBias") / 100, 0, 1.25),
+    occlusion: clamp(setting(settings, "spatialOcclusion") / 100, 0, 1.3),
+    depthSharpen: clamp(setting(settings, "spatialDepthSharpen") / 100, 0, 1.35),
+    depthBlur: clamp(setting(settings, "spatialDepthBlur") / 100, 0, 1),
+    contourDensity: clamp(setting(settings, "spatialContourDensity") / 100, 0, 1.4),
+    contourThreshold: clamp(setting(settings, "spatialContourThreshold") / 100, 0, 1),
+    vectorTension: clamp(setting(settings, "spatialVectorTension") / 100, 0, 1.25),
+    surfaceNormal: clamp(setting(settings, "spatialSurfaceNormal") / 100, 0, 1.35),
+    specularSense: clamp(setting(settings, "spatialSpecularSense") / 100, 0, 1.35),
+    shadowSense: clamp(setting(settings, "spatialShadowSense") / 100, 0, 1.35),
+    highlightSense: clamp(setting(settings, "spatialHighlightSense") / 100, 0, 1.35),
+    colorDepth: clamp(setting(settings, "spatialColorDepth") / 100, 0, 1.45),
+    noiseReject: clamp(setting(settings, "spatialNoiseReject") / 100, 0, 1),
+    objectCohesion: clamp(setting(settings, "spatialObjectCohesion") / 100, 0, 1.4),
+    motionTrace: clamp(setting(settings, "spatialMotionTrace") / 100, 0, 1.2),
+    subpixelScan: clamp(setting(settings, "spatialSubpixelScan") / 100, 0, 1.35),
+    livePointCloud: clamp(setting(settings, "spatialLivePointCloud") / 100, 0, 1.35),
+    tinOpacity: clamp(setting(settings, "spatialTinOpacity") / 100, 0, 1.25),
+    tinWire: clamp(setting(settings, "spatialTinWire") / 100, 0, 1.25),
     cellSize: clamp(setting(settings, "spatialCellSize") / 100, 0, 1),
-    cellDepth: amplified("spatialCellDepth", 0, 8),
-    surfaceMap: amplified("spatialSurfaceMap", 0, 8),
-    noiseMap: amplified("spatialNoiseMap", 0, 8),
-    gridWarp: amplified("spatialGridWarp", 0, 6),
-    pointLift: amplified("spatialPointLift", 0, 7),
-    facetSmoothing: clamp(setting(settings, "spatialFacetSmoothing") / 120, 0, 0.9),
-    lowLightSensitivity: clamp((setting(settings, "spatialSensitivity") + setting(settings, "spatialShadowSense") + setting(settings, "spatialGradientLift")) / 300 * SPATIAL_LOW_LIGHT_SENSITIVITY_GAIN, 0, 10),
+    cellDepth: clamp(setting(settings, "spatialCellDepth") / 100, 0, 1.45),
+    surfaceMap: clamp(setting(settings, "spatialSurfaceMap") / 100, 0, 1.45),
+    noiseMap: clamp(setting(settings, "spatialNoiseMap") / 100, 0, 1.45),
+    gridWarp: clamp(setting(settings, "spatialGridWarp") / 100, 0, 1.25),
+    pointLift: clamp(setting(settings, "spatialPointLift") / 100, 0, 1.35),
+    facetSmoothing: clamp(setting(settings, "spatialFacetSmoothing") / 100, 0, 1),
     thermalLock,
     palette: settings?.thermalPalette || "full-range-rgb"
   };
@@ -6255,24 +6130,6 @@ function applySpatialRecognitionEffects(context, width, height, settings, effect
   applySpatialRecognitionEffectsToContext(context, width, height, settings, effect, model);
 }
 
-function spatialUniformParallaxOffset(width, height, model, scale = 1) {
-  const strength = clamp(model.parallax * (0.72 + model.motionTrace * 0.045 + model.vectorTension * 0.025), 0, 10);
-  const magnitude = Math.min(width, height) * 0.006 * strength * scale;
-  const phase = model.motionTrace * 0.31 + model.vectorTension * 0.17 + model.gridWarp * 0.09 + 0.72;
-  return {
-    x: Math.cos(phase) * magnitude,
-    y: Math.sin(phase * 0.82) * magnitude
-  };
-}
-
-function spatialVisualPower(model) {
-  return clamp(model.master / SPATIAL_MAX_MODEL_SIGNAL, 0, 1);
-}
-
-function spatialModelRatio(value, max = SPATIAL_MAX_MODEL_SIGNAL) {
-  return clamp(value / max, 0, 1);
-}
-
 function applySpatialRecognitionEffectsToContext(context, width, height, settings, effect, model) {
   let frame;
   try {
@@ -6282,18 +6139,6 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
   }
   const data = frame.data;
   const source = new Uint8ClampedArray(data);
-  const masterVisual = spatialVisualPower(model);
-  const sensitivityVisual = spatialModelRatio(model.sensitivity);
-  const depthVisual = spatialModelRatio(model.depth);
-  const thermalVisual = spatialModelRatio(model.thermalLock);
-  const edgeVisual = spatialModelRatio(model.edgeWeight);
-  const microVisual = spatialModelRatio(model.microContrast, 8);
-  const occlusionVisual = spatialModelRatio(model.occlusion, 8);
-  const splitVisual = spatialModelRatio(model.colorSplit, 8);
-  const colorDepthVisual = spatialModelRatio(model.colorDepth, 8);
-  const smoothVisual = spatialModelRatio(model.smoothing, 5);
-  const gradientVisual = spatialModelRatio(model.gradientLift, 7);
-  const lowLightVisual = spatialModelRatio(model.lowLightSensitivity);
   const lumaAt = (pixelIndex) =>
     (source[pixelIndex] * 0.2126 + source[pixelIndex + 1] * 0.7152 + source[pixelIndex + 2] * 0.0722) / 255;
   for (let index = 0; index < data.length; index += 4) {
@@ -6310,29 +6155,17 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
     const localAverage = (luma * 2 + left + right + up + down) / 6;
     const localDeviation = Math.abs(luma - localAverage);
     const diagonalGradient = Math.abs(downRight - upLeft);
-    const darkness = clamp(1 - luma, 0, 1);
-    const lowLightSignal = clamp(
-      Math.pow(darkness, 1.08) * (0.16 + model.lowLightSensitivity * 0.22) +
-        Math.pow(localDeviation + diagonalGradient, 0.72) * model.lowLightSensitivity * 0.62,
-      0,
-      1
-    );
-    const lowLightGain = 1 + lowLightSignal * SPATIAL_LOW_LIGHT_VISIBILITY_GAIN + darkness * model.sensitivity * 0.32;
-    const normalSignal = clamp((Math.abs((right - left) - (down - up)) + diagonalGradient * 0.75) * lowLightGain, 0, 1);
-    const rawEdge =
-      (Math.abs(right - left) + Math.abs(down - up)) * lowLightGain +
-      localDeviation * (1.8 + model.microContrast * 1.4 + lowLightSignal * 7.5) +
-      lowLightSignal * model.subpixelScan * 0.12;
-    const noiseGate = 1 - clamp(Math.max(0, localDeviation * 2.8 - rawEdge * 0.18) * model.noiseReject * 0.55, 0, 0.42);
-    const edge = clamp((rawEdge + normalSignal * model.surfaceNormal * 0.55 + lowLightSignal * model.edgeWeight * 0.08) * noiseGate, 0, 1);
-    const xDepth = x / Math.max(1, width - 1);
+    const normalSignal = clamp(Math.abs((right - left) - (down - up)) + diagonalGradient * 0.75, 0, 1);
+    const rawEdge = Math.abs(right - left) + Math.abs(down - up) + localDeviation * (1.8 + model.microContrast * 1.4);
+    const noiseGate = 1 - clamp(Math.max(0, localDeviation * 2.8 - rawEdge * 0.18) * model.noiseReject, 0, 0.72);
+    const edge = clamp((rawEdge + normalSignal * model.surfaceNormal * 0.55) * noiseGate, 0, 1);
+    const radial = distanceFromCenter(x / Math.max(1, width - 1), y / Math.max(1, height - 1));
     const verticalDepth = 1 - y / Math.max(1, height - 1);
-    const planeDepth = clamp(verticalDepth * 0.68 + xDepth * 0.18 + localAverage * 0.14, 0, 1);
-    const specularSignal = clamp(Math.max(0, luma - 0.58) * model.specularSense * 2.65 + lowLightSignal * 0.12, 0, 1);
-    const shadowSignal = clamp(Math.max(0, 0.54 - luma) * model.shadowSense * 2.95 + lowLightSignal * 0.72, 0, 1);
+    const nearField = Math.pow(1 - radial, 1.35) * model.nearFieldBias;
+    const farField = Math.pow(radial, 1.12) * model.farFieldBias;
+    const specularSignal = clamp(Math.max(0, luma - 0.58) * model.specularSense * 2.65, 0, 1);
+    const shadowSignal = clamp(Math.max(0, 0.42 - luma) * model.shadowSense * 2.55, 0, 1);
     const highlightSignal = clamp(Math.max(0, luma - 0.48) * model.highlightSense * 2.05, 0, 1);
-    const nearField = clamp((edge * 0.52 + localDeviation * 1.1 + normalSignal * 0.24 + specularSignal * 0.16 + lowLightSignal * 0.18) * model.nearFieldBias, 0, 1.6);
-    const farField = clamp((shadowSignal * 0.28 + darkness * 0.16 + (1 - edge) * 0.08 + (1 - localDeviation) * 0.04) * model.farFieldBias, 0, 1.6);
     const contourPhase = Math.abs(
       Math.sin((luma * (7.5 + model.contourDensity * 8.8) + edge * 4.2 + model.range * 2.1 + normalSignal * model.vectorTension) * Math.PI)
     );
@@ -6340,35 +6173,27 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
       luma * (0.42 + model.range * 0.36) +
         edge * model.edgeWeight * (0.42 + model.depthSharpen * 0.34) +
         localDeviation * model.depth * 1.22 +
-        lowLightSignal * model.depth * 0.62 +
         normalSignal * model.surfaceNormal * 0.32 +
-        planeDepth * model.field * (0.15 + model.gradientLift * 0.16) +
+        verticalDepth * model.field * (0.16 + model.gradientLift * 0.22) +
         nearField * 0.18 -
         farField * 0.14 +
         specularSignal * 0.12 -
-        shadowSignal * model.occlusion * 0.18 +
-        sensitivityVisual * 0.18,
+        shadowSignal * model.occlusion * 0.18 -
+        radial * model.field * 0.14 +
+        model.sensitivity * 0.12,
       0,
       1
     );
     const [dr, dg, db] = spatialRecognitionDepthColor(pseudoDepth, model);
-    const thresholdGate = clamp((edge + localDeviation * 1.8 + normalSignal * 0.8 + lowLightSignal * 0.92) - model.contourThreshold * 0.32, 0, 1);
-    const contourMask = clamp((1 - contourPhase) * model.contourOpacity * thresholdGate * (0.38 + edge * 0.95 + lowLightSignal * 0.5), 0, 1);
+    const thresholdGate = clamp((edge + localDeviation * 1.8 + normalSignal * 0.8) - model.contourThreshold * 0.32, 0, 1);
+    const contourMask = clamp((1 - contourPhase) * model.contourOpacity * thresholdGate * (0.38 + edge * 0.95), 0, 1);
     const cohesion = clamp(1 + model.objectCohesion * (0.34 - localDeviation * 0.22), 0.78, 1.38);
     const depthMask = clamp(
-      (edge * 0.42 + localDeviation * 1.58 + contourMask * 0.68 + specularSignal * 0.18 + shadowSignal * 0.16 + lowLightSignal * 0.72) *
-        masterVisual *
-        cohesion,
+      (edge * 0.42 + localDeviation * 1.58 + contourMask * 0.68 + specularSignal * 0.18 + shadowSignal * 0.16) * model.master * cohesion,
       0,
-      0.72
+      0.95
     );
-    const alpha = clamp(
-      depthMask *
-        (0.14 + depthVisual * 0.3 + sensitivityVisual * 0.24 + thermalVisual * 0.16 + lowLightSignal * 0.22) *
-        SPATIAL_FIELD_VISIBILITY_SCALE,
-      0,
-      0.58
-    );
+    const alpha = clamp(depthMask * (0.26 + model.depth * 0.34 + model.sensitivity * 0.26 + model.thermalLock * 0.16), 0, 0.78);
     let r = data[index];
     let g = data[index + 1];
     let b = data[index + 2];
@@ -6377,37 +6202,28 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
     b = mixChannel(b, db, alpha * (0.88 + model.colorDepth * 0.14));
 
     if (model.microContrast > 0.01) {
-      const contrastLift =
-        clamp(
-          edge * microVisual * masterVisual * 1.4 + normalSignal * spatialModelRatio(model.surfaceNormal, 8) * 0.34 + lowLightSignal * lowLightVisual * 0.62,
-          0,
-          1.9
-        ) * SPATIAL_FIELD_VISIBILITY_SCALE;
+      const contrastLift = clamp(edge * model.microContrast * model.master * 1.15 + normalSignal * model.surfaceNormal * 0.32, 0, 1.6);
       r = (r - 128) * (1 + contrastLift) + 128;
       g = (g - 128) * (1 + contrastLift * 0.9) + 128;
       b = (b - 128) * (1 + contrastLift * 0.82) + 128;
     }
 
     if (model.occlusion > 0.01) {
-      const darken = clamp((shadowSignal + farField * 0.22) * occlusionVisual * masterVisual * 92 * SPATIAL_FIELD_VISIBILITY_SCALE, 0, 84);
+      const darken = clamp((shadowSignal + farField * 0.22) * model.occlusion * model.master * 68, 0, 96);
       r -= darken;
       g -= darken * 0.9;
       b -= darken * 0.82;
     }
 
     if (model.colorSplit > 0.01) {
-      const split = clamp(
-        (edge + contourMask + specularSignal * 0.45) * splitVisual * masterVisual * (34 + colorDepthVisual * 56) * SPATIAL_FIELD_VISIBILITY_SCALE,
-        0,
-        58
-      );
+      const split = clamp((edge + contourMask + specularSignal * 0.45) * model.colorSplit * model.master * (42 + model.colorDepth * 36), 0, 72);
       r += split;
       g += split * Math.sin((x / Math.max(1, width)) * Math.PI + model.motionTrace) * (0.28 + model.vectorTension * 0.2);
       b -= split * (0.44 + model.thermalLock * 0.18);
     }
 
     if (model.smoothing > 0.01) {
-      const smoothAlpha = clamp(smoothVisual * (0.06 + (1 - edge) * 0.12 + spatialModelRatio(model.depthBlur, 4) * 0.08) * masterVisual * SPATIAL_FIELD_VISIBILITY_SCALE, 0, 0.2);
+      const smoothAlpha = clamp(model.smoothing * (0.06 + (1 - edge) * 0.12 + model.depthBlur * 0.08) * model.master, 0, 0.28);
       const localGray = localAverage * 255;
       r = mixChannel(r, localGray, smoothAlpha);
       g = mixChannel(g, localGray, smoothAlpha * 0.9);
@@ -6415,22 +6231,10 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
     }
 
     if (model.gradientLift > 0.01) {
-      const lift =
-        (planeDepth * 0.72 + normalSignal * 0.16 + nearField * 0.12 - farField * 0.1 + highlightSignal * 0.22 + lowLightSignal * 0.44) *
-        gradientVisual *
-        masterVisual *
-        36 *
-        SPATIAL_FIELD_VISIBILITY_SCALE;
+      const lift = (verticalDepth - radial * 0.36 + nearField * 0.2 - farField * 0.16 + highlightSignal * 0.22) * model.gradientLift * model.master * 34;
       r += lift * 0.62;
       g += lift * 0.82;
       b += lift;
-    }
-
-    if (lowLightSignal > 0.01) {
-      const lowLightAlpha = clamp(lowLightSignal * masterVisual * (0.04 + lowLightVisual * 0.08) * SPATIAL_FIELD_VISIBILITY_SCALE, 0, 0.2);
-      r = mixChannel(r, dr, lowLightAlpha);
-      g = mixChannel(g, dg, lowLightAlpha * 0.94);
-      b = mixChannel(b, db, lowLightAlpha * 0.88);
     }
 
     data[index] = clamp(r, 0, 255);
@@ -6440,46 +6244,42 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
   context.putImageData(frame, 0, 0);
   paintLiveSpatialPointCloudAndTin(context, width, height, source, model);
 
-  const meshAlpha = clamp(spatialModelRatio(model.meshOpacity, 4) * masterVisual * 0.32 * SPATIAL_MESH_VISIBILITY_SCALE, 0, 0.34);
+  const meshAlpha = clamp(model.meshOpacity * model.master * 0.32, 0, 0.42);
   if (meshAlpha > 0.01) {
-    const gridStep = Math.max(10, Math.round(38 - spatialModelRatio(model.pointDensity, 8) * 16 - spatialModelRatio(model.contourDensity, 8) * 6));
-    const drift = spatialUniformParallaxOffset(width, height, model, 1);
+    const gridStep = Math.max(7, Math.round(38 - model.pointDensity * 20 - model.contourDensity * 7));
     context.save();
     context.globalCompositeOperation = "screen";
-    context.translate(drift.x, drift.y);
     context.lineWidth = Math.max(0.5, Math.min(width, height) / (900 - model.vectorTension * 260));
     context.strokeStyle = `rgba(125, 238, 255, ${clamp(meshAlpha + model.surfaceNormal * 0.04, 0, 0.5)})`;
-    for (let x = -gridStep; x <= width + gridStep; x += gridStep) {
+    for (let x = 0; x <= width; x += gridStep) {
+      const offset = Math.sin((x / Math.max(1, width)) * Math.PI * (2 + model.vectorTension * 2)) * model.parallax * gridStep * (0.45 + model.motionTrace * 0.24);
       context.beginPath();
-      context.moveTo(x, -gridStep);
-      context.lineTo(x, height + gridStep);
+      context.moveTo(x, 0);
+      context.lineTo(x + offset, height);
       context.stroke();
     }
-    context.strokeStyle = `rgba(255, 111, 164, ${clamp(meshAlpha * (0.74 + model.colorDepth * 0.22), 0, 0.5)})`;
-    for (let y = -gridStep; y <= height + gridStep; y += gridStep) {
+    context.strokeStyle = `rgba(255, 111, 164, ${meshAlpha * (0.74 + model.colorDepth * 0.22)})`;
+    for (let y = 0; y <= height; y += gridStep) {
+      const offset = Math.cos((y / Math.max(1, height)) * Math.PI * (2 + model.vectorTension * 1.6)) * model.parallax * gridStep * (0.42 + model.motionTrace * 0.2);
       context.beginPath();
-      context.moveTo(-gridStep, y);
-      context.lineTo(width + gridStep, y);
+      context.moveTo(0, y);
+      context.lineTo(width, y + offset);
       context.stroke();
     }
     context.restore();
   }
 
-  const pointAlpha = clamp(
-    spatialModelRatio(model.pointDensity, 8) * masterVisual * (0.22 + spatialModelRatio(model.subpixelScan, 8) * 0.14) * SPATIAL_MESH_VISIBILITY_SCALE,
-    0,
-    0.28
-  );
+  const pointAlpha = clamp(model.pointDensity * model.master * (0.28 + model.subpixelScan * 0.12), 0, 0.46);
   if (pointAlpha > 0.01) {
-    const pointStep = Math.max(8, Math.round(30 - spatialModelRatio(model.pointDensity, 8) * 14 - spatialModelRatio(model.subpixelScan, 8) * 5));
-    const drift = spatialUniformParallaxOffset(width, height, model, 0.85);
+    const pointStep = Math.max(5, Math.round(29 - model.pointDensity * 18 - model.subpixelScan * 7));
     context.save();
-    context.globalCompositeOperation = "source-over";
+    context.globalCompositeOperation = "screen";
     context.fillStyle = `rgba(238, 255, 255, ${pointAlpha})`;
     for (let y = pointStep; y < height; y += pointStep) {
       for (let x = pointStep; x < width; x += pointStep) {
-        const size = clamp(0.9 + spatialModelRatio(model.subpixelScan, 8) * 1.4 + spatialModelRatio(model.objectCohesion, 7) * 1.1, 0.9, 4.6);
-        context.fillRect(x + drift.x, y + drift.y, size, size);
+        const drift = Math.sin((x * 0.017 + y * 0.021) * (1 + model.parallax + model.motionTrace * 0.5)) * model.parallax * (2.2 + model.motionTrace * 1.8);
+        const size = 1.2 + model.subpixelScan * 1.1 + model.objectCohesion * 0.5;
+        context.fillRect(x + drift, y - drift, size, size);
       }
     }
     context.restore();
@@ -6487,45 +6287,16 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
 }
 
 function paintLiveSpatialPointCloudAndTin(context, width, height, source, model) {
-  const masterVisual = spatialVisualPower(model);
-  const livePointVisual = spatialModelRatio(model.livePointCloud, 8);
-  const pointDensityVisual = spatialModelRatio(model.pointDensity, 8);
-  const tinVisual = spatialModelRatio(model.tinOpacity, 7);
-  const wireVisual = spatialModelRatio(model.tinWire, 7);
-  const subpixelVisual = spatialModelRatio(model.subpixelScan, 8);
-  const lowLightVisual = spatialModelRatio(model.lowLightSensitivity);
-  const sensitivityVisual = spatialModelRatio(model.sensitivity);
-  const edgeVisual = spatialModelRatio(model.edgeWeight);
-  const surfaceVisual = spatialModelRatio(model.surfaceMap, 8);
-  const noiseVisual = spatialModelRatio(model.noiseMap, 8);
-  const pointLiftVisual = spatialModelRatio(model.pointLift, 7);
-  const cellDepthVisual = spatialModelRatio(model.cellDepth, 8);
-  const depthVisual = spatialModelRatio(model.depth);
-  const fieldVisual = spatialModelRatio(model.field, 8);
-  const rangeVisual = spatialModelRatio(model.range, 8);
-  const pointCloudAlpha = clamp(
-    livePointVisual * masterVisual * (0.3 + subpixelVisual * 0.18 + lowLightVisual * 0.16) * SPATIAL_MESH_VISIBILITY_SCALE,
-    0,
-    0.36
-  );
-  const tinAlpha = clamp(
-    tinVisual * masterVisual * (0.26 + surfaceVisual * 0.16 + cellDepthVisual * 0.12 + lowLightVisual * 0.14) * SPATIAL_MESH_VISIBILITY_SCALE,
-    0,
-    0.34
-  );
-  const wireAlpha = clamp(
-    wireVisual * masterVisual * (0.22 + surfaceVisual * 0.1 + lowLightVisual * 0.1) * SPATIAL_MESH_VISIBILITY_SCALE,
-    0,
-    0.3
-  );
+  const pointCloudAlpha = clamp(model.livePointCloud * model.master * (0.34 + model.subpixelScan * 0.16), 0, 0.58);
+  const tinAlpha = clamp(model.tinOpacity * model.master * (0.28 + model.surfaceMap * 0.12 + model.cellDepth * 0.08), 0, 0.48);
+  const wireAlpha = clamp(model.tinWire * model.master * (0.22 + model.surfaceMap * 0.08), 0, 0.42);
   if (pointCloudAlpha <= 0.01 && tinAlpha <= 0.01 && wireAlpha <= 0.01) return;
 
   const cellStep = Math.max(
-    9,
-    Math.round(42 - model.cellSize * 14 - pointDensityVisual * 10 - livePointVisual * 13 - subpixelVisual * 5 - lowLightVisual * 5)
+    8,
+    Math.round(40 - model.cellSize * 17 - model.pointDensity * 7 - model.livePointCloud * 6 - model.subpixelScan * 3)
   );
   const sampleRadius = Math.max(1, Math.round(cellStep * 0.45));
-  const uniformDrift = spatialUniformParallaxOffset(width, height, model, 0.7 + model.gridWarp * 0.05);
   const rows = [];
   const safeIndex = (x, y) => (clamp(Math.round(y), 0, height - 1) * width + clamp(Math.round(x), 0, width - 1)) * 4;
   const lumaAt = (x, y) => {
@@ -6544,36 +6315,28 @@ function paintLiveSpatialPointCloudAndTin(context, width, height, source, model)
       const upLeft = lumaAt(x - sampleRadius, y - sampleRadius);
       const downRight = lumaAt(x + sampleRadius, y + sampleRadius);
       const localAverage = (luma * 2 + left + right + up + down) / 6;
-      const darkness = clamp(1 - luma, 0, 1);
+      const edge = clamp(Math.abs(right - left) + Math.abs(down - up), 0, 1);
       const diagonal = Math.abs(downRight - upLeft);
-      const lowLightSignal = clamp(
-        Math.pow(darkness, 1.02) * (0.14 + model.lowLightSensitivity * 0.24) +
-          Math.pow(Math.abs(luma - localAverage) + diagonal, 0.7) * model.lowLightSensitivity * 0.58,
-        0,
-        1
-      );
-      const lowLightGain = 1 + lowLightSignal * (0.85 + lowLightVisual * 1.12) + darkness * sensitivityVisual * 0.55;
-      const edge = clamp((Math.abs(right - left) + Math.abs(down - up)) * lowLightGain + lowLightSignal * edgeVisual * 0.38, 0, 1);
-      const noise = clamp(Math.abs(luma - localAverage) * (1.9 + noiseVisual * 2.1 + lowLightSignal * 4.2) + diagonal * 0.42, 0, 1);
-      const surface = clamp((Math.abs((right - left) - (down - up)) + diagonal * 0.78 + edge * 0.24) * lowLightGain, 0, 1);
-      const xDepth = x / Math.max(1, width - 1);
+      const noise = clamp(Math.abs(luma - localAverage) * (1.9 + model.noiseMap * 1.8) + diagonal * 0.42, 0, 1);
+      const surface = clamp(Math.abs((right - left) - (down - up)) + diagonal * 0.78 + edge * 0.24, 0, 1);
+      const radial = distanceFromCenter(x / Math.max(1, width - 1), y / Math.max(1, height - 1));
       const verticalDepth = 1 - y / Math.max(1, height - 1);
-      const planeDepth = clamp(verticalDepth * 0.68 + xDepth * 0.18 + localAverage * 0.14, 0, 1);
       const depth = clamp(
-        luma * (0.32 + cellDepthVisual * 0.48) +
-          edge * edgeVisual * 0.48 +
-          noise * noiseVisual * 0.42 +
-          surface * surfaceVisual * 0.44 +
-          lowLightSignal * depthVisual * 0.5 +
-          planeDepth * fieldVisual * 0.16 +
-          (edge + noise + surface) * rangeVisual * 0.2 +
-          sensitivityVisual * 0.12,
+        luma * (0.32 + model.cellDepth * 0.48) +
+          edge * model.edgeWeight * 0.36 +
+          noise * model.noiseMap * 0.34 +
+          surface * model.surfaceMap * 0.38 +
+          verticalDepth * model.field * 0.16 -
+          radial * model.range * 0.12 +
+          model.sensitivity * 0.08,
         0,
         1
       );
-      const lift = pointLiftVisual * cellStep * (0.12 + depth * 0.46 + noise * 0.18);
-      const px = clamp(x + uniformDrift.x, 0, width);
-      const py = clamp(y + uniformDrift.y - lift, 0, height);
+      const warpPhase = (x * 0.017 + y * 0.013 + depth * 3.1) * (1 + model.motionTrace * 0.5);
+      const warp = model.gridWarp * model.parallax * cellStep * (0.16 + depth * 0.34 + surface * 0.22);
+      const lift = model.pointLift * cellStep * (0.12 + depth * 0.46 + noise * 0.18);
+      const px = clamp(x + Math.sin(warpPhase) * warp, 0, width);
+      const py = clamp(y + Math.cos(warpPhase * 0.9) * warp - lift, 0, height);
       row.push({
         x: px,
         y: py,
@@ -6581,7 +6344,6 @@ function paintLiveSpatialPointCloudAndTin(context, width, height, source, model)
         edge,
         noise,
         surface,
-        lowLight: lowLightSignal,
         color: spatialRecognitionDepthColor(depth, model)
       });
     }
@@ -6591,7 +6353,7 @@ function paintLiveSpatialPointCloudAndTin(context, width, height, source, model)
 
   if (tinAlpha > 0.01) {
     context.save();
-    context.globalCompositeOperation = "source-over";
+    context.globalCompositeOperation = "screen";
     for (let rowIndex = 0; rowIndex < rows.length - 1; rowIndex += 1) {
       const row = rows[rowIndex];
       const nextRow = rows[rowIndex + 1];
@@ -6617,7 +6379,7 @@ function paintLiveSpatialPointCloudAndTin(context, width, height, source, model)
   if (wireAlpha > 0.01) {
     context.save();
     context.globalCompositeOperation = "screen";
-    context.lineWidth = Math.max(0.45, cellStep / (16 - surfaceVisual * 5));
+    context.lineWidth = Math.max(0.45, cellStep / (16 - model.surfaceMap * 5));
     context.strokeStyle = `rgba(190, 249, 255, ${wireAlpha})`;
     for (let rowIndex = 0; rowIndex < rows.length - 1; rowIndex += 1) {
       const row = rows[rowIndex];
@@ -6642,22 +6404,18 @@ function paintLiveSpatialPointCloudAndTin(context, width, height, source, model)
 
   if (pointCloudAlpha > 0.01) {
     context.save();
-    context.globalCompositeOperation = "source-over";
+    context.globalCompositeOperation = "screen";
     for (const row of rows) {
       for (const point of row) {
         const signal = clamp(
-          point.depth * 0.42 +
-            point.edge * 0.28 +
-            point.noise * noiseVisual * 0.4 +
-            point.surface * surfaceVisual * 0.32 +
-            point.lowLight * lowLightVisual * 0.36,
+          point.depth * 0.42 + point.edge * 0.28 + point.noise * model.noiseMap * 0.34 + point.surface * model.surfaceMap * 0.26,
           0,
           1
         );
-        if (signal < clamp(0.08 - lowLightVisual * 0.048, 0.02, 0.08)) continue;
+        if (signal < 0.08) continue;
         const [r, g, b] = point.color;
-        const size = clamp(0.8 + signal * 2.4 + pointLiftVisual * 2.6 + subpixelVisual * 0.8 + point.lowLight * 1.1, 0.8, 5.2);
-        context.fillStyle = `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${clamp(pointCloudAlpha * (0.28 + signal * 0.72 + point.lowLight * 0.2), 0, 0.38)})`;
+        const size = clamp(0.8 + signal * 2.8 + model.pointLift * 1.1 + model.subpixelScan * 0.6, 0.8, 5.5);
+        context.fillStyle = `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${clamp(pointCloudAlpha * (0.3 + signal * 0.85), 0, 0.72)})`;
         context.fillRect(point.x - size / 2, point.y - size / 2, size, size);
       }
     }
@@ -6670,21 +6428,13 @@ function paintSpatialTinTriangle(context, points, alpha, model) {
   const edge = points.reduce((sum, point) => sum + point.edge, 0) / points.length;
   const noise = points.reduce((sum, point) => sum + point.noise, 0) / points.length;
   const surface = points.reduce((sum, point) => sum + point.surface, 0) / points.length;
-  const lowLight = points.reduce((sum, point) => sum + (point.lowLight || 0), 0) / points.length;
-  const noiseVisual = spatialModelRatio(model.noiseMap, 8);
-  const surfaceVisual = spatialModelRatio(model.surfaceMap, 8);
-  const lowLightVisual = spatialModelRatio(model.lowLightSensitivity);
   const color = spatialRecognitionDepthColor(
-    clamp(depth + noise * noiseVisual * 0.16 + surface * surfaceVisual * 0.12 + lowLight * lowLightVisual * 0.18, 0, 1),
+    clamp(depth + noise * model.noiseMap * 0.12 + surface * model.surfaceMap * 0.08, 0, 1),
     model
   );
-  const facetAlpha = clamp(
-    alpha * (0.14 + depth * 0.34 + edge * 0.18 + noise * noiseVisual * 0.28 + surface * surfaceVisual * 0.24 + lowLight * lowLightVisual * 0.3),
-    0,
-    0.34
-  );
+  const facetAlpha = clamp(alpha * (0.18 + depth * 0.42 + edge * 0.22 + noise * model.noiseMap * 0.24 + surface * model.surfaceMap * 0.2), 0, 0.48);
   if (facetAlpha <= 0.006) return;
-  const blendColor = color.map((channel) => mixChannel(channel, 255, spatialModelRatio(model.facetSmoothing, 0.9) * 0.03));
+  const blendColor = color.map((channel) => mixChannel(channel, 255, model.facetSmoothing * 0.08));
   context.beginPath();
   context.moveTo(points[0].x, points[0].y);
   context.lineTo(points[1].x, points[1].y);
