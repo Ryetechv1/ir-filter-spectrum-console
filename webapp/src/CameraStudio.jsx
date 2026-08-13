@@ -2016,6 +2016,95 @@ function featureGuideControlLabel(control) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function featureGuideSettingLabel(key) {
+  return String(key || "Setting")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[-_]+/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function featureGuideRangeText(control) {
+  const tuple = Array.isArray(control) ? control : ADJUSTMENT_LOOKUP.get(control);
+  if (!tuple) return "custom range";
+  const [, , min, max, unit = "", initial = 0] = tuple;
+  return `${min}${unit} to ${max}${unit}, default ${initial}${unit}`;
+}
+
+function featureGuideDominantSettings(settings = {}, limit = 5) {
+  return Object.entries(settings)
+    .filter(([key, value]) => {
+      if (!Number.isFinite(Number(value))) return false;
+      return Number(value) !== Number(DEFAULT_SETTINGS[key] ?? 0);
+    })
+    .sort(([, a], [, b]) => Math.abs(Number(b)) - Math.abs(Number(a)))
+    .slice(0, limit)
+    .map(([key, value]) => `${featureGuideSettingLabel(key)} ${value}`);
+}
+
+function featureGuideCategoryDescriptor(category, effects = []) {
+  const categoryLower = category.toLowerCase();
+  const countText = `${effects.length} local preset${effects.length === 1 ? "" : "s"}`;
+  if (categoryLower.includes("thermal")) {
+    return `${category} organizes ${countText} around thermogram-style color banding, isotherm contrast, heat-edge separation, and false-depth spectral mapping. It is intended for users who want strong layered heat palettes that still stack with manual color, inversion, spatial, and capture controls.`;
+  }
+  if (categoryLower.includes("inversion")) {
+    return `${category} contains ${countText} that invert tone, channels, ranges, and thermal response without locking out the rest of the adjustment stack. These presets are designed to start from a negative or spectral reversal and then accept further enhancement from sliders, RGBW mixers, and smart engines.`;
+  }
+  if (categoryLower.includes("spatial") || categoryLower.includes("xls") || categoryLower.includes("spectrograph")) {
+    return `${category} groups ${countText} for technical-looking spectral analysis, channel separation, pseudo-depth, and cell/field interpretation. It is built to expose structure, edges, layers, and signal differences that ordinary photo filters tend to flatten.`;
+  }
+  if (categoryLower.includes("uva") || categoryLower.includes("ir") || categoryLower.includes("night")) {
+    return `${category} provides ${countText} tuned for low-light, fluorescence, infrared-style wash, ultraviolet color energy, and faint-signal visibility. These looks are meant to push subtle camera input into more readable spectral contrast while remaining fully local.`;
+  }
+  if (categoryLower.includes("tone") || categoryLower.includes("color") || categoryLower.includes("duotone") || categoryLower.includes("tritone") || categoryLower.includes("quadtone")) {
+    return `${category} offers ${countText} focused on deliberate color design, tone separation, channel emphasis, and aesthetic palette shaping. It gives the studio a controlled way to move from clean adjustments into highly stylized spectral color systems.`;
+  }
+  return `${category} includes ${countText} that establish a distinct starting look while leaving the full manual, smart, thermal, overlay, and export pipeline available. Each preset is a local canvas recipe that can be modified, stacked, paused, captured, recorded, and combined with uploaded media.`;
+}
+
+function featureGuidePresetDescriptor(effect, index = 0) {
+  const dominant = featureGuideDominantSettings(effect.settings, 5);
+  const colorText = effect.overlayColor ? `Its overlay signature is ${effect.overlayColor}` : "It uses the current studio accent and canvas blend state";
+  const blendText = effect.blendMode || "normal";
+  const role = effect.favorite ? "featured shortcut" : "catalog preset";
+  return `${effect.name} is a ${role} in ${effect.category} that starts the canvas with ${blendText} blend behavior and a 500% intensity-ready effect recipe. ${colorText}, with strongest named movements in ${dominant.length ? dominant.join(", ") : "the baseline clean render"} so the result remains unique while still accepting every adjustment, smart engine, overlay, and export path.`;
+}
+
+function featureGuideAdjustmentDescriptor(control, group) {
+  const label = featureGuideControlLabel(control);
+  const range = featureGuideRangeText(control);
+  const groupTitle = group?.title || "Adjustment";
+  const key = Array.isArray(control) ? control[0] : control;
+  const keyLower = String(key || "").toLowerCase();
+  let role = "modifies the processed canvas with a visible local change";
+  if (keyLower.includes("thermal") || keyLower.includes("heat") || keyLower.includes("hotspot")) role = "shapes thermogram bands, isotherm pressure, and hotspot visibility";
+  else if (keyLower.includes("invert")) role = "adds stackable negative, channel-reversal, or tonal-range inversion";
+  else if (keyLower.includes("spatial") || keyLower.includes("mesh") || keyLower.includes("point") || keyLower.includes("cell")) role = "weights pseudo-depth, live cell mapping, mesh, point-cloud, or field recognition";
+  else if (keyLower.includes("red") || keyLower.includes("green") || keyLower.includes("blue") || keyLower.includes("white") || keyLower.includes("hue") || keyLower.includes("color")) role = "controls channel color, palette bias, or chromatic separation";
+  else if (keyLower.includes("noise") || keyLower.includes("grain") || keyLower.includes("detail") || keyLower.includes("edge") || keyLower.includes("structure")) role = "targets texture, defects, edges, grain, and fine surface structure";
+  else if (keyLower.includes("exposure") || keyLower.includes("shadow") || keyLower.includes("highlight") || keyLower.includes("black") || keyLower.includes("white") || keyLower.includes("tone")) role = "moves exposure, shadow/highlight separation, black floor, white ceiling, or midtone readability";
+  return `${label} belongs to ${groupTitle} and ${role}. Its active range is ${range}, and it is designed to remain stackable with presets, generated values, overlay layers, smart engines, snapshots, recordings, and HUD preview.`;
+}
+
+function featureGuideSettingDescriptor(key, index = 0) {
+  const label = featureGuideSettingLabel(key);
+  const range = settingRange(key);
+  const keyLower = String(key || "").toLowerCase();
+  let role = "stores a numeric processing value used by the live render pipeline";
+  if (STACKED_SETTING_KEYS.has(key)) role = "is part of the stacked advanced engine layer that can combine with the active preset instead of replacing it";
+  if (keyLower.includes("thermal") || keyLower.includes("heat") || keyLower.includes("hotspot")) role = "stores thermal, thermogram, isotherm, heat-edge, or hotspot behavior";
+  else if (keyLower.includes("smart")) role = "stores a smart-engine weighting value for local signal interpretation";
+  else if (keyLower.includes("spatial") || keyLower.includes("mesh") || keyLower.includes("point") || keyLower.includes("cell")) role = "stores spatial recognition, point-cloud, TIN, cell, mesh, or field-map sensitivity";
+  else if (keyLower.includes("rgbw") || keyLower.includes("red") || keyLower.includes("green") || keyLower.includes("blue") || keyLower.includes("white")) role = "stores a color-channel or RGBW mixer value that can influence base and overlay color math";
+  else if (keyLower.includes("invert")) role = "stores a stackable inversion amount used by the color inversion matrix";
+  return `${label} is setting key ${index + 1} in the studio state model. It ${role}; accepted values are clamped from ${range.min} to ${range.max}, which keeps presets, sliders, generated values, media layers, snapshots, and recordings using the same safe render contract.`;
+}
+
+function featureGuideSmartEngineDescriptor(processor) {
+  const controlNames = processor.controls.slice(0, 4).map((control) => featureGuideControlLabel(control)).join(", ");
+  return `Smart ${processor.title} is a toggleable local weighting engine with ${processor.controls.length} sliders. ${processor.description} Its first control surfaces include ${controlNames}, and when enabled it strengthens the active preset without disabling manual sliders, generated-value styles, overlays, thermal recoloring, or export capture.`;
+}
+
 function featureGuideControlCount(group) {
   if (group.type === "rgbw") return RGBW_MIXERS.length * RGBW_CHANNELS.length;
   if (group.type === "thermal-studio") return THERMAL_STUDIO_NUMERIC_ADJUSTMENTS.length + THERMAL_STUDIO_BANDS.length;
@@ -2028,22 +2117,26 @@ function featureGuideGroupItems(group) {
       title: mixer.label,
       meta: "RGBW mixer",
       description: `${mixer.label} exposes Red, Green, Blue, and White channel sliders that feed both overlay color and the base filter math.`,
-      details: RGBW_CHANNELS.map((channel) => `${channel.label} channel default ${mixer.defaults[channel.key]}`)
+      details: RGBW_CHANNELS.map((channel) => ({
+        title: `${mixer.label} ${channel.label}`,
+        text: `${channel.label} channel default ${mixer.defaults[channel.key]}`,
+        control: [`${mixer.key}${channel.key.toUpperCase()}`, `${mixer.label} ${channel.label}`, 0, 255, "", mixer.defaults[channel.key]]
+      }))
     }));
   }
   if (group.type === "thermal-studio") {
     return [
-      {
-        title: "A-O hotspot recolor matrix",
-        meta: `${THERMAL_STUDIO_BANDS.length} bands`,
-        description:
-          "Each thermogram, isotherm, pallet, or hotspot band can be assigned a full spectrum RGBWB color target and then widened or strengthened with sliders.",
-        details: THERMAL_STUDIO_BANDS.map((band) => `${band.letter}: ${band.label}`)
-      },
+      ...THERMAL_STUDIO_BANDS.map((band) => ({
+        title: `Thermal ${band.letter} ${band.label}`,
+        meta: "Thermal Studio RGBWB band",
+        description: `Thermal band ${band.letter} targets ${band.label.toLowerCase()} so a specific thermogram, palette, hotspot, or isotherm range can be recolored with a full-spectrum RGBWB dropdown while the master thermal sliders refine width and force.`,
+        control: [`thermalBand${band.letter}`, `Thermal ${band.letter} ${band.label}`, 0, 1, "", 0]
+      })),
       ...THERMAL_STUDIO_NUMERIC_ADJUSTMENTS.map((control) => ({
         title: featureGuideControlLabel(control),
         meta: "Thermal Studio slider",
-        description: "Controls thermal band force, width, or master recolor intensity inside the live canvas pipeline."
+        description: "Controls thermal band force, width, or master recolor intensity inside the live canvas pipeline.",
+        control
       }))
     ];
   }
@@ -2051,13 +2144,15 @@ function featureGuideGroupItems(group) {
     return group.processor.controls.map((control) => ({
       title: featureGuideControlLabel(control),
       meta: `Smart ${group.processor.title}`,
-      description: group.processor.description
+      description: group.processor.description,
+      control
     }));
   }
   return (group.controls || []).map((control) => ({
     title: featureGuideControlLabel(control),
     meta: group.title,
-    description: group.description
+    description: group.description,
+    control
   }));
 }
 
@@ -2087,23 +2182,67 @@ function buildFeatureGuideStats() {
 }
 
 function buildFeatureGuideSections() {
-  const featureFamilies = EFFECT_PRESET_GROUPS.map((group) => ({
+  const featureCategories = EFFECT_PRESET_GROUPS.map((group) => ({
     title: group.category,
     meta: `${group.effects.length} presets`,
-    description: `${group.category} contains ${group.effects.length} visually distinct local presets with 500% preset intensity and stackable manual controls.`,
-    details: group.effects.map((effect) => `${effect.name}: ${effect.category} preset using ${effect.blendMode || "normal"} blend behavior.`)
+    description: featureGuideCategoryDescriptor(group.category, group.effects),
+    details: group.effects.map((effect, index) => `${effect.name}: ${featureGuidePresetDescriptor(effect, index)}`)
+  }));
+  const presetDescriptors = CAMERA_EFFECTS.map((effect, index) => ({
+    title: effect.name,
+    meta: `${effect.category} / ${effect.blendMode || "normal"}`,
+    description: featureGuidePresetDescriptor(effect, index),
+    details: [
+      `Preset ID: ${effect.id}`,
+      `Category: ${effect.category}`,
+      `Blend mode: ${effect.blendMode || "normal"}`,
+      `Overlay signature: ${effect.overlayColor || "current palette"}`,
+      `Favorite shortcut: ${effect.favorite ? "yes" : "no"}`,
+      ...featureGuideDominantSettings(effect.settings, 6).map((detail) => `Primary movement: ${detail}`)
+    ]
   }));
   const adjustmentGroups = ADJUSTMENT_GROUPS.map((group) => ({
     title: group.title,
     meta: `${featureGuideControlCount(group)} controls`,
-    description: group.description,
+    description: `${group.title} is a dropdown control group. ${group.description} It is documented here as part of the full 463-control adjustment surface.`,
     details: featureGuideGroupItems(group).map((item) => `${item.title}: ${item.description}`)
   }));
+  const adjustmentControlDescriptors = ADJUSTMENT_GROUPS.flatMap((group) =>
+    featureGuideGroupItems(group).flatMap((item) => {
+      if (item.details?.length && group.type === "rgbw") {
+        return item.details.map((detail) => ({
+          title: detail.title,
+          meta: group.title,
+          description: `${detail.text}. ${featureGuideAdjustmentDescriptor(detail.control, group)}`,
+          details: [item.description]
+        }));
+      }
+      return {
+        title: item.title,
+        meta: item.meta || group.title,
+        description: featureGuideAdjustmentDescriptor(item.control || item.title, group),
+        details: item.details || []
+      };
+    })
+  );
+  const namedSettingKeyDescriptors = [...new Set([...Object.keys(DEFAULT_SETTINGS), ...EQUATION_MUTATION_KEYS])]
+    .sort((a, b) => a.localeCompare(b))
+    .map((key, index) => ({
+      title: featureGuideSettingLabel(key),
+      meta: key,
+      description: featureGuideSettingDescriptor(key, index),
+      details: [
+        `State key: ${key}`,
+        `Range: ${settingRange(key).min} to ${settingRange(key).max}`,
+        `Default: ${DEFAULT_SETTINGS[key] ?? 0}`,
+        STACKED_SETTING_KEYS.has(key) ? "Stacked advanced key: yes" : "Stacked advanced key: no"
+      ]
+    }));
   const smartEngines = SMART_SIGNAL_PROCESSORS.map((processor) => ({
     title: `Smart ${processor.title}`,
     meta: `${processor.controls.length} sliders`,
-    description: processor.description,
-    details: processor.controls.map((control) => featureGuideControlLabel(control))
+    description: featureGuideSmartEngineDescriptor(processor),
+    details: processor.controls.map((control) => `${featureGuideControlLabel(control)}: ${featureGuideRangeText(control)}`)
   }));
   return [
     {
@@ -2125,27 +2264,58 @@ function buildFeatureGuideSections() {
           description:
             "This separate GUI window is the official feature catalog, commit ledger, redirect hub, and future change-catalog baseline for guide-page pushes.",
           details: ["Search filters guide sections.", "Dropdowns group large feature sets.", "Redirect buttons open PRIME, YouTube, database, DWT, and spatial windows."]
+        },
+        {
+          title: "Free sincere experimental studio mission",
+          meta: "PRIME examples target",
+          description:
+            "All of this functionality is designed to provide THE MOST Highest COMPLETELY FREE & SINCERE Experimental studio for capturing premium spectral images such as the ones shown in the PRIME examples Gallery.",
+          details: [
+            "Use the PRIME Examples redirect button in this guide to open the target-gallery window.",
+            "The guide, camera, filters, smart engines, overlay compositor, capture system, and export tools are designed to support experimental spectral-image exploration without paid access.",
+            "All processing remains local to the browser surface unless the user opens external redirect windows."
+          ]
         }
       ]
     },
     {
       id: "presets",
-      title: "Effect Presets And Categories",
-      summary: `${CAMERA_EFFECTS.length} presets are grouped across ${EFFECT_PRESET_GROUPS.length} categories. Presets are local canvas recipes, not remote image generation.`,
-      items: featureFamilies
+      title: "All 288 Effect Preset Descriptors",
+      summary: `${CAMERA_EFFECTS.length} individual effect presets are documented with unique role, blend, category, overlay, and dominant-setting descriptions. Presets are local canvas recipes, not remote image generation.`,
+      items: presetDescriptors
+    },
+    {
+      id: "preset-categories",
+      title: "All 20 Preset Category Descriptors",
+      summary: `${EFFECT_PRESET_GROUPS.length} preset categories organize the visual system into searchable dropdown groups with clear category intent and preset membership.`,
+      items: featureCategories
     },
     {
       id: "adjustments",
-      title: "Adjustment Dropdowns And Slider Groups",
+      title: "All 463 Adjustment Control Descriptors",
       summary:
-        "All active adjustment dropdowns, RGBW mixers, thermal A-O controls, smart engines, spatial controls, DWT controls, and core photo sliders are documented here.",
+        "Every active adjustment control, RGBW mixer channel, thermal A-O control, smart engine slider, spatial control, DWT control, and core photo slider is documented here.",
+      items: adjustmentControlDescriptors
+    },
+    {
+      id: "adjustment-groups",
+      title: "Adjustment Dropdown Group Descriptors",
+      summary:
+        "These are the intelligent dropdown groups that host the adjustment controls so scrolling remains manageable while the full control surface remains available.",
       items: adjustmentGroups
     },
     {
-      id: "smart-engines",
-      title: "Smart Toggle Engines",
+      id: "setting-keys",
+      title: "All 462 Named Setting Key Descriptors",
       summary:
-        "Smart engines are local weighted passes. When off, presets behave normally. When on, they add extra weighting to depth, field, range, signal structure, color, isolation, and grouped-pixel behavior.",
+        "Every named state key used by presets, sliders, generated values, smart engines, thermal bands, RGBW mixers, media layers, snapshots, and recordings is cataloged here.",
+      items: namedSettingKeyDescriptors
+    },
+    {
+      id: "smart-engines",
+      title: "All 20 Smart Engine Descriptors",
+      summary:
+        "Every smart engine is documented with its local purpose, slider count, active behavior, and how it stacks with presets rather than replacing them.",
       items: smartEngines
     },
     {
