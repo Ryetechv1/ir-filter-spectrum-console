@@ -70,6 +70,12 @@ webapp/src/CameraStudio.jsx
 
 Search for `DWT_ISOLATE_PROFILE`.
 
+The current browser profile includes higher default sensitivity plus detector
+gains for fine grain, speckle/salt noise, banding, block artifacts, chroma
+noise, hot pixels, shadow noise, highlight noise, edge shimmer, and temporal
+flicker. These controls remain additive and should not replace the selected
+camera preset.
+
 ## NVIDIA AI-Q Readiness
 
 This package is ready to be wrapped by an AI-Q agent skill/tool later, but it

@@ -200,7 +200,9 @@ const THERMAL_SIGNAL_GAIN = 1.42;
 const RGBW_MIXER_GAIN = 1.72;
 const PRESET_INTENSITY_MULTIPLIER = 5;
 const SMART_SIGNAL_PIXEL_BUDGET = 74_000;
+const SPATIAL_RECOGNITION_PIXEL_BUDGET = 56_000;
 const SMART_DARK_EDGE_LABEL = "Smart darker edge amplifier";
+const SPATIAL_RECOGNITION_LABEL = "Spatial recognition field mapper";
 const TORCH_LOG_LIMIT = 14;
 const TORCH_STROBE_MIN_MS = 80;
 const TORCH_STROBE_MAX_MS = 2000;
@@ -210,23 +212,30 @@ const DWT_ISOLATE_PROFILE = {
   profileId: "dwt-adaptive-quantization-v1",
   profileAsset: studioAssetUrl("assets/dwt-isolate/dwt_isolate_profile.json"),
   wavelet: "haar",
-  lowFrequencyWeight: 0.38,
-  luminanceNoiseWeight: 0.8,
-  chrominanceNoiseWeight: 1.5,
-  digitalNoiseWeight: 1.2,
-  quantizationFloor: 0.035,
-  quantizationCeiling: 0.28,
-  defectThresholdBias: 0.045,
-  densityGain: 1.32,
-  edgeGain: 1.18,
-  chromaLockGain: 1.1,
-  artifactSuppressionGain: 1.24
+  lowFrequencyWeight: 0.48,
+  luminanceNoiseWeight: 1.12,
+  chrominanceNoiseWeight: 1.72,
+  digitalNoiseWeight: 1.58,
+  quantizationFloor: 0.018,
+  quantizationCeiling: 0.34,
+  defectThresholdBias: 0.068,
+  densityGain: 1.58,
+  edgeGain: 1.42,
+  chromaLockGain: 1.22,
+  artifactSuppressionGain: 1.46,
+  grainNoiseGain: 1.44,
+  speckleNoiseGain: 1.55,
+  bandingNoiseGain: 1.38,
+  blockArtifactGain: 1.62,
+  hotPixelGain: 1.7,
+  temporalFlickerGain: 1.28
 };
 let thermalWorkCanvas;
 let pixelateWorkCanvas;
 let mediaLayerWorkCanvas;
 let smartDarkEdgeWorkCanvas;
 let smartSignalWorkCanvas;
+let spatialRecognitionWorkCanvas;
 let previewFilterWorkCanvas;
 let canvasFilterSupportMemo;
 const TRUSTED_ACCESS = [
@@ -691,6 +700,21 @@ const SMART_DARK_EDGE_ADJUSTMENTS = [
   ["darkEdgeMicroGrain", "Dark Micro Grain", 0, 100, "%", 24]
 ];
 
+const SPATIAL_RECOGNITION_ADJUSTMENTS = [
+  ["spatialMaster", "Spatial Power", 0, 100, "%", 62],
+  ["spatialSensitivity", "Scene Sensitivity", 0, 100, "%", 58],
+  ["spatialDepth", "Depth Separation", 0, 100, "%", 66],
+  ["spatialField", "Field Curvature", 0, 100, "%", 42],
+  ["spatialRange", "Range Compression", 0, 100, "%", 54],
+  ["spatialPointDensity", "Point Cloud Density", 0, 100, "%", 50],
+  ["spatialEdgeWeight", "Edge Weight", 0, 100, "%", 62],
+  ["spatialMeshOpacity", "Mesh Opacity", 0, 100, "%", 42],
+  ["spatialContourOpacity", "Contour Opacity", 0, 100, "%", 48],
+  ["spatialParallax", "Parallax Drift", 0, 100, "%", 36],
+  ["spatialColorSplit", "Color Split", 0, 100, "%", 56],
+  ["spatialSmoothing", "Depth Smoothing", 0, 100, "%", 38]
+];
+
 const SMART_SIGNAL_PROCESSOR_SLIDERS = [
   ["Amount", "Power", 0, 100, "%", 62],
   ["Sensitivity", "Sensitivity", 0, 100, "%", 54],
@@ -706,7 +730,8 @@ const SMART_SIGNAL_PROCESSOR_SLIDERS = [
 
 const SMART_ISOLATE_GROUPED_PIXEL_SLIDERS = [
   ["Amount", "Engine Power", 0, 100, "%", 72],
-  ["Sensitivity", "Scene Sensitivity", 0, 100, "%", 66],
+  ["Sensitivity", "Scene Sensitivity", 0, 100, "%", 84],
+  ["DwtSensitivity", "DWT Sensitivity", 0, 100, "%", 86],
   ["Radius", "Neighborhood Radius", 0, 100, "%", 58],
   ["Contrast", "Defect Contrast", 0, 100, "%", 70],
   ["Shadow", "Shadow Defect Bias", 0, 100, "%", 52],
@@ -721,6 +746,16 @@ const SMART_ISOLATE_GROUPED_PIXEL_SLIDERS = [
   ["PixelDensity", "Pixel Density", 0, 100, "%", 68],
   ["DefectSignal", "Defect Sensitivity", 0, 100, "%", 82],
   ["DistortionResponse", "Distortion Response", 0, 100, "%", 76],
+  ["GrainNoise", "Grain Noise", 0, 100, "%", 74],
+  ["SpeckleNoise", "Speckle / Salt Noise", 0, 100, "%", 70],
+  ["BandingNoise", "Banding Noise", 0, 100, "%", 62],
+  ["BlockNoise", "Block Artifact Noise", 0, 100, "%", 66],
+  ["ChromaNoise", "Chroma Noise", 0, 100, "%", 72],
+  ["HotPixelNoise", "Hot Pixel Noise", 0, 100, "%", 64],
+  ["ShadowNoise", "Shadow Noise", 0, 100, "%", 68],
+  ["HighlightNoise", "Highlight Noise", 0, 100, "%", 58],
+  ["EdgeShimmer", "Edge Shimmer", 0, 100, "%", 64],
+  ["TemporalFlicker", "Temporal Flicker", 0, 100, "%", 52],
   ["Uniformity", "Grouping Uniformity", 0, 100, "%", 70],
   ["EdgeRepair", "Edge Repair", 0, 100, "%", 62],
   ["ChromaLock", "Chroma Lock", 0, 100, "%", 58],
@@ -896,6 +931,7 @@ const DEFAULT_SETTINGS = {
   invert: 0,
   ...Object.fromEntries(INVERSION_ADJUSTMENTS.map(([key, , , , , initial = 0]) => [key, initial])),
   ...Object.fromEntries(SMART_DARK_EDGE_ADJUSTMENTS.map(([key, , , , , initial = 0]) => [key, initial])),
+  ...Object.fromEntries(SPATIAL_RECOGNITION_ADJUSTMENTS.map(([key, , , , , initial = 0]) => [key, initial])),
   ...Object.fromEntries(SMART_SIGNAL_ADJUSTMENTS.map(([key, , , , , initial = 0]) => [key, initial])),
   ...Object.fromEntries(THERMAL_STUDIO_NUMERIC_ADJUSTMENTS.map(([key, , , , , initial = 0]) => [key, initial])),
   ...THERMAL_STUDIO_COLOR_DEFAULTS,
@@ -910,6 +946,7 @@ const DEFAULT_SETTINGS = {
 const STACKED_SETTING_KEYS = new Set([
   ...INVERSION_ADJUSTMENTS.map(([key]) => key),
   ...SMART_DARK_EDGE_ADJUSTMENTS.map(([key]) => key),
+  ...SPATIAL_RECOGNITION_ADJUSTMENTS.map(([key]) => key),
   ...SMART_SIGNAL_ADJUSTMENTS.map(([key]) => key),
   ...THERMAL_STUDIO_NUMERIC_ADJUSTMENTS.map(([key]) => key),
   ...THERMAL_STUDIO_BANDS.map((band) => `thermalHotspot${band.letter}Color`),
@@ -953,6 +990,13 @@ const ADJUSTMENT_GROUPS = [
     description: "Toggleable local darker-edge pass with 10 controls for edge darkening, black clamp, shadow depth, halo cleanup, and thermal binding.",
     type: "smart-dark-edge",
     controls: SMART_DARK_EDGE_ADJUSTMENTS
+  },
+  {
+    id: "spatial-recognition",
+    title: "Spatial Recognition Studio",
+    description: "Local camera-side pseudo-depth, point-cloud, contour, and field-map recognition derived from visible frame gradients.",
+    type: "spatial-recognition",
+    controls: SPATIAL_RECOGNITION_ADJUSTMENTS
   },
   ...SMART_SIGNAL_PROCESSORS.map((processor) => ({
     id: `smart-signal-${processor.id}`,
@@ -1103,7 +1147,16 @@ const ADJUSTMENT_GROUPS = [
 ];
 
 const ADJUSTMENT_LOOKUP = new Map(
-  [...CORE_ADJUSTMENTS, ...FINISH_ADJUSTMENTS, ...INVERSION_ADJUSTMENTS, ...SMART_DARK_EDGE_ADJUSTMENTS, ...SMART_SIGNAL_ADJUSTMENTS, ...THERMAL_STUDIO_NUMERIC_ADJUSTMENTS, ...ADVANCED_ADJUSTMENTS].map((control) => [
+  [
+    ...CORE_ADJUSTMENTS,
+    ...FINISH_ADJUSTMENTS,
+    ...INVERSION_ADJUSTMENTS,
+    ...SMART_DARK_EDGE_ADJUSTMENTS,
+    ...SPATIAL_RECOGNITION_ADJUSTMENTS,
+    ...SMART_SIGNAL_ADJUSTMENTS,
+    ...THERMAL_STUDIO_NUMERIC_ADJUSTMENTS,
+    ...ADVANCED_ADJUSTMENTS
+  ].map((control) => [
     control[0],
     control
   ])
@@ -1823,6 +1876,7 @@ const EQUATION_MUTATION_KEYS = [
   "shadowInvert",
   "highlightInvert",
   ...SMART_DARK_EDGE_ADJUSTMENTS.map(([key]) => key),
+  ...SPATIAL_RECOGNITION_ADJUSTMENTS.map(([key]) => key),
   ...SMART_SIGNAL_ADJUSTMENTS.map(([key]) => key),
   ...THERMAL_STUDIO_NUMERIC_ADJUSTMENTS.map(([key]) => key)
 ];
@@ -1848,6 +1902,7 @@ const EQUATION_STYLE_CATEGORY_KEYS = new Map([
   ["Exposure Tools", ["exposure", "highlightRecovery", "ambientLift", "shadowDepth", "localContrast"]],
   ["Color Lab", ["hue", "tint", "vibrance", "colorSeparation", "colorHarmony", "colorizeStrength"]],
   ["Detail, Texture & Noise", ["clarity", "dehaze", "edgeEnhance", "localContrast", "darkEdgeAmount", "darkEdgeDetailAmplify", "darkEdgeContrast"]],
+  ["Spatial Recognition Studio", SPATIAL_RECOGNITION_ADJUSTMENTS.map(([key]) => key)],
   ["Thermal Studio", THERMAL_STUDIO_NUMERIC_ADJUSTMENTS.map(([key]) => key)],
   ["Smart Signal Engines", SMART_SIGNAL_ADJUSTMENTS.map(([key]) => key)]
 ]);
@@ -2182,6 +2237,7 @@ function CameraStudio() {
     manualSettings: CAMERA_EFFECTS[0].settings,
     cameraFacing: "user",
     smartDarkEdgeEnabled: false,
+    spatialRecognitionEnabled: false,
     smartSignalEnabled: DEFAULT_SMART_SIGNAL_TOGGLES
   });
   const [authorized, setAuthorized] = useState(() => window.sessionStorage.getItem(STUDIO_UNLOCK_KEY) === "true");
@@ -2207,6 +2263,7 @@ function CameraStudio() {
   const [databaseWindowOpen, setDatabaseWindowOpen] = useState(false);
   const [primeResultsWindowOpen, setPrimeResultsWindowOpen] = useState(false);
   const [dwtWindowOpen, setDwtWindowOpen] = useState(false);
+  const [spatialWindowOpen, setSpatialWindowOpen] = useState(false);
   const [selectedYoutubeVideoId, setSelectedYoutubeVideoId] = useState(YOUTUBE_RECENT_UPLOADS[0]?.id || "");
   const [selectedPrimeResultId, setSelectedPrimeResultId] = useState(FEATURED_PRIME_RESULT_ID);
   const [selectedCategory, setSelectedCategory] = useState("All Presets");
@@ -2216,6 +2273,7 @@ function CameraStudio() {
   const [liveAdjustmentsEnabled, setLiveAdjustmentsEnabled] = useState(true);
   const [overlayAdjustmentsEnabled, setOverlayAdjustmentsEnabled] = useState(true);
   const [smartDarkEdgeEnabled, setSmartDarkEdgeEnabled] = useState(false);
+  const [spatialRecognitionEnabled, setSpatialRecognitionEnabled] = useState(false);
   const [smartSignalEnabled, setSmartSignalEnabled] = useState(DEFAULT_SMART_SIGNAL_TOGGLES);
   const [openAdjustmentGroups, setOpenAdjustmentGroups] = useState(() => new Set(ADJUSTMENT_GROUPS.filter((group) => group.open).map((group) => group.id)));
   const [snapshotUrl, setSnapshotUrl] = useState("");
@@ -2310,9 +2368,10 @@ function CameraStudio() {
       manualSettings: liveManualSettings,
       cameraFacing,
       smartDarkEdgeEnabled,
+      spatialRecognitionEnabled,
       smartSignalEnabled: normalizeSmartSignalToggles(smartSignalEnabled)
     };
-  }, [cameraFacing, filterCss, liveManualSettings, liveSelectedEffect, smartDarkEdgeEnabled, smartSignalEnabled]);
+  }, [cameraFacing, filterCss, liveManualSettings, liveSelectedEffect, smartDarkEdgeEnabled, smartSignalEnabled, spatialRecognitionEnabled]);
 
   useEffect(() => {
     cameraFeedPausedRef.current = cameraFeedPaused;
@@ -2343,7 +2402,13 @@ function CameraStudio() {
         const pausedAndUnchanged = cameraFeedPausedRef.current && renderVersion === lastPausedVersion;
         const frameInterval = cameraHudVisible
           ? CAMERA_HUD_FRAME_INTERVAL_MS
-          : cameraFrameInterval(renderState.manualSettings, renderState.selectedEffect, renderState.smartDarkEdgeEnabled, renderState.smartSignalEnabled);
+          : cameraFrameInterval(
+              renderState.manualSettings,
+              renderState.selectedEffect,
+              renderState.smartDarkEdgeEnabled,
+              renderState.smartSignalEnabled,
+              renderState.spatialRecognitionEnabled
+            );
         if (!pausedAndUnchanged && (!lastDraw || timestamp - lastDraw > frameInterval)) {
           const cameraLabel = cameraFeedPausedRef.current ? "Paused still frame" : "Local camera stream";
           drawCameraOutputCanvas(previewCanvasRef.current, cameraFrameRef.current, source, renderState, {
@@ -2388,6 +2453,7 @@ function CameraStudio() {
           manualSettings: mediaManualSettings,
           overlayAdjustmentsEnabled,
           smartDarkEdgeEnabled,
+          spatialRecognitionEnabled,
           smartSignalEnabled: normalizeSmartSignalToggles(smartSignalEnabled)
         });
         lastDraw = timestamp;
@@ -2401,7 +2467,7 @@ function CameraStudio() {
         mediaCompositeFrameRef.current = 0;
       }
     };
-  }, [mediaFilterCss, mediaManualSettings, mediaLayers, mediaSelectedEffect, overlayAdjustmentsEnabled, selectedEffectId, smartDarkEdgeEnabled, smartSignalEnabled]);
+  }, [mediaFilterCss, mediaManualSettings, mediaLayers, mediaSelectedEffect, overlayAdjustmentsEnabled, selectedEffectId, smartDarkEdgeEnabled, smartSignalEnabled, spatialRecognitionEnabled]);
 
   useEffect(() => {
     const frame = cameraFrameRef.current;
@@ -3024,6 +3090,8 @@ function CameraStudio() {
     setLiveAdjustmentsEnabled(true);
     setOverlayAdjustmentsEnabled(true);
     setSmartDarkEdgeEnabled(false);
+    setSpatialRecognitionEnabled(false);
+    setSpatialWindowOpen(false);
     setSmartSignalEnabled(DEFAULT_SMART_SIGNAL_TOGGLES);
   }
 
@@ -3155,6 +3223,7 @@ function CameraStudio() {
       manualSettings: mediaManualSettings,
       overlayAdjustmentsEnabled,
       smartDarkEdgeEnabled,
+      spatialRecognitionEnabled,
       smartSignalEnabled: normalizeSmartSignalToggles(smartSignalEnabled)
     });
     if (!canvas?.width || !canvas?.height) {
@@ -3201,6 +3270,7 @@ function CameraStudio() {
       manualSettings: liveManualSettings,
       cameraFacing,
       smartDarkEdgeEnabled,
+      spatialRecognitionEnabled,
       smartSignalEnabled: normalizeSmartSignalToggles(smartSignalEnabled)
     };
     const cameraLabel = cameraFeedPausedRef.current ? "Paused still frame" : "Local camera stream";
@@ -3234,6 +3304,7 @@ function CameraStudio() {
       manualSettings: liveManualSettings,
       cameraFacing,
       smartDarkEdgeEnabled,
+      spatialRecognitionEnabled,
       smartSignalEnabled: normalizeSmartSignalToggles(smartSignalEnabled)
     };
     const canvas = document.createElement("canvas");
@@ -3639,6 +3710,8 @@ function CameraStudio() {
               ? renderThermalStudioGroup()
             : group.type === "smart-dark-edge"
               ? renderSmartDarkEdgeGroup(group)
+            : group.type === "spatial-recognition"
+              ? renderSpatialRecognitionGroup(group)
               : group.type === "smart-signal"
                 ? renderSmartSignalGroup(group)
               : (
@@ -3720,7 +3793,25 @@ function CameraStudio() {
       ["Density gain", DWT_ISOLATE_PROFILE.densityGain],
       ["Edge gain", DWT_ISOLATE_PROFILE.edgeGain],
       ["Chroma lock gain", DWT_ISOLATE_PROFILE.chromaLockGain],
-      ["Artifact suppression", DWT_ISOLATE_PROFILE.artifactSuppressionGain]
+      ["Artifact suppression", DWT_ISOLATE_PROFILE.artifactSuppressionGain],
+      ["Grain gain", DWT_ISOLATE_PROFILE.grainNoiseGain],
+      ["Speckle gain", DWT_ISOLATE_PROFILE.speckleNoiseGain],
+      ["Banding gain", DWT_ISOLATE_PROFILE.bandingNoiseGain],
+      ["Block artifact gain", DWT_ISOLATE_PROFILE.blockArtifactGain],
+      ["Hot pixel gain", DWT_ISOLATE_PROFILE.hotPixelGain],
+      ["Flicker gain", DWT_ISOLATE_PROFILE.temporalFlickerGain]
+    ];
+    const detectorRows = [
+      ["Fine grain", "Subtle luminance jitter and sensor grain in nearby pixels."],
+      ["Speckle / salt", "Tiny isolated bright or dark pixel bursts."],
+      ["Banding", "Horizontal/vertical tonal bands and rolling-strip artifacts."],
+      ["Block artifacts", "Square compression blocks and grid-like distortion patches."],
+      ["Chroma noise", "Color-channel scatter that does not match local luminance."],
+      ["Hot pixels", "Small high-value points that spike above the neighborhood."],
+      ["Shadow noise", "Low-light shade defects and crawling dark regions."],
+      ["Highlight noise", "Overexposed specks and glowing bright defects."],
+      ["Edge shimmer", "Unstable edge halos, crawling outlines, and fringe shimmer."],
+      ["Temporal flicker", "Frame-like pulse weighting for strobe/noisy-camera feel."]
     ];
 
     return (
@@ -3738,7 +3829,8 @@ function CameraStudio() {
 
           <p className="dwt-window-note">
             Imported DWT adaptive quantization controls stay layered on top of the current live preset. Enabling this window's
-            Smart Isolate switch preserves <strong>{liveSelectedEffect.name}</strong> and only adds defect/distortion grouping math.
+            Smart Isolate switch preserves <strong>{liveSelectedEffect.name}</strong> and adds a higher-sensitivity local noise
+            detection stack for defect, distortion, subband, and quantization analysis.
           </p>
 
           <div className="dwt-status-grid" aria-label="DWT pipeline status">
@@ -3752,7 +3844,7 @@ function CameraStudio() {
             </div>
             <div>
               <span>Pipeline source</span>
-              <strong>Local OpenCV / DWT profile</strong>
+              <strong>Local canvas DWT profile</strong>
             </div>
           </div>
 
@@ -3784,12 +3876,127 @@ function CameraStudio() {
             ))}
           </div>
 
+          <div className="dwt-detector-grid" aria-label="DWT noise detector map">
+            {detectorRows.map(([label, value]) => (
+              <div key={label}>
+                <strong>{label}</strong>
+                <span>{value}</span>
+              </div>
+            ))}
+          </div>
+
           {isolateProcessor && (
             <div className="dwt-control-grid" aria-label="DWT isolate controls">
               {isolateProcessor.controls.map((control) => renderAdjustmentSlider(control, "smart-dark-edge-adjustment smart-signal-adjustment"))}
             </div>
           )}
         </section>
+      </div>
+    );
+  }
+
+  function renderSpatialRecognitionWindow() {
+    if (!spatialWindowOpen) return null;
+    const profileRows = [
+      ["Mode", "Pseudo-depth + point cloud + contour mesh"],
+      ["Data source", "Current camera/compositor canvas"],
+      ["Prototype source", "SpatialViewport / pointCloudWorker adapted locally"],
+      ["Privacy", "No identity matching, no biometric storage, no upload"],
+      ["AI-Q hook", "Optional future backend; local canvas active now"]
+    ];
+    return (
+      <div className="dwt-window-backdrop spatial-window-backdrop" role="dialog" aria-modal="true" aria-labelledby="spatialWindowTitle">
+        <section className="dwt-window spatial-window">
+          <div className="youtube-window-heading">
+            <div>
+              <Layers size={22} />
+              <h2 id="spatialWindowTitle">Spatial Recognition Studio</h2>
+            </div>
+            <button type="button" onClick={() => setSpatialWindowOpen(false)} aria-label="Close Spatial Recognition Studio">
+              <X size={20} />
+            </button>
+          </div>
+          <p className="dwt-window-note">
+            Spatial Recognition estimates depth-like field structure from visible luminance, local edge gradients, color separation,
+            and contour density. It is an experimental local visual-analysis pass layered on top of the current preset.
+          </p>
+
+          <div className="dwt-status-grid spatial-status-grid" aria-label="Spatial recognition status">
+            <div>
+              <span>Current preset</span>
+              <strong>{liveSelectedEffect.name}</strong>
+            </div>
+            <div>
+              <span>Spatial pass</span>
+              <strong>{spatialRecognitionEnabled ? "Active" : "Bypassed"}</strong>
+            </div>
+            <div>
+              <span>Point budget</span>
+              <strong>{SPATIAL_RECOGNITION_PIXEL_BUDGET.toLocaleString()} px</strong>
+            </div>
+          </div>
+
+          <div className="dwt-action-row">
+            <button
+              type="button"
+              className={spatialRecognitionEnabled ? "active" : ""}
+              onClick={() => setSpatialRecognitionEnabled((enabled) => !enabled)}
+            >
+              <ShieldCheck size={16} />
+              {spatialRecognitionEnabled ? "Disable Spatial Recognition" : "Enable Spatial Recognition"}
+            </button>
+          </div>
+
+          <div className="dwt-profile-grid" aria-label="Spatial recognition profile">
+            {profileRows.map(([label, value]) => (
+              <div key={label}>
+                <span>{label}</span>
+                <strong>{value}</strong>
+              </div>
+            ))}
+          </div>
+
+          <div className="dwt-control-grid spatial-control-grid" aria-label="Spatial recognition controls">
+            {SPATIAL_RECOGNITION_ADJUSTMENTS.map((control) => renderAdjustmentSlider(control, "smart-dark-edge-adjustment spatial-recognition-adjustment"))}
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  function renderSpatialRecognitionGroup(group) {
+    return (
+      <div className="smart-dark-edge-group spatial-recognition-group">
+        <button
+          type="button"
+          className={spatialRecognitionEnabled ? "adjustment-scope-toggle active" : "adjustment-scope-toggle"}
+          aria-pressed={spatialRecognitionEnabled}
+          onClick={() => setSpatialRecognitionEnabled((enabled) => !enabled)}
+        >
+          <Layers size={15} />
+          <span>
+            <strong>{SPATIAL_RECOGNITION_LABEL}</strong>
+            <small>
+              {spatialRecognitionEnabled
+                ? "Spatial point-cloud, contour, and pseudo-depth mapping is active on preview, HUD, snapshots, recordings, and overlays."
+                : "Off: spatial mapping is bypassed while depth, mesh, contour, and point-cloud controls remain ready."}
+            </small>
+          </span>
+        </button>
+        <div className="smart-isolate-engine-brief spatial-recognition-brief" aria-label="Spatial recognition description">
+          <strong>Local Spatial Field Mapping</strong>
+          <p>
+            Adapted from the imported SpatialViewport/pointCloudWorker prototype without adding Three.js dependencies. The camera canvas
+            decimates frame pixels into a depth-weighted field map so desktop, mobile, HUD, exports, and media layers all share the same result.
+          </p>
+          <button type="button" className="dwt-inline-button" onClick={() => setSpatialWindowOpen(true)}>
+            <Layers size={14} />
+            Open Spatial Recognition Studio
+          </button>
+        </div>
+        <div className="adjustment-list smart-dark-edge-list spatial-recognition-list">
+          {group.controls.map((control) => renderAdjustmentSlider(control, "smart-dark-edge-adjustment spatial-recognition-adjustment"))}
+        </div>
       </div>
     );
   }
@@ -4024,7 +4231,7 @@ function CameraStudio() {
           <ul>
             <li>{CAMERA_EFFECTS.length} local visual presets compiled at 500% intensity for IR-style, UVA-style, full-spectrum thermal, XLS, inversion, tritone, quadtone, channel spectrograph, black-field, channel sweep, cinematic, monochrome, duotone, retro, and color-lab looks.</li>
             <li>Four RGBW gradient mixers for Main, Secondary, Third, and Highlights color layers that drive overlays, filter math, and the selected app accent aesthetic.</li>
-            <li>Grouped adjustment dropdowns with 11 core photo controls, 10 color inversion tools, 20 inversion presets, 10 smart darker-edge controls, 20 smart signal engines, an expanded AI-orchestrated Smart Isolate Grouped Pixels defect/distortion module with 20 controls, Thermal Studio A-O hotspot recoloring, 100 advanced sliders, equation-generated filter names/descriptions, and live/overlay adjustment toggles.</li>
+            <li>Grouped adjustment dropdowns with 11 core photo controls, 10 color inversion tools, 20 inversion presets, 10 smart darker-edge controls, 20 smart signal engines, local Spatial Recognition Studio controls, an expanded AI-orchestrated Smart Isolate Grouped Pixels DWT/noise defect-distortion module with 31 controls, Thermal Studio A-O hotspot recoloring, 100 advanced sliders, equation-generated filter names/descriptions, and live/overlay adjustment toggles.</li>
             <li>Processed PNG snapshots and 1080P or 2K MP4 recordings with local camera effects applied.</li>
             <li>Separate 1-3 layer image/video compositor with opacity, splice masks, blend modes, transforms, full adjustment-stack support, and clean PNG export.</li>
             <li>Clean exports hide app-added preview chrome, labels, and watermark overlays so only the processed image or video remains.</li>
@@ -4480,6 +4687,7 @@ function CameraStudio() {
       )}
 
       {renderDwtIsolationWindow()}
+      {renderSpatialRecognitionWindow()}
 
       {primeResultsWindowOpen && selectedPrimeResult && (
         <div className="prime-results-window-backdrop" role="dialog" aria-modal="true" aria-labelledby="primeResultsWindowTitle">
@@ -4695,6 +4903,7 @@ function drawMediaLayer(context, width, height, layer, renderState) {
     manualSettings: layerSettings,
     cameraFacing: "environment",
     smartDarkEdgeEnabled: renderState.smartDarkEdgeEnabled,
+    spatialRecognitionEnabled: renderState.spatialRecognitionEnabled,
     smartSignalEnabled: normalizeSmartSignalToggles(renderState.smartSignalEnabled)
   }, {
     forcePixelFilters: false,
@@ -4937,6 +5146,7 @@ function drawStudioFrame(context, width, height, mediaSource, renderState, optio
   applyAdvancedCameraPixelEffects(context, width, height, signalSettings, selectedEffect, options);
   applySmartDarkEdgeAmplifier(context, width, height, signalSettings, selectedEffect, renderState.smartDarkEdgeEnabled, options);
   applySmartSignalProcessorEffects(context, width, height, signalSettings, selectedEffect, renderState.smartSignalEnabled, options);
+  applySpatialRecognitionEffects(context, width, height, signalSettings, selectedEffect, renderState.spatialRecognitionEnabled, options);
   paintOverlay(context, width, height, selectedEffect, signalSettings);
   paintSpecialOverlay(context, width, height, signalSettings, selectedEffect);
   paintCanvasGrain(context, width, height, signalSettings);
@@ -5052,8 +5262,10 @@ function applyCanvasPreviewFiltersToContext(context, width, height, filterCss) {
   context.putImageData(frame, 0, 0);
 }
 
-function cameraFrameInterval(settings, effect, smartDarkEdgeEnabled = false, smartSignalEnabled = {}) {
-  return hasAdvancedCameraPixelEffects(settings, effect, smartDarkEdgeEnabled, smartSignalEnabled) ? CAMERA_HEAVY_FRAME_INTERVAL_MS : CAMERA_LIGHT_FRAME_INTERVAL_MS;
+function cameraFrameInterval(settings, effect, smartDarkEdgeEnabled = false, smartSignalEnabled = {}, spatialRecognitionEnabled = false) {
+  return hasAdvancedCameraPixelEffects(settings, effect, smartDarkEdgeEnabled, smartSignalEnabled, spatialRecognitionEnabled)
+    ? CAMERA_HEAVY_FRAME_INTERVAL_MS
+    : CAMERA_LIGHT_FRAME_INTERVAL_MS;
 }
 
 function advancedCameraPixelModel(settings, effect) {
@@ -5087,7 +5299,7 @@ function advancedCameraPixelModel(settings, effect) {
   };
 }
 
-function hasAdvancedCameraPixelEffects(settings, effect, smartDarkEdgeEnabled = false, smartSignalEnabled = {}) {
+function hasAdvancedCameraPixelEffects(settings, effect, smartDarkEdgeEnabled = false, smartSignalEnabled = {}, spatialRecognitionEnabled = false) {
   const model = advancedCameraPixelModel(settings, effect);
   return Boolean(
     model.thermalAmount ||
@@ -5098,7 +5310,8 @@ function hasAdvancedCameraPixelEffects(settings, effect, smartDarkEdgeEnabled = 
       model.colorBalanceAmount ||
       model.thermalStudioActive ||
       smartDarkEdgeEnabled ||
-      hasEnabledSmartSignalProcessor(smartSignalEnabled)
+      hasEnabledSmartSignalProcessor(smartSignalEnabled) ||
+      hasSpatialRecognitionSignal(settings, effect, spatialRecognitionEnabled)
   );
 }
 
@@ -5365,10 +5578,21 @@ function buildSmartSignalProcessorSettings(context, width, height, settings, eff
       addSetting("highlightRecovery", 9 * strength);
       addSetting("hdrRange", 8 * strength);
     } else if (processor.id === "isolateGroupedPixels") {
-      addSetting("posterize", 16 * strength);
-      addSetting("noiseReduction", 12 * strength);
-      addSetting("thermalContour", 10 * strength * thermalBoost);
-      addSetting("colorSeparation", 12 * strength);
+      const dwtSensitivity = smartSignalSetting(settings, processor, "DwtSensitivity") / 100;
+      const noiseLift =
+        smartSignalSetting(settings, processor, "GrainNoise") +
+        smartSignalSetting(settings, processor, "SpeckleNoise") +
+        smartSignalSetting(settings, processor, "BandingNoise") +
+        smartSignalSetting(settings, processor, "BlockNoise") +
+        smartSignalSetting(settings, processor, "ChromaNoise") +
+        smartSignalSetting(settings, processor, "HotPixelNoise");
+      const noisePressure = clamp(noiseLift / 600, 0, 1.2);
+      addSetting("posterize", 18 * strength * (1 + dwtSensitivity * 0.38));
+      addSetting("noiseReduction", 16 * strength * (1 + noisePressure * 0.42));
+      addSetting("thermalContour", 12 * strength * thermalBoost * (1 + dwtSensitivity * 0.28));
+      addSetting("colorSeparation", 13 * strength * (1 + noisePressure * 0.25));
+      addSetting("clarity", 8 * strength * (1 + dwtSensitivity * 0.22));
+      addSetting("edgeEnhance", 9 * strength * (1 + dwtSensitivity * 0.2));
     }
   });
 
@@ -5605,6 +5829,183 @@ function thermalStudioColorForBand(band, value) {
   return option?.color || [255, 255, 255];
 }
 
+function hasSpatialRecognitionSignal(settings = {}, effect = {}, enabled = false) {
+  return buildSpatialRecognitionModel(settings, effect, enabled).active;
+}
+
+function buildSpatialRecognitionModel(settings = {}, effect = {}, enabled = false) {
+  const master = enabled ? clamp(setting(settings, "spatialMaster") / 100, 0, 1) : 0;
+  const thermalBias = isThermalRenderMode(settings, effect) ? 0.16 : 0;
+  const edgeBias = effectSetting(settings, "edgeEnhance", 0, PIXEL_EFFECT_GAIN) / 220;
+  return {
+    active: master > 0.01,
+    master,
+    sensitivity: clamp(setting(settings, "spatialSensitivity") / 100 + thermalBias * 0.2, 0, 1.25),
+    depth: clamp(setting(settings, "spatialDepth") / 100 + thermalBias, 0, 1.35),
+    field: clamp(setting(settings, "spatialField") / 100, 0, 1.15),
+    range: clamp(setting(settings, "spatialRange") / 100, 0, 1.2),
+    pointDensity: clamp(setting(settings, "spatialPointDensity") / 100, 0, 1),
+    edgeWeight: clamp(setting(settings, "spatialEdgeWeight") / 100 + edgeBias, 0, 1.35),
+    meshOpacity: clamp(setting(settings, "spatialMeshOpacity") / 100, 0, 1),
+    contourOpacity: clamp(setting(settings, "spatialContourOpacity") / 100, 0, 1),
+    parallax: clamp(setting(settings, "spatialParallax") / 100, 0, 1),
+    colorSplit: clamp(setting(settings, "spatialColorSplit") / 100, 0, 1.15),
+    smoothing: clamp(setting(settings, "spatialSmoothing") / 100, 0, 1),
+    palette: settings?.thermalPalette || "full-range-rgb"
+  };
+}
+
+function applySpatialRecognitionEffects(context, width, height, settings, effect, enabled = false, options = {}) {
+  const model = buildSpatialRecognitionModel(settings, effect, enabled);
+  if (!model.active || !context?.canvas || !width || !height) return;
+  const pixelBudget = Math.min(options.pixelBudget || SPATIAL_RECOGNITION_PIXEL_BUDGET, SPATIAL_RECOGNITION_PIXEL_BUDGET);
+  if (width * height > pixelBudget) {
+    const scale = Math.sqrt(pixelBudget / (width * height));
+    const workWidth = Math.max(1, Math.round(width * scale));
+    const workHeight = Math.max(1, Math.round(height * scale));
+    spatialRecognitionWorkCanvas ||= document.createElement("canvas");
+    if (spatialRecognitionWorkCanvas.width !== workWidth) spatialRecognitionWorkCanvas.width = workWidth;
+    if (spatialRecognitionWorkCanvas.height !== workHeight) spatialRecognitionWorkCanvas.height = workHeight;
+    const workContext = spatialRecognitionWorkCanvas.getContext("2d", { alpha: false, willReadFrequently: true });
+    if (!workContext) return;
+    workContext.save();
+    workContext.imageSmoothingEnabled = true;
+    workContext.imageSmoothingQuality = "high";
+    workContext.clearRect(0, 0, workWidth, workHeight);
+    workContext.drawImage(context.canvas, 0, 0, width, height, 0, 0, workWidth, workHeight);
+    workContext.restore();
+    applySpatialRecognitionEffectsToContext(workContext, workWidth, workHeight, settings, effect, model);
+    context.save();
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
+    context.clearRect(0, 0, width, height);
+    context.drawImage(spatialRecognitionWorkCanvas, 0, 0, workWidth, workHeight, 0, 0, width, height);
+    context.restore();
+    return;
+  }
+  applySpatialRecognitionEffectsToContext(context, width, height, settings, effect, model);
+}
+
+function applySpatialRecognitionEffectsToContext(context, width, height, settings, effect, model) {
+  let frame;
+  try {
+    frame = context.getImageData(0, 0, width, height);
+  } catch {
+    return;
+  }
+  const data = frame.data;
+  const source = new Uint8ClampedArray(data);
+  const lumaAt = (pixelIndex) =>
+    (source[pixelIndex] * 0.2126 + source[pixelIndex + 1] * 0.7152 + source[pixelIndex + 2] * 0.0722) / 255;
+  for (let index = 0; index < data.length; index += 4) {
+    const pixel = index / 4;
+    const x = pixel % width;
+    const y = Math.floor(pixel / width);
+    const luma = lumaAt(index);
+    const left = x > 0 ? lumaAt(index - 4) : luma;
+    const right = x < width - 1 ? lumaAt(index + 4) : luma;
+    const up = y > 0 ? lumaAt(index - width * 4) : luma;
+    const down = y < height - 1 ? lumaAt(index + width * 4) : luma;
+    const localAverage = (luma * 2 + left + right + up + down) / 6;
+    const edge = clamp(Math.abs(right - left) + Math.abs(down - up) + Math.abs(luma - localAverage) * 1.8, 0, 1);
+    const radial = distanceFromCenter(x / Math.max(1, width - 1), y / Math.max(1, height - 1));
+    const verticalDepth = 1 - y / Math.max(1, height - 1);
+    const contourPhase = Math.abs(Math.sin((luma * 7.5 + edge * 4.2 + model.range * 2.1) * Math.PI));
+    const pseudoDepth = clamp(
+      luma * (0.42 + model.range * 0.36) +
+        edge * model.edgeWeight * 0.42 +
+        Math.abs(luma - localAverage) * model.depth * 1.05 +
+        verticalDepth * model.field * 0.16 -
+        radial * model.field * 0.14 +
+        model.sensitivity * 0.08,
+      0,
+      1
+    );
+    const [dr, dg, db] = spatialRecognitionDepthColor(pseudoDepth, model);
+    const contourMask = clamp((1 - contourPhase) * model.contourOpacity * (0.38 + edge * 0.8), 0, 1);
+    const depthMask = clamp((edge * 0.36 + Math.abs(luma - localAverage) * 1.35 + contourMask * 0.5) * model.master, 0, 0.88);
+    const alpha = clamp(depthMask * (0.22 + model.depth * 0.28 + model.sensitivity * 0.18), 0, 0.62);
+    let r = data[index];
+    let g = data[index + 1];
+    let b = data[index + 2];
+    r = mixChannel(r, dr, alpha);
+    g = mixChannel(g, dg, alpha * 0.96);
+    b = mixChannel(b, db, alpha * 0.92);
+
+    if (model.colorSplit > 0.01) {
+      const split = clamp((edge + contourMask) * model.colorSplit * model.master * 34, 0, 42);
+      r += split;
+      g += split * Math.sin((x / Math.max(1, width)) * Math.PI) * 0.28;
+      b -= split * 0.5;
+    }
+
+    if (model.smoothing > 0.01) {
+      const smoothAlpha = clamp(model.smoothing * (0.06 + (1 - edge) * 0.12) * model.master, 0, 0.22);
+      const localGray = localAverage * 255;
+      r = mixChannel(r, localGray, smoothAlpha);
+      g = mixChannel(g, localGray, smoothAlpha * 0.9);
+      b = mixChannel(b, localGray, smoothAlpha * 0.8);
+    }
+
+    data[index] = clamp(r, 0, 255);
+    data[index + 1] = clamp(g, 0, 255);
+    data[index + 2] = clamp(b, 0, 255);
+  }
+  context.putImageData(frame, 0, 0);
+
+  const meshAlpha = clamp(model.meshOpacity * model.master * 0.32, 0, 0.42);
+  if (meshAlpha > 0.01) {
+    const gridStep = Math.max(10, Math.round(36 - model.pointDensity * 20));
+    context.save();
+    context.globalCompositeOperation = "screen";
+    context.lineWidth = Math.max(0.5, Math.min(width, height) / 850);
+    context.strokeStyle = `rgba(125, 238, 255, ${meshAlpha})`;
+    for (let x = 0; x <= width; x += gridStep) {
+      const offset = Math.sin((x / Math.max(1, width)) * Math.PI * 2) * model.parallax * gridStep * 0.45;
+      context.beginPath();
+      context.moveTo(x, 0);
+      context.lineTo(x + offset, height);
+      context.stroke();
+    }
+    context.strokeStyle = `rgba(255, 111, 164, ${meshAlpha * 0.74})`;
+    for (let y = 0; y <= height; y += gridStep) {
+      const offset = Math.cos((y / Math.max(1, height)) * Math.PI * 2) * model.parallax * gridStep * 0.42;
+      context.beginPath();
+      context.moveTo(0, y);
+      context.lineTo(width, y + offset);
+      context.stroke();
+    }
+    context.restore();
+  }
+
+  const pointAlpha = clamp(model.pointDensity * model.master * 0.28, 0, 0.36);
+  if (pointAlpha > 0.01) {
+    const pointStep = Math.max(8, Math.round(28 - model.pointDensity * 18));
+    context.save();
+    context.globalCompositeOperation = "screen";
+    context.fillStyle = `rgba(238, 255, 255, ${pointAlpha})`;
+    for (let y = pointStep; y < height; y += pointStep) {
+      for (let x = pointStep; x < width; x += pointStep) {
+        const drift = Math.sin((x * 0.017 + y * 0.021) * (1 + model.parallax)) * model.parallax * 2.2;
+        context.fillRect(x + drift, y - drift, 1.4, 1.4);
+      }
+    }
+    context.restore();
+  }
+}
+
+function spatialRecognitionDepthColor(value, model) {
+  const palette = model.palette || "full-range-rgb";
+  if (thermalUsesExpandedRgbRange(palette) || palette.includes("heat") || palette.includes("rainbow")) {
+    return thermalPaletteColor(value, palette === "classic" ? "full-range-rgb" : palette);
+  }
+  if (value < 0.28) return [18, 24, 92];
+  if (value < 0.48) return [20, 220, 198];
+  if (value < 0.68) return [111, 255, 84];
+  if (value < 0.84) return [255, 218, 56];
+  return [255, 74, 64];
+}
+
 function hasEnabledSmartSignalProcessor(smartSignalEnabled = {}) {
   return SMART_SIGNAL_PROCESSORS.some((processor) => Boolean(smartSignalEnabled?.[processor.id]));
 }
@@ -5623,12 +6024,23 @@ function smartSignalProcessorStrength(settings = {}, processor) {
 function buildIsolateGroupedPixelModel(settings = {}, processor) {
   const dwtProfile = DWT_ISOLATE_PROFILE;
   const strength = smartSignalProcessorStrength(settings, processor);
+  const dwtSensitivity = smartSignalSetting(settings, processor, "DwtSensitivity") / 100;
   const colorTarget = smartSignalSetting(settings, processor, "ColorTarget") / 100;
   const pixelSize = smartSignalSetting(settings, processor, "PixelSize") / 100;
   const pixelWeight = smartSignalSetting(settings, processor, "PixelWeight") / 100;
   const pixelDensity = smartSignalSetting(settings, processor, "PixelDensity") / 100;
   const defectSignal = smartSignalSetting(settings, processor, "DefectSignal") / 100;
   const distortionResponse = smartSignalSetting(settings, processor, "DistortionResponse") / 100;
+  const grainNoise = smartSignalSetting(settings, processor, "GrainNoise") / 100;
+  const speckleNoise = smartSignalSetting(settings, processor, "SpeckleNoise") / 100;
+  const bandingNoise = smartSignalSetting(settings, processor, "BandingNoise") / 100;
+  const blockNoise = smartSignalSetting(settings, processor, "BlockNoise") / 100;
+  const chromaNoise = smartSignalSetting(settings, processor, "ChromaNoise") / 100;
+  const hotPixelNoise = smartSignalSetting(settings, processor, "HotPixelNoise") / 100;
+  const shadowNoise = smartSignalSetting(settings, processor, "ShadowNoise") / 100;
+  const highlightNoise = smartSignalSetting(settings, processor, "HighlightNoise") / 100;
+  const edgeShimmer = smartSignalSetting(settings, processor, "EdgeShimmer") / 100;
+  const temporalFlicker = smartSignalSetting(settings, processor, "TemporalFlicker") / 100;
   const uniformity = smartSignalSetting(settings, processor, "Uniformity") / 100;
   const edgeRepair = smartSignalSetting(settings, processor, "EdgeRepair") / 100;
   const chromaLock = smartSignalSetting(settings, processor, "ChromaLock") / 100;
@@ -5645,12 +6057,23 @@ function buildIsolateGroupedPixelModel(settings = {}, processor) {
   return {
     active: strength > 0.01,
     strength,
+    dwtSensitivity,
     colorTarget,
     pixelSize,
     pixelWeight,
     pixelDensity,
     defectSignal,
     distortionResponse,
+    grainNoise,
+    speckleNoise,
+    bandingNoise,
+    blockNoise,
+    chromaNoise,
+    hotPixelNoise,
+    shadowNoise,
+    highlightNoise,
+    edgeShimmer,
+    temporalFlicker,
     uniformity,
     edgeRepair,
     chromaLock,
@@ -5665,9 +6088,9 @@ function buildIsolateGroupedPixelModel(settings = {}, processor) {
     smoothing,
     blend,
     blockSize: clamp(Math.round(1 + pixelSize * 7 + radius * 5), 2, 14),
-    densitySignal: clamp(pixelDensity * (0.5 + strength * 0.32) * dwtProfile.densityGain, 0, 1.72),
+    densitySignal: clamp(pixelDensity * (0.5 + strength * 0.32 + dwtSensitivity * 0.28) * dwtProfile.densityGain, 0, 2.05),
     defectThreshold: clamp(
-      0.08 + (1 - sensitivity) * 0.2 - defectSignal * dwtProfile.defectThresholdBias,
+      0.07 + (1 - sensitivity) * 0.16 - defectSignal * dwtProfile.defectThresholdBias - dwtSensitivity * 0.035,
       dwtProfile.quantizationFloor,
       dwtProfile.quantizationCeiling
     ),
@@ -5888,20 +6311,77 @@ function applyIsolateGroupedPixelEngine(r, g, b, luma, localAverage, edge, midMa
   const blockY = Math.floor(y / model.blockSize);
   const blockHash = ((blockX * 37 + blockY * 61 + Math.floor(model.pixelSize * 97)) % 113) / 112;
   const diagonalHash = ((Math.floor((x + y) / Math.max(2, model.blockSize)) * 19 + blockX * 7) % 53) / 52;
+  const microHash = (((x + 3) * 73856093) ^ ((y + 5) * 19349663) ^ Math.floor(model.dwtSensitivity * 997)) >>> 0;
+  const microNoise = (microHash & 255) / 255;
+  const fineGrainSignal = clamp(
+    Math.abs(luma - localAverage) * (1.1 + model.dwtSensitivity * 1.35) * model.grainNoise * dwtProfile.grainNoiseGain +
+      Math.abs(microNoise - 0.5) * model.grainNoise * 0.42,
+    0,
+    1.38
+  );
+  const speckleSeed = ((microHash >>> 8) & 255) / 255;
+  const speckleSignal = clamp(
+    (speckleSeed > 0.86 ? (speckleSeed - 0.86) * 7.14 : 0) * model.speckleNoise * dwtProfile.speckleNoiseGain +
+      Math.max(0, Math.abs(luma - localAverage) - 0.06) * model.speckleNoise * 1.8,
+    0,
+    1.25
+  );
+  const bandPhase = Math.sin((y / Math.max(1, model.blockSize * 3)) * Math.PI * 2 + model.dwtSensitivity * Math.PI);
+  const bandingSignal = clamp(Math.abs(bandPhase) * model.bandingNoise * (0.24 + Math.abs(luma - localAverage) * 1.7) * dwtProfile.bandingNoiseGain, 0, 1.12);
+  const blockBoundary = x % model.blockSize === 0 || y % model.blockSize === 0;
+  const blockArtifactSignal = clamp(
+    (blockBoundary ? 0.42 : Math.abs(blockHash - diagonalHash) * 0.26) * model.blockNoise * dwtProfile.blockArtifactGain +
+      edge * model.blockNoise * 0.2,
+    0,
+    1.2
+  );
+  const chromaNoiseSignal = clamp(colorSpread * model.chromaNoise * (0.6 + model.chromaLock * 0.75) * dwtProfile.chrominanceNoiseWeight, 0, 1.35);
+  const hotPixelSignal = clamp(
+    (highlightMask * Math.max(0, luma - localAverage) * 2.4 + speckleSignal * 0.28) * model.hotPixelNoise * dwtProfile.hotPixelGain,
+    0,
+    1.28
+  );
+  const shadowNoiseSignal = clamp(shadowMask * Math.abs(luma - localAverage) * model.shadowNoise * 2.2, 0, 1.16);
+  const highlightNoiseSignal = clamp(highlightMask * Math.abs(luma - localAverage) * model.highlightNoise * 2.1, 0, 1.16);
+  const edgeShimmerSignal = clamp(edge * (Math.abs(diagonalHash - microNoise) + 0.24) * model.edgeShimmer * (0.6 + model.pixelWeight * 0.56), 0, 1.18);
+  const temporalFlickerSignal = clamp(
+    Math.abs(Math.sin((x * 0.019 + y * 0.023 + microNoise * 2.7) * (1 + model.temporalFlicker))) *
+      model.temporalFlicker *
+      (0.18 + edge * 0.52 + midMask * 0.2) *
+      dwtProfile.temporalFlickerGain,
+    0,
+    1.05
+  );
+  const dwtNoiseField = clamp(
+    fineGrainSignal * 0.36 +
+      speckleSignal * 0.42 +
+      bandingSignal * 0.32 +
+      blockArtifactSignal * 0.38 +
+      chromaNoiseSignal * 0.36 +
+      hotPixelSignal * 0.44 +
+      shadowNoiseSignal * 0.32 +
+      highlightNoiseSignal * 0.32 +
+      edgeShimmerSignal * 0.34 +
+      temporalFlickerSignal * 0.26,
+    0,
+    1.72
+  );
   const isolateGroupedPixelsDensitySignal = clamp(
     model.densitySignal * (0.32 + blockHash * 0.52 + diagonalHash * 0.22) +
       colorSpread * model.pixelDensity * 0.28 +
-      edge * model.pixelWeight * 0.18 * dwtProfile.edgeGain,
+      edge * model.pixelWeight * 0.18 * dwtProfile.edgeGain +
+      dwtNoiseField * (0.18 + model.dwtSensitivity * 0.24),
     0,
-    1.45
+    1.82
   );
   const dwtSubbandSignal = clamp(
-    edge * dwtProfile.digitalNoiseWeight * 0.18 +
-      Math.abs(luma - localAverage) * dwtProfile.luminanceNoiseWeight * 0.16 +
-      colorSpread * dwtProfile.chrominanceNoiseWeight * 0.12 +
-      midMask * dwtProfile.lowFrequencyWeight * 0.08,
+    edge * dwtProfile.digitalNoiseWeight * 0.22 +
+      Math.abs(luma - localAverage) * dwtProfile.luminanceNoiseWeight * 0.22 +
+      colorSpread * dwtProfile.chrominanceNoiseWeight * 0.14 +
+      midMask * dwtProfile.lowFrequencyWeight * 0.1 +
+      dwtNoiseField * (0.34 + model.dwtSensitivity * 0.22),
     0,
-    1.2
+    1.58
   );
   const isolateGroupedPixelsDefectSignal = clamp(
     Math.abs(luma - localAverage) * (2.8 + model.defectSignal * 3.8) +
@@ -5912,19 +6392,20 @@ function applyIsolateGroupedPixelEngine(r, g, b, luma, localAverage, edge, midMa
       midMask * model.midtone * 0.28 +
       isolateGroupedPixelsDensitySignal * 0.26 -
       model.defectThreshold +
-      dwtSubbandSignal * 0.34,
+      dwtSubbandSignal * 0.48 +
+      dwtNoiseField * 0.34,
     0,
-    1.35
+    1.72
   );
   const activation = clamp(
-    (isolateGroupedPixelsDefectSignal * (0.72 + model.sensitivity * 0.44) + colorMatch * model.colorTarget * 0.26) *
+    (isolateGroupedPixelsDefectSignal * (0.72 + model.sensitivity * 0.44 + model.dwtSensitivity * 0.28) + colorMatch * model.colorTarget * 0.26) *
       model.strength,
     0,
     1
   );
   if (activation <= 0.004) return [r, g, b];
 
-  const dwtQuantPressure = clamp(dwtSubbandSignal * (0.42 + model.pixelDensity * 0.22), 0, 0.82);
+  const dwtQuantPressure = clamp(dwtSubbandSignal * (0.5 + model.pixelDensity * 0.24 + model.dwtSensitivity * 0.2), 0, 1.05);
   const levels = Math.max(2, Math.round(14 - model.uniformity * 8 - model.isolation * 4 - dwtQuantPressure * 3));
   const step = 255 / Math.max(1, levels - 1);
   const groupGray = Math.round(gray / step) * step;
@@ -5945,6 +6426,14 @@ function applyIsolateGroupedPixelEngine(r, g, b, luma, localAverage, edge, midMa
   r = mixChannel(r, targetGroupedR, groupAlpha);
   g = mixChannel(g, targetGroupedG, groupAlpha);
   b = mixChannel(b, targetGroupedB, groupAlpha);
+
+  const noiseTintAlpha = clamp(activation * dwtNoiseField * (0.12 + model.dwtSensitivity * 0.18), 0, 0.42);
+  if (noiseTintAlpha > 0.004) {
+    const [nr, ng, nb] = thermalPaletteColor(clamp(0.2 + dwtNoiseField * 0.74 + colorMatch * 0.1, 0, 1), model.chromaNoise > 0.58 ? "red-lime" : "edge-spectrum");
+    r = mixChannel(r, nr, noiseTintAlpha);
+    g = mixChannel(g, ng, noiseTintAlpha * 0.96);
+    b = mixChannel(b, nb, noiseTintAlpha * 0.9);
+  }
 
   const defectDarken = clamp(activation * model.distortionResponse * (shadowMask * 0.28 + edge * 0.22), 0, 0.5);
   r *= 1 - defectDarken;

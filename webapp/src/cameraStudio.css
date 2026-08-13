@@ -2090,6 +2090,36 @@
   gap: 8px;
 }
 
+.dwt-detector-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.dwt-detector-grid div,
+.spatial-status-grid div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(var(--studio-accent-rgb), 0.18);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 14% 0%, rgba(var(--studio-accent-rgb), 0.12), transparent 38%),
+    rgba(2, 5, 8, 0.34);
+}
+
+.dwt-detector-grid strong {
+  color: #f5f8fb;
+  font-size: 12px;
+}
+
+.dwt-detector-grid span {
+  color: #aeb8c2;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .dwt-control-grid {
   display: grid;
   gap: 8px;
@@ -2099,6 +2129,20 @@
   border: 1px solid rgba(var(--studio-accent-rgb), 0.18);
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.24);
+}
+
+.spatial-window {
+  width: min(1080px, calc(100vw - 32px));
+}
+
+.spatial-control-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.spatial-recognition-brief {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(var(--studio-accent-rgb), 0.16), transparent 35%),
+    rgba(2, 5, 8, 0.4);
 }
 
 .database-frame-note {
@@ -2611,6 +2655,8 @@
   .dwt-status-grid,
   .dwt-action-row,
   .dwt-profile-grid,
+  .dwt-detector-grid,
+  .spatial-control-grid,
   .recording-action-row,
   .resolution-selector,
   .media-compositor-actions,

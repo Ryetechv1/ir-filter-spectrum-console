@@ -30,8 +30,15 @@ The Camera Studio is opened from the main console with the `Studio` button. It r
 - All visual effect presets are compiled through a 500% intensity amplifier. The amplifier boosts numeric preset settings away from their neutral value and increases preset overlay alpha while clamping to each control's safe range.
 - Four RGBW mixer groups drive live gradient color layers and the main filter math: Main, Secondary, Third, and Highlights.
 - Ten inversion controls add Classic RGB Invert, Luma Negative, Channel Swap Invert, Spectral Invert, Thermal Black-Hot Invert, Red Channel Invert, Green Channel Invert, Blue Channel Invert, Shadow Range Invert, and Highlight Range Invert.
-- The adjustment surface is grouped into dropdown sections. It includes 12 core photo sliders, 10 inversion sliders, smart darker-edge controls, 20 smart signal engines, the expanded Smart Isolate Grouped Pixels defect/distortion engine with 20 controls, Thermal Studio A-O hotspot recoloring, and 100 advanced effect sliders for exposure-style controls, color channels, bloom/halation, scanlines, IR/UVA/thermal washes, and other photobooth effects.
+- The adjustment surface is grouped into dropdown sections. It includes 12 core photo sliders, 10 inversion sliders, smart darker-edge controls, local Spatial Recognition Studio controls, 20 smart signal engines, the expanded Smart Isolate Grouped Pixels DWT/noise defect-distortion engine with 31 controls, Thermal Studio A-O hotspot recoloring, and 100 advanced effect sliders for exposure-style controls, color channels, bloom/halation, scanlines, IR/UVA/thermal washes, and other photobooth effects.
 - The smart signal engines are local image-processing tools only. They do not identify people, match identities, store biometrics, or use face/wolf recognition.
+
+## Spatial Recognition Studio
+
+- Spatial Recognition Studio adapts the imported point-cloud prototype into the browser camera pipeline without adding heavy Three.js or LAS loader dependencies to the live static app.
+- The preserved prototype handoff lives in `integrations/spatial_recognition_prototype/` for future Codex import work.
+- The studio estimates pseudo-depth, contour bands, point-cloud dots, field curvature, and mesh overlays from visible luminance/edge gradients in the current camera/compositor canvas.
+- The spatial pass is local and visual-only. It does not identify people, perform biometric matching, store a face model, or upload camera frames.
 
 ## AI-Orchestrated Defect / Distortion Isolation
 
@@ -39,7 +46,8 @@ The Camera Studio is opened from the main console with the `Studio` button. It r
 - The local Python package lives in `integrations/dwt_isolate_pipeline/` and imports `noise_loss.py`, `models.py`, and `export_visualizer.py`.
 - The package validates OpenCV dataset hooks with `test_steg_pipeline.py` and exports `dwt_isolate_profile.json` for the static web app.
 - Enabling Smart Isolate Grouped Pixels preserves the current preset/filter and layers the DWT-weighted grouping pass on top of the existing camera output.
-- `DWT Isolation Studio` is a dedicated popup GUI for the imported profile. It shows the active preset, DWT status, profile parameters, profile JSON links, and the Smart Isolate sliders without replacing the current filter/preset.
+- `DWT Isolation Studio` is a dedicated popup GUI for the imported profile. It shows the active preset, DWT status, profile parameters, profile JSON links, a detector map, and the Smart Isolate sliders without replacing the current filter/preset.
+- The DWT/noise layer now exposes stronger sensitivity plus detectors for grain, speckle/salt noise, banding, block artifacts, chroma noise, hot pixels, shadow noise, highlight noise, edge shimmer, and temporal flicker.
 
 ## YouTube Channel Window
 
