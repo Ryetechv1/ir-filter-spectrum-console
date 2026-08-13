@@ -4149,8 +4149,8 @@ function CameraStudio() {
           </div>
           <p className="dwt-window-note">
             Spatial Recognition estimates depth-like field structure from visible luminance, local edge gradients, color separation,
-            noise, and contour density. Its live Point Cloud and TIN modes map camera cells into surface, noise, and depth geometry
-            while staying layered on top of the current preset.
+            noise, and contour density. Its live Point Cloud, TIN, mesh, and cell sample modes share one synchronized camera-cell
+            field so surface, noise, and depth geometry follow the current frame while preserving the active preset.
           </p>
 
           <div className="dwt-status-grid spatial-status-grid" aria-label="Spatial recognition status">
@@ -4258,8 +4258,8 @@ function CameraStudio() {
           <strong>Local Spatial Field Mapping</strong>
           <p>
             Adapted from the imported SpatialViewport/pointCloudWorker prototype without adding Three.js dependencies. The camera canvas
-            decimates frame pixels into live cells, point-cloud samples, and TIN triangle facets so desktop, mobile, HUD, exports, and
-            media layers all share the same surface/noise/depth result.
+            decimates frame pixels into one synchronized live-cell field used by point-cloud samples, TIN triangle facets, mesh lines,
+            and cell nodes so desktop, mobile, HUD, exports, and media layers all share the same surface/noise/depth result.
           </p>
           <button type="button" className="dwt-inline-button" onClick={() => setSpatialWindowOpen(true)}>
             <Layers size={14} />
@@ -4504,7 +4504,7 @@ function CameraStudio() {
           <ul>
             <li>{CAMERA_EFFECTS.length} local visual presets compiled at 500% intensity for IR-style, UVA-style, full-spectrum thermal, XLS, inversion, tritone, quadtone, channel spectrograph, black-field, channel sweep, cinematic, monochrome, duotone, retro, and color-lab looks.</li>
             <li>Four RGBW gradient mixers for Main, Secondary, Third, and Highlights color layers that drive overlays, filter math, and the selected app accent aesthetic.</li>
-            <li>Grouped adjustment dropdowns with 11 core photo controls, 10 color inversion tools, 20 inversion presets, 10 smart darker-edge controls, 20 smart signal engines, 43 local Spatial Recognition Studio controls with live Point Cloud/TIN surface mapping, a visual mesh interface toggle and opacity scaler, an expanded AI-orchestrated Smart Isolate Grouped Pixels DWT/noise defect-distortion module with 31 controls, Thermal Studio A-O hotspot recoloring, 100 advanced sliders, equation-generated filter names/descriptions, and live/overlay adjustment toggles.</li>
+            <li>Grouped adjustment dropdowns with 11 core photo controls, 10 color inversion tools, 20 inversion presets, 10 smart darker-edge controls, 20 smart signal engines, 43 local Spatial Recognition Studio controls with synchronized live cell, mesh, Point Cloud, and TIN surface mapping, a visual mesh interface toggle and opacity scaler, an expanded AI-orchestrated Smart Isolate Grouped Pixels DWT/noise defect-distortion module with 31 controls, Thermal Studio A-O hotspot recoloring, 100 advanced sliders, equation-generated filter names/descriptions, and live/overlay adjustment toggles.</li>
             <li>Flashlight Studio includes Hold Torch, Lock Rear Torch, Strobe, Dimmer Pulse, interval timing, and brightness-duty controls where the rear-camera torch API is exposed by the device.</li>
             <li>Processed PNG snapshots and 1080P or 2K MP4 recordings with local camera effects applied, including browser download plus desktop folder-save support when permission is granted.</li>
             <li>Separate 1-3 layer image/video compositor with opacity, splice masks, blend modes, transforms, full adjustment-stack support, and clean PNG export.</li>
@@ -6315,57 +6315,26 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
     data[index + 1] = clamp(g, 0, 255);
     data[index + 2] = clamp(b, 0, 255);
   }
-  context.putImageData(frame, 0, 0);
-  if (model.visualInterfaceOpacity > 0.01) paintLiveSpatialPointCloudAndTin(context, width, height, source, model);
-
   const meshAlpha = clamp(model.meshOpacity * model.visualInterfaceOpacity * model.master * 0.32, 0, 0.42);
-  if (meshAlpha > 0.01) {
-    const gridStep = Math.max(6, Math.round(31 - model.pointDensity * 16 - model.contourDensity * 8 - model.subpixelScan * 5));
-    context.save();
-    context.globalCompositeOperation = "screen";
-    context.lineWidth = Math.max(0.5, Math.min(width, height) / (900 - model.vectorTension * 260));
-    context.strokeStyle = `rgba(125, 238, 255, ${clamp(meshAlpha + model.surfaceNormal * 0.04, 0, 0.5)})`;
-    for (let x = 0; x <= width; x += gridStep) {
-      const offset = Math.sin((x / Math.max(1, width)) * Math.PI * (2 + model.vectorTension * 2)) * model.parallax * gridStep * (0.45 + model.motionTrace * 0.24);
-      context.beginPath();
-      context.moveTo(x, 0);
-      context.lineTo(x + offset, height);
-      context.stroke();
-    }
-    context.strokeStyle = `rgba(255, 111, 164, ${meshAlpha * (0.74 + model.colorDepth * 0.22)})`;
-    for (let y = 0; y <= height; y += gridStep) {
-      const offset = Math.cos((y / Math.max(1, height)) * Math.PI * (2 + model.vectorTension * 1.6)) * model.parallax * gridStep * (0.42 + model.motionTrace * 0.2);
-      context.beginPath();
-      context.moveTo(0, y);
-      context.lineTo(width, y + offset);
-      context.stroke();
-    }
-    context.restore();
-  }
-
   const pointAlpha = clamp(model.pointDensity * model.visualInterfaceOpacity * model.master * (0.28 + model.subpixelScan * 0.12), 0, 0.46);
-  if (pointAlpha > 0.01) {
-    const pointStep = Math.max(4, Math.round(24 - model.pointDensity * 14 - model.subpixelScan * 8 - model.livePointCloud * 3));
-    context.save();
-    context.globalCompositeOperation = "screen";
-    context.fillStyle = `rgba(238, 255, 255, ${pointAlpha})`;
-    for (let y = pointStep; y < height; y += pointStep) {
-      for (let x = pointStep; x < width; x += pointStep) {
-        const drift = Math.sin((x * 0.017 + y * 0.021) * (1 + model.parallax + model.motionTrace * 0.5)) * model.parallax * (2.2 + model.motionTrace * 1.8);
-        const size = 1.2 + model.subpixelScan * 1.1 + model.objectCohesion * 0.5;
-        context.fillRect(x + drift, y - drift, size, size);
-      }
-    }
-    context.restore();
+  context.putImageData(frame, 0, 0);
+
+  if (model.visualInterfaceOpacity > 0.01 && (meshAlpha > 0.01 || pointAlpha > 0.01 || hasLiveSpatialCellLayerSignal(model))) {
+    const cellField = buildLiveSpatialCellField(width, height, source, model);
+    paintLiveSpatialPointCloudAndTin(context, cellField, model);
+    paintSyncedSpatialCellMesh(context, cellField, model, meshAlpha);
+    paintSyncedSpatialCellSamples(context, cellField, model, pointAlpha);
   }
 }
 
-function paintLiveSpatialPointCloudAndTin(context, width, height, source, model) {
+function hasLiveSpatialCellLayerSignal(model) {
+  return model.livePointCloud > 0.01 || model.tinOpacity > 0.01 || model.tinWire > 0.01;
+}
+
+function buildLiveSpatialCellField(width, height, source, model) {
   const pointCloudAlpha = clamp(model.livePointCloud * model.visualInterfaceOpacity * model.master * (0.34 + model.subpixelScan * 0.16), 0, 0.58);
   const tinAlpha = clamp(model.tinOpacity * model.visualInterfaceOpacity * model.master * (0.28 + model.surfaceMap * 0.12 + model.cellDepth * 0.08), 0, 0.48);
   const wireAlpha = clamp(model.tinWire * model.visualInterfaceOpacity * model.master * (0.22 + model.surfaceMap * 0.08), 0, 0.42);
-  if (pointCloudAlpha <= 0.01 && tinAlpha <= 0.01 && wireAlpha <= 0.01) return;
-
   const cellStep = Math.max(
     7,
     Math.round(32 - model.cellSize * 13 - model.pointDensity * 6 - model.livePointCloud * 5 - model.subpixelScan * 5 - model.surfaceMap * 3)
@@ -6423,8 +6392,12 @@ function paintLiveSpatialPointCloudAndTin(context, width, height, source, model)
     }
     if (row.length) rows.push(row);
   }
-  if (rows.length < 2 || rows[0].length < 2) return;
+  return { rows, cellStep, pointCloudAlpha, tinAlpha, wireAlpha };
+}
 
+function paintLiveSpatialPointCloudAndTin(context, cellField, model) {
+  if (!cellField?.rows?.length || cellField.rows.length < 2 || cellField.rows[0].length < 2) return;
+  const { rows, cellStep, pointCloudAlpha, tinAlpha, wireAlpha } = cellField;
   if (tinAlpha > 0.01) {
     context.save();
     context.globalCompositeOperation = "screen";
@@ -6495,6 +6468,76 @@ function paintLiveSpatialPointCloudAndTin(context, width, height, source, model)
     }
     context.restore();
   }
+}
+
+function paintSyncedSpatialCellMesh(context, cellField, model, meshAlpha) {
+  if (meshAlpha <= 0.01 || !cellField?.rows?.length || cellField.rows.length < 2) return;
+  const { rows, cellStep } = cellField;
+  context.save();
+  context.globalCompositeOperation = "screen";
+  context.lineWidth = Math.max(0.48, cellStep / (20 - model.vectorTension * 6));
+  const rowAlpha = clamp(meshAlpha + model.surfaceNormal * 0.04, 0, 0.5);
+  const columnAlpha = clamp(meshAlpha * (0.74 + model.colorDepth * 0.22), 0, 0.48);
+  for (const row of rows) {
+    if (row.length < 2) continue;
+    context.beginPath();
+    row.forEach((point, index) => {
+      const signalLift = (point.depth + point.surface + point.noise * model.noiseMap) * model.master;
+      const y = clamp(point.y + (signalLift - 0.5) * model.cellDepth * 2.2, 0, context.canvas.height);
+      if (index === 0) context.moveTo(point.x, y);
+      else context.lineTo(point.x, y);
+    });
+    context.strokeStyle = `rgba(125, 238, 255, ${rowAlpha})`;
+    context.stroke();
+  }
+
+  const maxColumns = Math.max(...rows.map((row) => row.length));
+  for (let column = 0; column < maxColumns; column += 1) {
+    let started = false;
+    context.beginPath();
+    for (const row of rows) {
+      const point = row[column];
+      if (!point) continue;
+      const signalLift = (point.depth + point.edge + point.surface * model.surfaceMap) * model.master;
+      const x = clamp(point.x + (signalLift - 0.5) * model.gridWarp * 2.6, 0, context.canvas.width);
+      if (!started) {
+        context.moveTo(x, point.y);
+        started = true;
+      } else {
+        context.lineTo(x, point.y);
+      }
+    }
+    if (started) {
+      context.strokeStyle = `rgba(255, 111, 164, ${columnAlpha})`;
+      context.stroke();
+    }
+  }
+  context.restore();
+}
+
+function paintSyncedSpatialCellSamples(context, cellField, model, pointAlpha) {
+  if (pointAlpha <= 0.01 || !cellField?.rows?.length) return;
+  context.save();
+  context.globalCompositeOperation = "screen";
+  for (const row of cellField.rows) {
+    for (const point of row) {
+      const signal = clamp(
+        point.depth * 0.36 +
+          point.edge * 0.32 +
+          point.noise * model.noiseMap * 0.28 +
+          point.surface * model.surfaceMap * 0.26 +
+          model.cellDepth * 0.08,
+        0,
+        1
+      );
+      if (signal < 0.06) continue;
+      const [r, g, b] = point.color;
+      const size = clamp(0.8 + signal * 2.2 + model.subpixelScan * 0.8 + model.objectCohesion * 0.35, 0.8, 4.8);
+      context.fillStyle = `rgba(${Math.round(mixChannel(r, 238, 0.28))}, ${Math.round(mixChannel(g, 255, 0.22))}, ${Math.round(mixChannel(b, 255, 0.18))}, ${clamp(pointAlpha * (0.28 + signal * 0.82), 0, 0.58)})`;
+      context.fillRect(point.x - size / 2, point.y - size / 2, size, size);
+    }
+  }
+  context.restore();
 }
 
 function paintSpatialTinTriangle(context, points, alpha, model) {
