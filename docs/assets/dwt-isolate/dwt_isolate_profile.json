@@ -1,0 +1,36 @@
+{
+  "profile": {
+    "profile_id": "dwt-adaptive-quantization-v1",
+    "version": "2026-08-12",
+    "source": "integrations/dwt_isolate_pipeline",
+    "wavelet": "haar",
+    "low_frequency_weight": 0.38,
+    "luminance_noise_weight": 0.8,
+    "chrominance_noise_weight": 1.5,
+    "digital_noise_weight": 1.2,
+    "quantization_floor": 0.035,
+    "quantization_ceiling": 0.28,
+    "defect_threshold_bias": 0.045,
+    "density_gain": 1.32,
+    "edge_gain": 1.18,
+    "chroma_lock_gain": 1.1,
+    "artifact_suppression_gain": 1.24,
+    "browser_notes": [
+      "Profile derives from AdaptiveDWTStegEncoder subband weights.",
+      "The browser uses deterministic canvas pixel math, not PyTorch.",
+      "Smart isolate is additive and must preserve the active preset stack."
+    ]
+  },
+  "opencvDatasetProbe": {
+    "frames": 3,
+    "shape": [
+      128,
+      128,
+      3
+    ],
+    "mean_luma": 0.5067,
+    "mean_edge_strength": 0.0518,
+    "opencv_version": "5.0.0",
+    "uses_synthetic_fallback": true
+  }
+}
