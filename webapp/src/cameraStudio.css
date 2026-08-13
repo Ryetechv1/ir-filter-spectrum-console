@@ -1,13 +1,13 @@
 .camera-studio-shell {
-  --studio-accent: var(--theme-accent, #22d3ee);
-  --studio-accent-strong: var(--theme-accent-strong, #8ce8ff);
-  --studio-accent-deep: var(--theme-accent-deep, #0891b2);
-  --studio-accent-rgb: var(--theme-accent-rgb, 34, 211, 238);
+  --studio-accent: var(--theme-accent, #ff2b2b);
+  --studio-accent-strong: var(--theme-accent-strong, #ff7a7a);
+  --studio-accent-deep: var(--theme-accent-deep, #b91c1c);
+  --studio-accent-rgb: var(--theme-accent-rgb, 255, 43, 43);
   --studio-accent-contrast: var(--theme-accent-contrast, #050507);
-  --studio-accent-gradient: var(--theme-accent-gradient, linear-gradient(135deg, #8ce8ff 0%, #22d3ee 48%, #0891b2 100%));
-  --studio-accent-soft-gradient: var(--theme-accent-soft-gradient, linear-gradient(135deg, rgba(34, 211, 238, 0.34), rgba(34, 211, 238, 0.13), rgba(255, 255, 255, 0.04)));
-  --studio-accent-border: var(--theme-accent-border, rgba(34, 211, 238, 0.52));
-  --studio-accent-bleed: var(--theme-accent-bleed, rgba(34, 211, 238, 0.16));
+  --studio-accent-gradient: var(--theme-accent-gradient, linear-gradient(135deg, #ff7a7a 0%, #ff2b2b 48%, #b91c1c 100%));
+  --studio-accent-soft-gradient: var(--theme-accent-soft-gradient, linear-gradient(135deg, rgba(255, 43, 43, 0.34), rgba(255, 43, 43, 0.13), rgba(255, 255, 255, 0.04)));
+  --studio-accent-border: var(--theme-accent-border, rgba(255, 43, 43, 0.52));
+  --studio-accent-bleed: var(--theme-accent-bleed, rgba(255, 43, 43, 0.16));
   --studio-container-fill: linear-gradient(180deg, rgba(16, 25, 34, 0.96), rgba(7, 12, 18, 0.98));
   --studio-container-border-gradient: linear-gradient(135deg, rgba(255, 255, 255, 0.34), rgba(var(--studio-accent-rgb), 0.9) 38%, rgba(var(--studio-accent-rgb), 0.2) 70%, rgba(255, 255, 255, 0.12));
   min-height: 100vh;

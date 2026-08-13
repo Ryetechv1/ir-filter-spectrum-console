@@ -1,4 +1,4 @@
-export const THEME_ACCENT_STORAGE_KEY = "sw-spectral-image-studio-accent-theme";
+export const THEME_ACCENT_STORAGE_KEY = "sw-spectral-image-studio-accent-theme-v2-red-default";
 
 export const THEME_ACCENT_OPTIONS = [
   {
@@ -138,7 +138,7 @@ export const THEME_ACCENT_OPTIONS = [
   }
 ];
 
-export const DEFAULT_THEME_ACCENT_ID = "teal-cyan";
+export const DEFAULT_THEME_ACCENT_ID = "red";
 
 export function getAccentTheme(id = DEFAULT_THEME_ACCENT_ID) {
   return THEME_ACCENT_OPTIONS.find((option) => option.id === id) || THEME_ACCENT_OPTIONS.find((option) => option.id === DEFAULT_THEME_ACCENT_ID);
