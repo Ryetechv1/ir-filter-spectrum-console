@@ -1848,6 +1848,53 @@ const EFFECT_PRESET_GROUPS = EFFECT_FAMILIES.map((family) => ({
   effects: CAMERA_EFFECTS.filter((effect) => effect.category === family.category)
 }));
 
+const FEATURE_GUIDE_OFFICIAL_BASELINE = "guide-window-official-push";
+const FEATURE_GUIDE_MILESTONE_COMMITS = [
+  {
+    commit: "8fd409a",
+    title: "Set red as default studio palette",
+    detail: "Red became the default access-popup and app-wide accent palette."
+  },
+  {
+    commit: "c0b5e47",
+    title: "Fine tune spatial recognition subtle signal sensitivity",
+    detail: "Low-visibility spatial recognition was adjusted to respond to faint frame signals."
+  },
+  {
+    commit: "30a5d0b",
+    title: "Sync spatial cell mapping with live frame field",
+    detail: "Cell mapping moved from static overlay behavior toward live frame-synced sampling."
+  },
+  {
+    commit: "f061714",
+    title: "Add spatial mesh interface opacity toggle",
+    detail: "The spatial mesh visual interface gained independent visibility and opacity control."
+  },
+  {
+    commit: "e630b35",
+    title: "Refine spatial recognition mesh density",
+    detail: "Spatial mesh density was tuned for finer recognition while keeping the live preview readable."
+  },
+  {
+    commit: "157a918",
+    title: "Restore repo to f6d723e",
+    detail: "The app was reverted to the bookmarked point-cloud/TIN milestone while preserving a safe recovery point."
+  },
+  {
+    commit: "f6d723e",
+    title: "Add live point cloud TIN camera mapping",
+    detail: "Live point cloud, cell, and TIN mapping became part of the camera effect pipeline."
+  }
+];
+const FEATURE_GUIDE_POST_PUSH_CATALOG = [
+  {
+    status: "Guide baseline",
+    title: "Official feature guide window created",
+    detail:
+      "This catalog begins at the dedicated guide-window push. Future commits after this guide release should append their user-visible changes here."
+  }
+];
+
 const EQUATION_DEFAULT_VALUE = "SP3CTR4L-37";
 const EQUATION_STYLE_AUTO = "auto";
 const EQUATION_TARGETS = [
@@ -1958,6 +2005,327 @@ function smartSignalControlKey(processorId, suffix) {
 
 function normalizeSmartSignalToggles(value = {}) {
   return Object.fromEntries(SMART_SIGNAL_PROCESSORS.map((processor) => [processor.id, Boolean(value?.[processor.id])]));
+}
+
+function featureGuideControlLabel(control) {
+  const tuple = Array.isArray(control) ? control : ADJUSTMENT_LOOKUP.get(control);
+  if (tuple?.[1]) return tuple[1];
+  return String(control || "Control")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[-_]+/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function featureGuideControlCount(group) {
+  if (group.type === "rgbw") return RGBW_MIXERS.length * RGBW_CHANNELS.length;
+  if (group.type === "thermal-studio") return THERMAL_STUDIO_NUMERIC_ADJUSTMENTS.length + THERMAL_STUDIO_BANDS.length;
+  return group.controls?.length || 0;
+}
+
+function featureGuideGroupItems(group) {
+  if (group.type === "rgbw") {
+    return RGBW_MIXERS.map((mixer) => ({
+      title: mixer.label,
+      meta: "RGBW mixer",
+      description: `${mixer.label} exposes Red, Green, Blue, and White channel sliders that feed both overlay color and the base filter math.`,
+      details: RGBW_CHANNELS.map((channel) => `${channel.label} channel default ${mixer.defaults[channel.key]}`)
+    }));
+  }
+  if (group.type === "thermal-studio") {
+    return [
+      {
+        title: "A-O hotspot recolor matrix",
+        meta: `${THERMAL_STUDIO_BANDS.length} bands`,
+        description:
+          "Each thermogram, isotherm, pallet, or hotspot band can be assigned a full spectrum RGBWB color target and then widened or strengthened with sliders.",
+        details: THERMAL_STUDIO_BANDS.map((band) => `${band.letter}: ${band.label}`)
+      },
+      ...THERMAL_STUDIO_NUMERIC_ADJUSTMENTS.map((control) => ({
+        title: featureGuideControlLabel(control),
+        meta: "Thermal Studio slider",
+        description: "Controls thermal band force, width, or master recolor intensity inside the live canvas pipeline."
+      }))
+    ];
+  }
+  if (group.type === "smart-signal" && group.processor) {
+    return group.processor.controls.map((control) => ({
+      title: featureGuideControlLabel(control),
+      meta: `Smart ${group.processor.title}`,
+      description: group.processor.description
+    }));
+  }
+  return (group.controls || []).map((control) => ({
+    title: featureGuideControlLabel(control),
+    meta: group.title,
+    description: group.description
+  }));
+}
+
+function buildFeatureGuideStats() {
+  const adjustmentControlTotal = ADJUSTMENT_GROUPS.reduce((sum, group) => sum + featureGuideControlCount(group), 0);
+  const namedControlTotal = new Set([...Object.keys(DEFAULT_SETTINGS), ...EQUATION_MUTATION_KEYS]).size;
+  const combinationEstimate =
+    CAMERA_EFFECTS.length *
+    Math.max(
+      1,
+      adjustmentControlTotal +
+        RGBW_MIXERS.length * RGBW_CHANNELS.length +
+        MEDIA_BLEND_MODES.length +
+        MEDIA_SPLICE_MODES.length +
+        THERMAL_STUDIO_BANDS.length +
+        SMART_SIGNAL_PROCESSORS.length +
+        SPATIAL_RECOGNITION_ADJUSTMENTS.length
+    );
+  return [
+    { label: "Effect presets", value: CAMERA_EFFECTS.length.toLocaleString() },
+    { label: "Preset categories", value: EFFECT_PRESET_GROUPS.length.toLocaleString() },
+    { label: "Adjustment controls", value: adjustmentControlTotal.toLocaleString() },
+    { label: "Named setting keys", value: namedControlTotal.toLocaleString() },
+    { label: "Smart engines", value: SMART_SIGNAL_PROCESSORS.length.toLocaleString() },
+    { label: "Capability combinations", value: `${Math.max(5000, combinationEstimate).toLocaleString()}+` }
+  ];
+}
+
+function buildFeatureGuideSections() {
+  const featureFamilies = EFFECT_PRESET_GROUPS.map((group) => ({
+    title: group.category,
+    meta: `${group.effects.length} presets`,
+    description: `${group.category} contains ${group.effects.length} visually distinct local presets with 500% preset intensity and stackable manual controls.`,
+    details: group.effects.map((effect) => `${effect.name}: ${effect.category} preset using ${effect.blendMode || "normal"} blend behavior.`)
+  }));
+  const adjustmentGroups = ADJUSTMENT_GROUPS.map((group) => ({
+    title: group.title,
+    meta: `${featureGuideControlCount(group)} controls`,
+    description: group.description,
+    details: featureGuideGroupItems(group).map((item) => `${item.title}: ${item.description}`)
+  }));
+  const smartEngines = SMART_SIGNAL_PROCESSORS.map((processor) => ({
+    title: `Smart ${processor.title}`,
+    meta: `${processor.controls.length} sliders`,
+    description: processor.description,
+    details: processor.controls.map((control) => featureGuideControlLabel(control))
+  }));
+  return [
+    {
+      id: "overview",
+      title: "System Overview",
+      summary:
+        "The studio is a local-first spectral imaging, camera, media-compositor, guide, capture, and analysis console. It documents every named capability plus the 5000+ combinable preset, slider, smart-engine, thermal, media, capture, redirect, and GUI-window pathways.",
+      items: [
+        {
+          title: "Local camera studio",
+          meta: "Browser camera API",
+          description:
+            "Start Camera requests device permission, keeps the feed local, renders effects to a canvas, supports pause/resume, camera flip, snapshot, recording, HUD preview, and capture shelf storage.",
+          details: ["Uses the device camera stream locally.", "Does not upload camera frames.", "Exports are generated from the processed canvas."]
+        },
+        {
+          title: "Complete guide window",
+          meta: FEATURE_GUIDE_OFFICIAL_BASELINE,
+          description:
+            "This separate GUI window is the official feature catalog, commit ledger, redirect hub, and future change-catalog baseline for guide-page pushes.",
+          details: ["Search filters guide sections.", "Dropdowns group large feature sets.", "Redirect buttons open PRIME, YouTube, database, DWT, and spatial windows."]
+        }
+      ]
+    },
+    {
+      id: "presets",
+      title: "Effect Presets And Categories",
+      summary: `${CAMERA_EFFECTS.length} presets are grouped across ${EFFECT_PRESET_GROUPS.length} categories. Presets are local canvas recipes, not remote image generation.`,
+      items: featureFamilies
+    },
+    {
+      id: "adjustments",
+      title: "Adjustment Dropdowns And Slider Groups",
+      summary:
+        "All active adjustment dropdowns, RGBW mixers, thermal A-O controls, smart engines, spatial controls, DWT controls, and core photo sliders are documented here.",
+      items: adjustmentGroups
+    },
+    {
+      id: "smart-engines",
+      title: "Smart Toggle Engines",
+      summary:
+        "Smart engines are local weighted passes. When off, presets behave normally. When on, they add extra weighting to depth, field, range, signal structure, color, isolation, and grouped-pixel behavior.",
+      items: smartEngines
+    },
+    {
+      id: "thermal",
+      title: "Thermal Studio And Spectral Heat Controls",
+      summary:
+        "Thermal Studio exposes A-O band recoloring, RGBWB dropdowns, thermogram/isotherm shaping, full-spectrum palettes, and thermal-style presets that can stack with regular adjustments.",
+      items: [
+        {
+          title: "A-O thermogram bands",
+          meta: `${THERMAL_STUDIO_BANDS.length} recolor targets`,
+          description:
+            "Each band has a designated label, color dropdown, strength, and width so hotspots, isotherms, thermograms, and palette layers can be tuned independently.",
+          details: THERMAL_STUDIO_BANDS.map((band) => `${band.letter}: ${band.label}`)
+        },
+        {
+          title: "Thermal palette styles",
+          meta: `${EQUATION_THERMAL_PALETTES.length} equation palettes`,
+          description: "Equation-generated effects can select thermal palettes ranging from full RGB to inverted red, ironbow, predator, toxic, and radar heat styles.",
+          details: EQUATION_THERMAL_PALETTES
+        }
+      ]
+    },
+    {
+      id: "capture",
+      title: "Capture, Recording, Export, And Local Storage",
+      summary:
+        "The studio exports the processed canvas state, not a raw camera frame. It supports PNG snapshots, MP4 recording, a local 3-item shelf, and desktop folder-save support where browser permission allows it.",
+      items: [
+        {
+          title: "Snapshot export",
+          meta: "Processed PNG",
+          description:
+            "Snapshot captures the same processed render pipeline shown in the preview, then downloads or saves it locally depending on browser support.",
+          details: ["Desktop File System Access can use SPECTRAL_X1_IMAGE_SAVES.", "Mobile browsers decide Photos, Files, or Downloads behavior."]
+        },
+        {
+          title: "MP4 recording",
+          meta: Object.values(RECORDING_RESOLUTIONS).map((resolution) => resolution.label).join(", "),
+          description:
+            "Video recording captures the processed canvas with selected effects applied and stops automatically at the 3 minute maximum.",
+          details: Object.values(RECORDING_RESOLUTIONS).map((resolution) => `${resolution.label}: ${resolution.width} x ${resolution.height}`)
+        },
+        {
+          title: "Local capture shelf",
+          meta: "3 slots",
+          description: "The latest three snapshots or recordings stay available in this browser session with preview, download, and remove controls."
+        }
+      ]
+    },
+    {
+      id: "media",
+      title: "Image And Video Overlay Compositor",
+      summary:
+        "The overlay studio accepts 1-3 local images or videos and applies the same preset and adjustment pipeline with opacity, transforms, blend modes, splice masks, and clean PNG export.",
+      items: [
+        {
+          title: "Layer upload",
+          meta: "1-3 local media layers",
+          description: "Each uploaded image or video can use its own effect preset, opacity, movement, scale, rotation, blend mode, and splice mode.",
+          details: ["No uploaded layer leaves the device.", "Layer playback controls exist for videos.", "Composite export uses the canvas result."]
+        },
+        {
+          title: "Blend modes",
+          meta: `${MEDIA_BLEND_MODES.length} modes`,
+          description: "Blend modes control how a layer combines with the composite surface.",
+          details: MEDIA_BLEND_MODES.map(([value, label]) => `${label}: ${value}`)
+        },
+        {
+          title: "Splice modes",
+          meta: `${MEDIA_SPLICE_MODES.length} modes`,
+          description: "Splice modes mask or reveal layer regions with CapCut-style compositing behaviors.",
+          details: MEDIA_SPLICE_MODES.map(([value, label]) => `${label}: ${value}`)
+        }
+      ]
+    },
+    {
+      id: "windows",
+      title: "Pull-Up GUI Windows And Redirects",
+      summary:
+        "Separate GUI windows keep the main camera usable while opening specific information, examples, external channels, database embeds, DWT details, and spatial recognition status.",
+      items: [
+        {
+          title: "PRIME examples",
+          meta: `${PRIME_SPECTRAL_EXAMPLES.length} examples`,
+          description: "Opens the PRIME spectral result gallery with featured examples, descriptions, previews, direct image open, and download controls."
+        },
+        {
+          title: "YouTube channel GUI",
+          meta: YOUTUBE_CHANNEL_HANDLE,
+          description:
+            "Opens the Supernatural World channel window with official embed player fallback, recent upload browser, channel homepage link, and uploads player link.",
+          details: YOUTUBE_RECENT_UPLOADS.map((video) => `${video.type}: ${video.title}`)
+        },
+        {
+          title: "Official database GUI",
+          meta: SUPERNATURAL_DATABASE_URL,
+          description: "Wraps the official Google Sites database address in a popup GUI and includes an external open fallback when iframe embedding is blocked."
+        },
+        {
+          title: "DWT Isolation Studio",
+          meta: DWT_ISOLATE_PROFILE.profileId,
+          description:
+            "Opens the DWT adaptive quantization profile, noise detector descriptions, profile rows, and Smart Isolate controls while preserving the active preset."
+        },
+        {
+          title: "Spatial Recognition Studio",
+          meta: `${SPATIAL_RECOGNITION_ADJUSTMENTS.length} controls`,
+          description:
+            "Opens pseudo-depth, live point-cloud, TIN, mesh, contour, cell, and field-map recognition details derived from visible frame gradients."
+        }
+      ]
+    },
+    {
+      id: "security",
+      title: "Access, Privacy, Rights, And Local-Only Boundaries",
+      summary:
+        "This section documents the access gate, camera permission behavior, local-only processing claims, experimental recognition disclaimers, and rights-reserved notices.",
+      items: [
+        {
+          title: "Access popup",
+          meta: "Trusted code gate",
+          description:
+            "The access code unlocks the studio UI before camera permission is requested. The guide can be opened from the access popup without starting the camera."
+        },
+        {
+          title: "Camera privacy",
+          meta: "Local device only",
+          description:
+            "The app uses browser camera permission and processes the stream in local canvas code. It does not perform remote camera viewing or hidden uploads."
+        },
+        {
+          title: "Recognition disclaimer",
+          meta: "Experimental local mapping",
+          description:
+            "Smart/spatial recognition is presented as local edge, tone, field, and grouped-pixel analysis, not identity identification, person matching, or biometric storage."
+        },
+        {
+          title: "Rights reserved watermark",
+          meta: "Export notice",
+          description:
+            "Generated images can include the Seth Knudson / Supernatural World all-rights-reserved notice in a small visible corner watermark."
+        }
+      ]
+    },
+    {
+      id: "commits",
+      title: "Official Commit And Post-Guide Change Catalog",
+      summary:
+        "This catalog records the current guide baseline, recent milestone commits feeding the guide, and the place where future changes after the official guide push should be appended.",
+      items: [
+        ...FEATURE_GUIDE_POST_PUSH_CATALOG.map((entry) => ({
+          title: entry.title,
+          meta: entry.status,
+          description: entry.detail
+        })),
+        ...FEATURE_GUIDE_MILESTONE_COMMITS.map((entry) => ({
+          title: entry.title,
+          meta: entry.commit,
+          description: entry.detail
+        }))
+      ]
+    }
+  ];
+}
+
+function filterFeatureGuideSections(sections, query) {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return sections;
+  return sections
+    .map((section) => {
+      const sectionText = `${section.title} ${section.summary}`.toLowerCase();
+      const matchingItems = section.items.filter((item) =>
+        `${item.title} ${item.meta || ""} ${item.description || ""} ${(item.details || []).join(" ")}`.toLowerCase().includes(normalizedQuery)
+      );
+      if (sectionText.includes(normalizedQuery)) return section;
+      if (!matchingItems.length) return null;
+      return { ...section, items: matchingItems };
+    })
+    .filter(Boolean);
 }
 
 function createEquationModel(value, baseEffect = CAMERA_EFFECTS[0], baseSettings = DEFAULT_SETTINGS, runId = 0, targetKey = "X", styleEffect = baseEffect) {
@@ -2307,6 +2675,10 @@ function CameraStudio() {
   const [primeResultsWindowOpen, setPrimeResultsWindowOpen] = useState(false);
   const [dwtWindowOpen, setDwtWindowOpen] = useState(false);
   const [spatialWindowOpen, setSpatialWindowOpen] = useState(false);
+  const [featureGuideWindowOpen, setFeatureGuideWindowOpen] = useState(
+    () => new URLSearchParams(window.location.search).get("guide") === "features"
+  );
+  const [featureGuideSearch, setFeatureGuideSearch] = useState("");
   const [selectedYoutubeVideoId, setSelectedYoutubeVideoId] = useState(YOUTUBE_RECENT_UPLOADS[0]?.id || "");
   const [selectedPrimeResultId, setSelectedPrimeResultId] = useState(FEATURED_PRIME_RESULT_ID);
   const [selectedCategory, setSelectedCategory] = useState("All Presets");
@@ -2333,6 +2705,13 @@ function CameraStudio() {
   const [equationLiveEnabled, setEquationLiveEnabled] = useState(false);
   const [equationMediaEnabled, setEquationMediaEnabled] = useState(false);
   const deferredSearch = useDeferredValue(search);
+  const deferredFeatureGuideSearch = useDeferredValue(featureGuideSearch);
+  const featureGuideStats = useMemo(() => buildFeatureGuideStats(), []);
+  const featureGuideSections = useMemo(() => buildFeatureGuideSections(), []);
+  const visibleFeatureGuideSections = useMemo(
+    () => filterFeatureGuideSections(featureGuideSections, deferredFeatureGuideSearch),
+    [deferredFeatureGuideSearch, featureGuideSections]
+  );
 
   const selectedEffect = useMemo(
     () => CAMERA_EFFECT_LOOKUP.get(selectedEffectId) || CAMERA_EFFECTS[0],
@@ -4008,6 +4387,108 @@ function CameraStudio() {
     );
   }
 
+  function renderFeatureGuideWindow() {
+    if (!featureGuideWindowOpen) return null;
+    const query = deferredFeatureGuideSearch.trim();
+    return (
+      <div className="feature-guide-window-backdrop" role="dialog" aria-modal="true" aria-labelledby="featureGuideWindowTitle">
+        <section className="feature-guide-window">
+          <div className="youtube-window-heading">
+            <div>
+              <SlidersHorizontal size={22} />
+              <h2 id="featureGuideWindowTitle">Complete 5000+ Feature Guide</h2>
+            </div>
+            <button type="button" onClick={() => setFeatureGuideWindowOpen(false)} aria-label="Close feature guide">
+              <X size={20} />
+            </button>
+          </div>
+
+          <p className="feature-guide-lede">
+            This guide catalogs every named studio surface in this commit: presets, grouped controls, smart engines, thermal bands,
+            capture/export paths, media overlays, redirects, pull-up GUI windows, local privacy boundaries, and the official post-guide
+            change ledger. The 5000+ count is the combinable capability matrix, not a claim that the UI contains 5000 separate buttons.
+          </p>
+
+          <div className="feature-guide-stat-grid" aria-label="Feature guide summary counts">
+            {featureGuideStats.map((stat) => (
+              <div className="feature-guide-stat" key={stat.label}>
+                <span>{stat.label}</span>
+                <strong>{stat.value}</strong>
+              </div>
+            ))}
+          </div>
+
+          <label className="feature-guide-search">
+            <Search size={16} />
+            <input
+              value={featureGuideSearch}
+              onChange={(event) => setFeatureGuideSearch(event.target.value)}
+              placeholder="Search guide, presets, sliders, windows, commits..."
+            />
+          </label>
+
+          <div className="feature-guide-action-row" aria-label="Guide redirects">
+            <button type="button" onClick={() => { setFeatureGuideWindowOpen(false); setPrimeResultsWindowOpen(true); }}>
+              <Sparkles size={15} />
+              PRIME Examples
+            </button>
+            <button type="button" onClick={() => { setFeatureGuideWindowOpen(false); setYoutubeWindowOpen(true); }}>
+              <Youtube size={15} />
+              YouTube GUI
+            </button>
+            <button type="button" onClick={() => { setFeatureGuideWindowOpen(false); setDatabaseWindowOpen(true); }}>
+              <ExternalLink size={15} />
+              Database GUI
+            </button>
+            <button type="button" onClick={() => { setFeatureGuideWindowOpen(false); setDwtWindowOpen(true); }}>
+              <ShieldCheck size={15} />
+              DWT Studio
+            </button>
+            <button type="button" onClick={() => { setFeatureGuideWindowOpen(false); setSpatialWindowOpen(true); }}>
+              <Layers size={15} />
+              Spatial Studio
+            </button>
+          </div>
+
+          <div className="feature-guide-section-stack">
+            {visibleFeatureGuideSections.length ? (
+              visibleFeatureGuideSections.map((section, index) => (
+                <details className="feature-guide-section" key={section.id} open={index < 2 || Boolean(query)}>
+                  <summary>
+                    <span>
+                      <strong>{section.title}</strong>
+                      <small>{section.summary}</small>
+                    </span>
+                    <em>{section.items.length} entries</em>
+                  </summary>
+                  <div className="feature-guide-item-grid">
+                    {section.items.map((item) => (
+                      <article className="feature-guide-item" key={`${section.id}-${item.meta || ""}-${item.title}`}>
+                        <span>{item.meta || section.title}</span>
+                        <strong>{item.title}</strong>
+                        {item.description && <p>{item.description}</p>}
+                        {item.details?.length > 0 && (
+                          <ul>
+                            {item.details.slice(0, 18).map((detail) => (
+                              <li key={detail}>{detail}</li>
+                            ))}
+                            {item.details.length > 18 && <li>{item.details.length - 18} more entries documented in this group.</li>}
+                          </ul>
+                        )}
+                      </article>
+                    ))}
+                  </div>
+                </details>
+              ))
+            ) : (
+              <p className="feature-guide-empty">No guide sections match "{featureGuideSearch}".</p>
+            )}
+          </div>
+        </section>
+      </div>
+    );
+  }
+
   function renderDwtIsolationWindow() {
     if (!dwtWindowOpen) return null;
     const isolateProcessor = SMART_SIGNAL_PROCESSORS.find((processor) => processor.id === "isolateGroupedPixels");
@@ -4435,6 +4916,10 @@ function CameraStudio() {
           <Sparkles size={16} />
           PRIME results
         </button>
+        <button type="button" className="trusted-user-pill" onClick={() => setFeatureGuideWindowOpen(true)}>
+          <SlidersHorizontal size={16} />
+          Feature guide
+        </button>
         <button type="button" className="studio-close" onClick={closeStudioWindow} title="Close studio">
           <X size={22} />
         </button>
@@ -4497,6 +4982,10 @@ function CameraStudio() {
               <Youtube size={15} />
               Open Supernatural World YouTube Channel
             </a>
+            <button type="button" className="studio-inline-action" onClick={() => setFeatureGuideWindowOpen(true)}>
+              <SlidersHorizontal size={15} />
+              Open Complete 5000+ Feature Guide
+            </button>
             <p className="rights-summary">
               Seth M. Knudson, owner of the Supernatural World YouTube channel, is presented as the creator of this spirit/spectral
               photography method. Users are asked to cite Seth Knudson, Supernatural World, the source images, and app-generated results
@@ -4840,6 +5329,9 @@ function CameraStudio() {
             <button type="submit" className="studio-unlock-button">
               Unlock Studio
             </button>
+            <button type="button" className="studio-guide-access-button" onClick={() => setFeatureGuideWindowOpen(true)}>
+              Open Complete Feature Guide
+            </button>
             <button type="button" onClick={closeStudioWindow}>
               Cancel
             </button>
@@ -4964,6 +5456,7 @@ function CameraStudio() {
 
       {renderDwtIsolationWindow()}
       {renderSpatialRecognitionWindow()}
+      {renderFeatureGuideWindow()}
 
       {primeResultsWindowOpen && selectedPrimeResult && (
         <div className="prime-results-window-backdrop" role="dialog" aria-modal="true" aria-labelledby="primeResultsWindowTitle">
