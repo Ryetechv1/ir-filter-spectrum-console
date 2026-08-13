@@ -707,6 +707,7 @@ const SMART_DARK_EDGE_ADJUSTMENTS = [
 
 const SPATIAL_RECOGNITION_ADJUSTMENTS = [
   ["spatialMaster", "Spatial Power", 0, 100, "%", 62],
+  ["spatialInterfaceOpacity", "Visual Interface Opacity", 0, 100, "%", 100],
   ["spatialSensitivity", "Scene Sensitivity", 0, 100, "%", 58],
   ["spatialDepth", "Depth Separation", 0, 100, "%", 66],
   ["spatialField", "Field Curvature", 0, 100, "%", 42],
@@ -2276,6 +2277,7 @@ function CameraStudio() {
     cameraFacing: "user",
     smartDarkEdgeEnabled: false,
     spatialRecognitionEnabled: false,
+    spatialVisualInterfaceEnabled: true,
     smartSignalEnabled: DEFAULT_SMART_SIGNAL_TOGGLES
   });
   const [authorized, setAuthorized] = useState(() => window.sessionStorage.getItem(STUDIO_UNLOCK_KEY) === "true");
@@ -2314,6 +2316,7 @@ function CameraStudio() {
   const [overlayAdjustmentsEnabled, setOverlayAdjustmentsEnabled] = useState(true);
   const [smartDarkEdgeEnabled, setSmartDarkEdgeEnabled] = useState(false);
   const [spatialRecognitionEnabled, setSpatialRecognitionEnabled] = useState(false);
+  const [spatialVisualInterfaceEnabled, setSpatialVisualInterfaceEnabled] = useState(true);
   const [smartSignalEnabled, setSmartSignalEnabled] = useState(DEFAULT_SMART_SIGNAL_TOGGLES);
   const [openAdjustmentGroups, setOpenAdjustmentGroups] = useState(() => new Set(ADJUSTMENT_GROUPS.filter((group) => group.open).map((group) => group.id)));
   const [snapshotUrl, setSnapshotUrl] = useState("");
@@ -2409,9 +2412,19 @@ function CameraStudio() {
       cameraFacing,
       smartDarkEdgeEnabled,
       spatialRecognitionEnabled,
+      spatialVisualInterfaceEnabled,
       smartSignalEnabled: normalizeSmartSignalToggles(smartSignalEnabled)
     };
-  }, [cameraFacing, filterCss, liveManualSettings, liveSelectedEffect, smartDarkEdgeEnabled, smartSignalEnabled, spatialRecognitionEnabled]);
+  }, [
+    cameraFacing,
+    filterCss,
+    liveManualSettings,
+    liveSelectedEffect,
+    smartDarkEdgeEnabled,
+    smartSignalEnabled,
+    spatialRecognitionEnabled,
+    spatialVisualInterfaceEnabled
+  ]);
 
   useEffect(() => {
     cameraFeedPausedRef.current = cameraFeedPaused;
@@ -2494,6 +2507,7 @@ function CameraStudio() {
           overlayAdjustmentsEnabled,
           smartDarkEdgeEnabled,
           spatialRecognitionEnabled,
+          spatialVisualInterfaceEnabled,
           smartSignalEnabled: normalizeSmartSignalToggles(smartSignalEnabled)
         });
         lastDraw = timestamp;
@@ -2507,7 +2521,18 @@ function CameraStudio() {
         mediaCompositeFrameRef.current = 0;
       }
     };
-  }, [mediaFilterCss, mediaManualSettings, mediaLayers, mediaSelectedEffect, overlayAdjustmentsEnabled, selectedEffectId, smartDarkEdgeEnabled, smartSignalEnabled, spatialRecognitionEnabled]);
+  }, [
+    mediaFilterCss,
+    mediaManualSettings,
+    mediaLayers,
+    mediaSelectedEffect,
+    overlayAdjustmentsEnabled,
+    selectedEffectId,
+    smartDarkEdgeEnabled,
+    smartSignalEnabled,
+    spatialRecognitionEnabled,
+    spatialVisualInterfaceEnabled
+  ]);
 
   useEffect(() => {
     const frame = cameraFrameRef.current;
@@ -3384,6 +3409,7 @@ function CameraStudio() {
       overlayAdjustmentsEnabled,
       smartDarkEdgeEnabled,
       spatialRecognitionEnabled,
+      spatialVisualInterfaceEnabled,
       smartSignalEnabled: normalizeSmartSignalToggles(smartSignalEnabled)
     });
     if (!canvas?.width || !canvas?.height) {
@@ -3429,6 +3455,7 @@ function CameraStudio() {
       cameraFacing,
       smartDarkEdgeEnabled,
       spatialRecognitionEnabled,
+      spatialVisualInterfaceEnabled,
       smartSignalEnabled: normalizeSmartSignalToggles(smartSignalEnabled)
     };
     const cameraLabel = cameraFeedPausedRef.current ? "Paused still frame" : "Local camera stream";
@@ -3463,6 +3490,7 @@ function CameraStudio() {
       cameraFacing,
       smartDarkEdgeEnabled,
       spatialRecognitionEnabled,
+      spatialVisualInterfaceEnabled,
       smartSignalEnabled: normalizeSmartSignalToggles(smartSignalEnabled)
     };
     const canvas = document.createElement("canvas");
@@ -4138,6 +4166,14 @@ function CameraStudio() {
               <span>Point budget</span>
               <strong>{SPATIAL_RECOGNITION_PIXEL_BUDGET.toLocaleString()} px</strong>
             </div>
+            <div>
+              <span>Visual interface</span>
+              <strong>
+                {spatialVisualInterfaceEnabled
+                  ? `${manualSettings.spatialInterfaceOpacity ?? DEFAULT_SETTINGS.spatialInterfaceOpacity}% opacity`
+                  : "Hidden"}
+              </strong>
+            </div>
           </div>
 
           <div className="dwt-action-row">
@@ -4148,6 +4184,15 @@ function CameraStudio() {
             >
               <ShieldCheck size={16} />
               {spatialRecognitionEnabled ? "Disable Spatial Recognition" : "Enable Spatial Recognition"}
+            </button>
+            <button
+              type="button"
+              className={spatialVisualInterfaceEnabled ? "active" : ""}
+              aria-pressed={spatialVisualInterfaceEnabled}
+              onClick={() => setSpatialVisualInterfaceEnabled((enabled) => !enabled)}
+            >
+              <Layers size={16} />
+              {spatialVisualInterfaceEnabled ? "Hide Mesh Interface" : "Show Mesh Interface"}
             </button>
           </div>
 
@@ -4187,6 +4232,28 @@ function CameraStudio() {
             </small>
           </span>
         </button>
+        <div className="spatial-interface-toolbar">
+          <button
+            type="button"
+            className={spatialVisualInterfaceEnabled ? "adjustment-scope-toggle active" : "adjustment-scope-toggle"}
+            aria-pressed={spatialVisualInterfaceEnabled}
+            onClick={() => setSpatialVisualInterfaceEnabled((enabled) => !enabled)}
+          >
+            <Layers size={15} />
+            <span>
+              <strong>Visual Mesh Interface</strong>
+              <small>
+                {spatialVisualInterfaceEnabled
+                  ? "Shown: mesh, point-cloud dots, and TIN facets use the Visual Interface Opacity slider."
+                  : "Hidden: spatial processing stays active while mesh, point-cloud, and TIN interface layers are suppressed."}
+              </small>
+            </span>
+          </button>
+          {renderAdjustmentSlider(
+            ADJUSTMENT_LOOKUP.get("spatialInterfaceOpacity"),
+            "smart-dark-edge-adjustment spatial-recognition-adjustment spatial-interface-opacity"
+          )}
+        </div>
         <div className="smart-isolate-engine-brief spatial-recognition-brief" aria-label="Spatial recognition description">
           <strong>Local Spatial Field Mapping</strong>
           <p>
@@ -4437,7 +4504,7 @@ function CameraStudio() {
           <ul>
             <li>{CAMERA_EFFECTS.length} local visual presets compiled at 500% intensity for IR-style, UVA-style, full-spectrum thermal, XLS, inversion, tritone, quadtone, channel spectrograph, black-field, channel sweep, cinematic, monochrome, duotone, retro, and color-lab looks.</li>
             <li>Four RGBW gradient mixers for Main, Secondary, Third, and Highlights color layers that drive overlays, filter math, and the selected app accent aesthetic.</li>
-            <li>Grouped adjustment dropdowns with 11 core photo controls, 10 color inversion tools, 20 inversion presets, 10 smart darker-edge controls, 20 smart signal engines, 42 local Spatial Recognition Studio controls with live Point Cloud/TIN surface mapping, an expanded AI-orchestrated Smart Isolate Grouped Pixels DWT/noise defect-distortion module with 31 controls, Thermal Studio A-O hotspot recoloring, 100 advanced sliders, equation-generated filter names/descriptions, and live/overlay adjustment toggles.</li>
+            <li>Grouped adjustment dropdowns with 11 core photo controls, 10 color inversion tools, 20 inversion presets, 10 smart darker-edge controls, 20 smart signal engines, 43 local Spatial Recognition Studio controls with live Point Cloud/TIN surface mapping, a visual mesh interface toggle and opacity scaler, an expanded AI-orchestrated Smart Isolate Grouped Pixels DWT/noise defect-distortion module with 31 controls, Thermal Studio A-O hotspot recoloring, 100 advanced sliders, equation-generated filter names/descriptions, and live/overlay adjustment toggles.</li>
             <li>Flashlight Studio includes Hold Torch, Lock Rear Torch, Strobe, Dimmer Pulse, interval timing, and brightness-duty controls where the rear-camera torch API is exposed by the device.</li>
             <li>Processed PNG snapshots and 1080P or 2K MP4 recordings with local camera effects applied, including browser download plus desktop folder-save support when permission is granted.</li>
             <li>Separate 1-3 layer image/video compositor with opacity, splice masks, blend modes, transforms, full adjustment-stack support, and clean PNG export.</li>
@@ -5111,6 +5178,7 @@ function drawMediaLayer(context, width, height, layer, renderState) {
     cameraFacing: "environment",
     smartDarkEdgeEnabled: renderState.smartDarkEdgeEnabled,
     spatialRecognitionEnabled: renderState.spatialRecognitionEnabled,
+    spatialVisualInterfaceEnabled: renderState.spatialVisualInterfaceEnabled,
     smartSignalEnabled: normalizeSmartSignalToggles(renderState.smartSignalEnabled)
   }, {
     forcePixelFilters: false,
@@ -5353,7 +5421,10 @@ function drawStudioFrame(context, width, height, mediaSource, renderState, optio
   applyAdvancedCameraPixelEffects(context, width, height, signalSettings, selectedEffect, options);
   applySmartDarkEdgeAmplifier(context, width, height, signalSettings, selectedEffect, renderState.smartDarkEdgeEnabled, options);
   applySmartSignalProcessorEffects(context, width, height, signalSettings, selectedEffect, renderState.smartSignalEnabled, options);
-  applySpatialRecognitionEffects(context, width, height, signalSettings, selectedEffect, renderState.spatialRecognitionEnabled, options);
+  applySpatialRecognitionEffects(context, width, height, signalSettings, selectedEffect, renderState.spatialRecognitionEnabled, {
+    ...options,
+    spatialVisualInterfaceEnabled: renderState.spatialVisualInterfaceEnabled !== false
+  });
   paintOverlay(context, width, height, selectedEffect, signalSettings);
   paintSpecialOverlay(context, width, height, signalSettings, selectedEffect);
   paintCanvasGrain(context, width, height, signalSettings);
@@ -6040,11 +6111,13 @@ function hasSpatialRecognitionSignal(settings = {}, effect = {}, enabled = false
   return buildSpatialRecognitionModel(settings, effect, enabled).active;
 }
 
-function buildSpatialRecognitionModel(settings = {}, effect = {}, enabled = false) {
+function buildSpatialRecognitionModel(settings = {}, effect = {}, enabled = false, options = {}) {
   const master = enabled ? clamp(setting(settings, "spatialMaster") / 100, 0, 1) : 0;
   const thermalBias = isThermalRenderMode(settings, effect) ? 0.16 : 0;
   const edgeBias = effectSetting(settings, "edgeEnhance", 0, PIXEL_EFFECT_GAIN) / 220;
   const thermalLock = clamp(setting(settings, "spatialThermalLock") / 100 + thermalBias * 0.8, 0, 1.35);
+  const visualInterfaceOpacity =
+    options.spatialVisualInterfaceEnabled === false ? 0 : clamp(setting(settings, "spatialInterfaceOpacity") / 100, 0, 1);
   const sensitivityBoost =
     (setting(settings, "spatialMicroContrast") +
       setting(settings, "spatialSubpixelScan") +
@@ -6054,6 +6127,7 @@ function buildSpatialRecognitionModel(settings = {}, effect = {}, enabled = fals
   return {
     active: master > 0.01,
     master,
+    visualInterfaceOpacity,
     sensitivity: clamp(setting(settings, "spatialSensitivity") / 100 + thermalBias * 0.24 + sensitivityBoost, 0, 1.55),
     depth: clamp(setting(settings, "spatialDepth") / 100 + thermalBias + thermalLock * 0.12, 0, 1.65),
     field: clamp(setting(settings, "spatialField") / 100 + setting(settings, "spatialVectorTension") / 420, 0, 1.35),
@@ -6100,7 +6174,7 @@ function buildSpatialRecognitionModel(settings = {}, effect = {}, enabled = fals
 }
 
 function applySpatialRecognitionEffects(context, width, height, settings, effect, enabled = false, options = {}) {
-  const model = buildSpatialRecognitionModel(settings, effect, enabled);
+  const model = buildSpatialRecognitionModel(settings, effect, enabled, options);
   if (!model.active || !context?.canvas || !width || !height) return;
   const pixelBudget = Math.min(options.pixelBudget || SPATIAL_RECOGNITION_PIXEL_BUDGET, SPATIAL_RECOGNITION_PIXEL_BUDGET);
   if (width * height > pixelBudget) {
@@ -6242,9 +6316,9 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
     data[index + 2] = clamp(b, 0, 255);
   }
   context.putImageData(frame, 0, 0);
-  paintLiveSpatialPointCloudAndTin(context, width, height, source, model);
+  if (model.visualInterfaceOpacity > 0.01) paintLiveSpatialPointCloudAndTin(context, width, height, source, model);
 
-  const meshAlpha = clamp(model.meshOpacity * model.master * 0.32, 0, 0.42);
+  const meshAlpha = clamp(model.meshOpacity * model.visualInterfaceOpacity * model.master * 0.32, 0, 0.42);
   if (meshAlpha > 0.01) {
     const gridStep = Math.max(6, Math.round(31 - model.pointDensity * 16 - model.contourDensity * 8 - model.subpixelScan * 5));
     context.save();
@@ -6269,7 +6343,7 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
     context.restore();
   }
 
-  const pointAlpha = clamp(model.pointDensity * model.master * (0.28 + model.subpixelScan * 0.12), 0, 0.46);
+  const pointAlpha = clamp(model.pointDensity * model.visualInterfaceOpacity * model.master * (0.28 + model.subpixelScan * 0.12), 0, 0.46);
   if (pointAlpha > 0.01) {
     const pointStep = Math.max(4, Math.round(24 - model.pointDensity * 14 - model.subpixelScan * 8 - model.livePointCloud * 3));
     context.save();
@@ -6287,9 +6361,9 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
 }
 
 function paintLiveSpatialPointCloudAndTin(context, width, height, source, model) {
-  const pointCloudAlpha = clamp(model.livePointCloud * model.master * (0.34 + model.subpixelScan * 0.16), 0, 0.58);
-  const tinAlpha = clamp(model.tinOpacity * model.master * (0.28 + model.surfaceMap * 0.12 + model.cellDepth * 0.08), 0, 0.48);
-  const wireAlpha = clamp(model.tinWire * model.master * (0.22 + model.surfaceMap * 0.08), 0, 0.42);
+  const pointCloudAlpha = clamp(model.livePointCloud * model.visualInterfaceOpacity * model.master * (0.34 + model.subpixelScan * 0.16), 0, 0.58);
+  const tinAlpha = clamp(model.tinOpacity * model.visualInterfaceOpacity * model.master * (0.28 + model.surfaceMap * 0.12 + model.cellDepth * 0.08), 0, 0.48);
+  const wireAlpha = clamp(model.tinWire * model.visualInterfaceOpacity * model.master * (0.22 + model.surfaceMap * 0.08), 0, 0.42);
   if (pointCloudAlpha <= 0.01 && tinAlpha <= 0.01 && wireAlpha <= 0.01) return;
 
   const cellStep = Math.max(
