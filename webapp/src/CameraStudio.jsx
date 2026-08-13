@@ -4312,6 +4312,8 @@ function CameraStudio() {
             Adapted from the imported SpatialViewport/pointCloudWorker prototype without adding Three.js dependencies. The camera canvas
             decimates frame pixels into finer live cells, subtle point-cloud samples, and low-opacity TIN triangle facets so desktop,
             mobile, HUD, exports, and media layers all share the same surface/noise/depth result without covering the scene.
+            Spatial Power now weights frame detail instead of creating a central radial light point, and Parallax Drift moves as one
+            even translated layer across the whole preview.
           </p>
           <button type="button" className="dwt-inline-button" onClick={() => setSpatialWindowOpen(true)}>
             <Layers size={14} />
@@ -6252,6 +6254,16 @@ function applySpatialRecognitionEffects(context, width, height, settings, effect
   applySpatialRecognitionEffectsToContext(context, width, height, settings, effect, model);
 }
 
+function spatialUniformParallaxOffset(width, height, model, scale = 1) {
+  const strength = clamp(model.parallax * (0.72 + model.motionTrace * 0.045 + model.vectorTension * 0.025), 0, 10);
+  const magnitude = Math.min(width, height) * 0.006 * strength * scale;
+  const phase = model.motionTrace * 0.31 + model.vectorTension * 0.17 + model.gridWarp * 0.09 + 0.72;
+  return {
+    x: Math.cos(phase) * magnitude,
+    y: Math.sin(phase * 0.82) * magnitude
+  };
+}
+
 function applySpatialRecognitionEffectsToContext(context, width, height, settings, effect, model) {
   let frame;
   try {
@@ -6292,13 +6304,14 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
       lowLightSignal * model.subpixelScan * 0.12;
     const noiseGate = 1 - clamp(Math.max(0, localDeviation * 2.8 - rawEdge * 0.18) * model.noiseReject * 0.55, 0, 0.42);
     const edge = clamp((rawEdge + normalSignal * model.surfaceNormal * 0.55 + lowLightSignal * model.edgeWeight * 0.08) * noiseGate, 0, 1);
-    const radial = distanceFromCenter(x / Math.max(1, width - 1), y / Math.max(1, height - 1));
+    const xDepth = x / Math.max(1, width - 1);
     const verticalDepth = 1 - y / Math.max(1, height - 1);
-    const nearField = Math.pow(1 - radial, 1.35) * model.nearFieldBias;
-    const farField = Math.pow(radial, 1.12) * model.farFieldBias;
+    const planeDepth = clamp(verticalDepth * 0.68 + xDepth * 0.18 + localAverage * 0.14, 0, 1);
     const specularSignal = clamp(Math.max(0, luma - 0.58) * model.specularSense * 2.65 + lowLightSignal * 0.12, 0, 1);
     const shadowSignal = clamp(Math.max(0, 0.54 - luma) * model.shadowSense * 2.95 + lowLightSignal * 0.72, 0, 1);
     const highlightSignal = clamp(Math.max(0, luma - 0.48) * model.highlightSense * 2.05, 0, 1);
+    const nearField = clamp((edge * 0.52 + localDeviation * 1.1 + normalSignal * 0.24 + specularSignal * 0.16 + lowLightSignal * 0.18) * model.nearFieldBias, 0, 1.6);
+    const farField = clamp((shadowSignal * 0.28 + darkness * 0.16 + (1 - edge) * 0.08 + (1 - localDeviation) * 0.04) * model.farFieldBias, 0, 1.6);
     const contourPhase = Math.abs(
       Math.sin((luma * (7.5 + model.contourDensity * 8.8) + edge * 4.2 + model.range * 2.1 + normalSignal * model.vectorTension) * Math.PI)
     );
@@ -6308,12 +6321,11 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
         localDeviation * model.depth * 1.22 +
         lowLightSignal * model.depth * 0.62 +
         normalSignal * model.surfaceNormal * 0.32 +
-        verticalDepth * model.field * (0.16 + model.gradientLift * 0.22) +
+        planeDepth * model.field * (0.15 + model.gradientLift * 0.16) +
         nearField * 0.18 -
         farField * 0.14 +
         specularSignal * 0.12 -
         shadowSignal * model.occlusion * 0.18 -
-        radial * model.field * 0.14 +
         model.sensitivity * 0.12,
       0,
       1
@@ -6383,7 +6395,7 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
 
     if (model.gradientLift > 0.01) {
       const lift =
-        (verticalDepth - radial * 0.36 + nearField * 0.2 - farField * 0.16 + highlightSignal * 0.22 + lowLightSignal * 0.44) *
+        (planeDepth * 0.72 + normalSignal * 0.16 + nearField * 0.12 - farField * 0.1 + highlightSignal * 0.22 + lowLightSignal * 0.44) *
         model.gradientLift *
         model.master *
         34 *
@@ -6410,23 +6422,23 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
   const meshAlpha = clamp(model.meshOpacity * model.master * 0.32 * SPATIAL_MESH_VISIBILITY_SCALE, 0, 0.075);
   if (meshAlpha > 0.01) {
     const gridStep = Math.max(4, Math.round(26 - model.pointDensity * 4 - model.contourDensity * 2 - model.lowLightSensitivity * 0.8));
+    const drift = spatialUniformParallaxOffset(width, height, model, 1);
     context.save();
     context.globalCompositeOperation = "screen";
+    context.translate(drift.x, drift.y);
     context.lineWidth = Math.max(0.28, Math.min(0.72, Math.min(width, height) / (1400 - model.vectorTension * 210)));
     context.strokeStyle = `rgba(125, 238, 255, ${clamp(meshAlpha + model.surfaceNormal * 0.004, 0, 0.085)})`;
-    for (let x = 0; x <= width; x += gridStep) {
-      const offset = Math.sin((x / Math.max(1, width)) * Math.PI * (2 + model.vectorTension * 2)) * model.parallax * gridStep * (0.45 + model.motionTrace * 0.24);
+    for (let x = -gridStep; x <= width + gridStep; x += gridStep) {
       context.beginPath();
-      context.moveTo(x, 0);
-      context.lineTo(x + offset, height);
+      context.moveTo(x, -gridStep);
+      context.lineTo(x, height + gridStep);
       context.stroke();
     }
     context.strokeStyle = `rgba(255, 111, 164, ${clamp(meshAlpha * (0.62 + model.colorDepth * 0.05), 0, 0.07)})`;
-    for (let y = 0; y <= height; y += gridStep) {
-      const offset = Math.cos((y / Math.max(1, height)) * Math.PI * (2 + model.vectorTension * 1.6)) * model.parallax * gridStep * (0.42 + model.motionTrace * 0.2);
+    for (let y = -gridStep; y <= height + gridStep; y += gridStep) {
       context.beginPath();
-      context.moveTo(0, y);
-      context.lineTo(width, y + offset);
+      context.moveTo(-gridStep, y);
+      context.lineTo(width + gridStep, y);
       context.stroke();
     }
     context.restore();
@@ -6435,14 +6447,14 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
   const pointAlpha = clamp(model.pointDensity * model.master * (0.28 + model.subpixelScan * 0.12) * SPATIAL_MESH_VISIBILITY_SCALE, 0, 0.075);
   if (pointAlpha > 0.01) {
     const pointStep = Math.max(4, Math.round(18 - model.pointDensity * 3 - model.subpixelScan * 1.4));
+    const drift = spatialUniformParallaxOffset(width, height, model, 0.85);
     context.save();
     context.globalCompositeOperation = "screen";
     context.fillStyle = `rgba(238, 255, 255, ${pointAlpha})`;
     for (let y = pointStep; y < height; y += pointStep) {
       for (let x = pointStep; x < width; x += pointStep) {
-        const drift = Math.sin((x * 0.017 + y * 0.021) * (1 + model.parallax + model.motionTrace * 0.5)) * model.parallax * (2.2 + model.motionTrace * 1.8);
         const size = clamp(0.45 + model.subpixelScan * 0.16 + model.objectCohesion * 0.08, 0.45, 1.35);
-        context.fillRect(x + drift, y - drift, size, size);
+        context.fillRect(x + drift.x, y + drift.y, size, size);
       }
     }
     context.restore();
@@ -6472,6 +6484,7 @@ function paintLiveSpatialPointCloudAndTin(context, width, height, source, model)
     Math.round(28 - model.cellSize * 9 - model.pointDensity * 3 - model.livePointCloud * 2 - model.subpixelScan * 1.4 - model.lowLightSensitivity * 0.9)
   );
   const sampleRadius = Math.max(1, Math.round(cellStep * 0.34));
+  const uniformDrift = spatialUniformParallaxOffset(width, height, model, 0.7 + model.gridWarp * 0.05);
   const rows = [];
   const safeIndex = (x, y) => (clamp(Math.round(y), 0, height - 1) * width + clamp(Math.round(x), 0, width - 1)) * 4;
   const lumaAt = (x, y) => {
@@ -6502,25 +6515,24 @@ function paintLiveSpatialPointCloudAndTin(context, width, height, source, model)
       const edge = clamp((Math.abs(right - left) + Math.abs(down - up)) * lowLightGain + lowLightSignal * model.edgeWeight * 0.06, 0, 1);
       const noise = clamp(Math.abs(luma - localAverage) * (1.9 + model.noiseMap * 1.8 + lowLightSignal * 5.2) + diagonal * 0.42, 0, 1);
       const surface = clamp((Math.abs((right - left) - (down - up)) + diagonal * 0.78 + edge * 0.24) * lowLightGain, 0, 1);
-      const radial = distanceFromCenter(x / Math.max(1, width - 1), y / Math.max(1, height - 1));
+      const xDepth = x / Math.max(1, width - 1);
       const verticalDepth = 1 - y / Math.max(1, height - 1);
+      const planeDepth = clamp(verticalDepth * 0.68 + xDepth * 0.18 + localAverage * 0.14, 0, 1);
       const depth = clamp(
         luma * (0.32 + model.cellDepth * 0.48) +
           edge * model.edgeWeight * 0.36 +
           noise * model.noiseMap * 0.34 +
           surface * model.surfaceMap * 0.38 +
           lowLightSignal * model.depth * 0.44 +
-          verticalDepth * model.field * 0.16 -
-          radial * model.range * 0.12 +
+          planeDepth * model.field * 0.13 +
+          (edge + noise + surface) * model.range * 0.028 +
           model.sensitivity * 0.08,
         0,
         1
       );
-      const warpPhase = (x * 0.017 + y * 0.013 + depth * 3.1) * (1 + model.motionTrace * 0.5);
-      const warp = model.gridWarp * model.parallax * cellStep * (0.16 + depth * 0.34 + surface * 0.22);
       const lift = model.pointLift * cellStep * (0.12 + depth * 0.46 + noise * 0.18);
-      const px = clamp(x + Math.sin(warpPhase) * warp, 0, width);
-      const py = clamp(y + Math.cos(warpPhase * 0.9) * warp - lift, 0, height);
+      const px = clamp(x + uniformDrift.x, 0, width);
+      const py = clamp(y + uniformDrift.y - lift, 0, height);
       row.push({
         x: px,
         y: py,
