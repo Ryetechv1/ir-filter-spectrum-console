@@ -30,15 +30,16 @@ The Camera Studio is opened from the main console with the `Studio` button. It r
 - All visual effect presets are compiled through a 500% intensity amplifier. The amplifier boosts numeric preset settings away from their neutral value and increases preset overlay alpha while clamping to each control's safe range.
 - Four RGBW mixer groups drive live gradient color layers and the main filter math: Main, Secondary, Third, and Highlights.
 - Ten inversion controls add Classic RGB Invert, Luma Negative, Channel Swap Invert, Spectral Invert, Thermal Black-Hot Invert, Red Channel Invert, Green Channel Invert, Blue Channel Invert, Shadow Range Invert, and Highlight Range Invert.
-- The adjustment surface is grouped into dropdown sections. It includes 12 core photo sliders, 10 inversion sliders, smart darker-edge controls, 32 local Spatial Recognition Studio controls, 20 smart signal engines, the expanded Smart Isolate Grouped Pixels DWT/noise defect-distortion engine with 31 controls, Thermal Studio A-O hotspot recoloring, and 100 advanced effect sliders for exposure-style controls, color channels, bloom/halation, scanlines, IR/UVA/thermal washes, and other photobooth effects.
+- The adjustment surface is grouped into dropdown sections. It includes 12 core photo sliders, 10 inversion sliders, smart darker-edge controls, 42 local Spatial Recognition Studio controls, 20 smart signal engines, the expanded Smart Isolate Grouped Pixels DWT/noise defect-distortion engine with 31 controls, Thermal Studio A-O hotspot recoloring, and 100 advanced effect sliders for exposure-style controls, color channels, bloom/halation, scanlines, IR/UVA/thermal washes, and other photobooth effects.
 - The smart signal engines are local image-processing tools only. They do not identify people, match identities, store biometrics, or use face/wolf recognition.
 
 ## Spatial Recognition Studio
 
 - Spatial Recognition Studio adapts the imported point-cloud prototype into the browser camera pipeline without adding heavy Three.js or LAS loader dependencies to the live static app.
 - The preserved prototype handoff lives in `integrations/spatial_recognition_prototype/` for future Codex import work.
-- The studio estimates pseudo-depth, contour bands, point-cloud dots, field curvature, and mesh overlays from visible luminance/edge gradients in the current camera/compositor canvas.
-- The 32-control spatial stack now includes micro contrast, near/far field bias, occlusion, contour density/threshold, surface-normal response, specular/shadow/highlight sensitivity, color depth, noise rejection, object cohesion, motion trace, subpixel scan, and thermal-lock weighting.
+- The studio estimates pseudo-depth, contour bands, live point-cloud dots, field curvature, grid cells, TIN triangle facets, and mesh overlays from visible luminance/edge/noise gradients in the current camera/compositor canvas.
+- The 42-control spatial stack now includes micro contrast, near/far field bias, occlusion, contour density/threshold, surface-normal response, specular/shadow/highlight sensitivity, color depth, noise rejection, object cohesion, motion trace, subpixel scan, thermal-lock weighting, live point-cloud strength, TIN facet opacity, TIN wire strength, cell size, cell-depth mapping, surface mapping, noise mapping, grid warp, point-height lift, and facet smoothing.
+- Point Cloud and TIN are live integrated features. Each sampled cell reads visible pixels from the current rendered camera/upload canvas, estimates pseudo-depth/noise/surface-normal values, draws point samples, and fills/strokes TIN facets so the visible preview, HUD, snapshots, video recording canvas, and overlay compositor share the same geometry layer.
 - The spatial pass is local and visual-only. It does not identify people, perform biometric matching, store a face model, or upload camera frames.
 
 ## AI-Orchestrated Defect / Distortion Isolation

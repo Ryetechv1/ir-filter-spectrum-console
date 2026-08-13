@@ -10,7 +10,7 @@ The production camera studio does not import this prototype directly. `SpatialVi
 - `applySpatialRecognitionEffects()`
 - `applySpatialRecognitionEffectsToContext()`
 
-That implementation estimates depth-like field structure from local luminance, edge gradients, color separation, contour bands, pseudo-depth, mesh overlays, and point-cloud dots. It is visual-only and does not perform biometric identity recognition, face matching, or camera-frame upload.
+That implementation estimates depth-like field structure from local luminance, edge gradients, color separation, contour bands, pseudo-depth, mesh overlays, live point-cloud dots, and TIN triangle facets. It is visual-only and does not perform biometric identity recognition, face matching, or camera-frame upload.
 
 ## Source Prototype Files
 
@@ -28,8 +28,8 @@ The original files are preserved under `source/`:
 
 | Prototype idea | Camera studio implementation |
 |---|---|
-| Point cloud viewport | `spatialPointDensity`, point-dot overlay |
-| TIN/vector mesh mode | `spatialMeshOpacity`, warped mesh grid |
+| Point cloud viewport | `spatialPointDensity`, `spatialLivePointCloud`, cell-sampled point-dot overlay |
+| TIN/vector mesh mode | `spatialTinOpacity`, `spatialTinWire`, `spatialCellSize`, `spatialCellDepth`, `spatialSurfaceMap`, `spatialNoiseMap`, live triangle facet overlay |
 | Worker parsing | Replaced by local canvas pixel sampling for mobile safety |
 | Resolution control | `SPATIAL_RECOGNITION_PIXEL_BUDGET` and downsampled worker canvas |
 | Controls panel | `Spatial Recognition Studio` adjustment dropdown and popup |

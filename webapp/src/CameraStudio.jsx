@@ -737,7 +737,17 @@ const SPATIAL_RECOGNITION_ADJUSTMENTS = [
   ["spatialObjectCohesion", "Object Cohesion", 0, 100, "%", 58],
   ["spatialMotionTrace", "Motion Trace", 0, 100, "%", 28],
   ["spatialSubpixelScan", "Subpixel Scan", 0, 100, "%", 46],
-  ["spatialThermalLock", "Thermal Lock", 0, 100, "%", 60]
+  ["spatialThermalLock", "Thermal Lock", 0, 100, "%", 60],
+  ["spatialLivePointCloud", "Live Point Cloud", 0, 100, "%", 72],
+  ["spatialTinOpacity", "TIN Facet Opacity", 0, 100, "%", 58],
+  ["spatialTinWire", "TIN Wire Strength", 0, 100, "%", 52],
+  ["spatialCellSize", "Cell Size", 0, 100, "%", 48],
+  ["spatialCellDepth", "Cell Depth Mapping", 0, 100, "%", 66],
+  ["spatialSurfaceMap", "Surface Mapping", 0, 100, "%", 62],
+  ["spatialNoiseMap", "Noise Mapping", 0, 100, "%", 58],
+  ["spatialGridWarp", "Grid Warp", 0, 100, "%", 44],
+  ["spatialPointLift", "Point Height Lift", 0, 100, "%", 54],
+  ["spatialFacetSmoothing", "TIN Facet Smoothing", 0, 100, "%", 42]
 ];
 
 const SMART_SIGNAL_PROCESSOR_SLIDERS = [
@@ -1019,7 +1029,7 @@ const ADJUSTMENT_GROUPS = [
   {
     id: "spatial-recognition",
     title: "Spatial Recognition Studio",
-    description: "Local camera-side pseudo-depth, point-cloud, contour, and field-map recognition derived from visible frame gradients.",
+    description: "Local camera-side pseudo-depth, live point-cloud, TIN facets, contour, cell, and field-map recognition derived from visible frame gradients.",
     type: "spatial-recognition",
     controls: SPATIAL_RECOGNITION_ADJUSTMENTS
   },
@@ -4091,7 +4101,7 @@ function CameraStudio() {
   function renderSpatialRecognitionWindow() {
     if (!spatialWindowOpen) return null;
     const profileRows = [
-      ["Mode", "Pseudo-depth + point cloud + contour mesh"],
+      ["Mode", "Pseudo-depth + live point cloud + TIN facets"],
       ["Data source", "Current camera/compositor canvas"],
       ["Prototype source", "SpatialViewport / pointCloudWorker adapted locally"],
       ["Privacy", "No identity matching, no biometric storage, no upload"],
@@ -4111,7 +4121,8 @@ function CameraStudio() {
           </div>
           <p className="dwt-window-note">
             Spatial Recognition estimates depth-like field structure from visible luminance, local edge gradients, color separation,
-            and contour density. It is an experimental local visual-analysis pass layered on top of the current preset.
+            noise, and contour density. Its live Point Cloud and TIN modes map camera cells into surface, noise, and depth geometry
+            while staying layered on top of the current preset.
           </p>
 
           <div className="dwt-status-grid spatial-status-grid" aria-label="Spatial recognition status">
@@ -4171,8 +4182,8 @@ function CameraStudio() {
             <strong>{SPATIAL_RECOGNITION_LABEL}</strong>
             <small>
               {spatialRecognitionEnabled
-                ? "Spatial point-cloud, contour, and pseudo-depth mapping is active on preview, HUD, snapshots, recordings, and overlays."
-                : "Off: spatial mapping is bypassed while depth, mesh, contour, and point-cloud controls remain ready."}
+                ? "Spatial point-cloud, TIN facets, contour, and pseudo-depth mapping is active on preview, HUD, snapshots, recordings, and overlays."
+                : "Off: spatial mapping is bypassed while depth, TIN, mesh, contour, and point-cloud controls remain ready."}
             </small>
           </span>
         </button>
@@ -4180,7 +4191,8 @@ function CameraStudio() {
           <strong>Local Spatial Field Mapping</strong>
           <p>
             Adapted from the imported SpatialViewport/pointCloudWorker prototype without adding Three.js dependencies. The camera canvas
-            decimates frame pixels into a depth-weighted field map so desktop, mobile, HUD, exports, and media layers all share the same result.
+            decimates frame pixels into live cells, point-cloud samples, and TIN triangle facets so desktop, mobile, HUD, exports, and
+            media layers all share the same surface/noise/depth result.
           </p>
           <button type="button" className="dwt-inline-button" onClick={() => setSpatialWindowOpen(true)}>
             <Layers size={14} />
@@ -4425,7 +4437,7 @@ function CameraStudio() {
           <ul>
             <li>{CAMERA_EFFECTS.length} local visual presets compiled at 500% intensity for IR-style, UVA-style, full-spectrum thermal, XLS, inversion, tritone, quadtone, channel spectrograph, black-field, channel sweep, cinematic, monochrome, duotone, retro, and color-lab looks.</li>
             <li>Four RGBW gradient mixers for Main, Secondary, Third, and Highlights color layers that drive overlays, filter math, and the selected app accent aesthetic.</li>
-            <li>Grouped adjustment dropdowns with 11 core photo controls, 10 color inversion tools, 20 inversion presets, 10 smart darker-edge controls, 20 smart signal engines, 32 local Spatial Recognition Studio controls, an expanded AI-orchestrated Smart Isolate Grouped Pixels DWT/noise defect-distortion module with 31 controls, Thermal Studio A-O hotspot recoloring, 100 advanced sliders, equation-generated filter names/descriptions, and live/overlay adjustment toggles.</li>
+            <li>Grouped adjustment dropdowns with 11 core photo controls, 10 color inversion tools, 20 inversion presets, 10 smart darker-edge controls, 20 smart signal engines, 42 local Spatial Recognition Studio controls with live Point Cloud/TIN surface mapping, an expanded AI-orchestrated Smart Isolate Grouped Pixels DWT/noise defect-distortion module with 31 controls, Thermal Studio A-O hotspot recoloring, 100 advanced sliders, equation-generated filter names/descriptions, and live/overlay adjustment toggles.</li>
             <li>Flashlight Studio includes Hold Torch, Lock Rear Torch, Strobe, Dimmer Pulse, interval timing, and brightness-duty controls where the rear-camera torch API is exposed by the device.</li>
             <li>Processed PNG snapshots and 1080P or 2K MP4 recordings with local camera effects applied, including browser download plus desktop folder-save support when permission is granted.</li>
             <li>Separate 1-3 layer image/video compositor with opacity, splice masks, blend modes, transforms, full adjustment-stack support, and clean PNG export.</li>
@@ -6072,6 +6084,16 @@ function buildSpatialRecognitionModel(settings = {}, effect = {}, enabled = fals
     objectCohesion: clamp(setting(settings, "spatialObjectCohesion") / 100, 0, 1.4),
     motionTrace: clamp(setting(settings, "spatialMotionTrace") / 100, 0, 1.2),
     subpixelScan: clamp(setting(settings, "spatialSubpixelScan") / 100, 0, 1.35),
+    livePointCloud: clamp(setting(settings, "spatialLivePointCloud") / 100, 0, 1.35),
+    tinOpacity: clamp(setting(settings, "spatialTinOpacity") / 100, 0, 1.25),
+    tinWire: clamp(setting(settings, "spatialTinWire") / 100, 0, 1.25),
+    cellSize: clamp(setting(settings, "spatialCellSize") / 100, 0, 1),
+    cellDepth: clamp(setting(settings, "spatialCellDepth") / 100, 0, 1.45),
+    surfaceMap: clamp(setting(settings, "spatialSurfaceMap") / 100, 0, 1.45),
+    noiseMap: clamp(setting(settings, "spatialNoiseMap") / 100, 0, 1.45),
+    gridWarp: clamp(setting(settings, "spatialGridWarp") / 100, 0, 1.25),
+    pointLift: clamp(setting(settings, "spatialPointLift") / 100, 0, 1.35),
+    facetSmoothing: clamp(setting(settings, "spatialFacetSmoothing") / 100, 0, 1),
     thermalLock,
     palette: settings?.thermalPalette || "full-range-rgb"
   };
@@ -6220,6 +6242,7 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
     data[index + 2] = clamp(b, 0, 255);
   }
   context.putImageData(frame, 0, 0);
+  paintLiveSpatialPointCloudAndTin(context, width, height, source, model);
 
   const meshAlpha = clamp(model.meshOpacity * model.master * 0.32, 0, 0.42);
   if (meshAlpha > 0.01) {
@@ -6261,6 +6284,164 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
     }
     context.restore();
   }
+}
+
+function paintLiveSpatialPointCloudAndTin(context, width, height, source, model) {
+  const pointCloudAlpha = clamp(model.livePointCloud * model.master * (0.34 + model.subpixelScan * 0.16), 0, 0.58);
+  const tinAlpha = clamp(model.tinOpacity * model.master * (0.28 + model.surfaceMap * 0.12 + model.cellDepth * 0.08), 0, 0.48);
+  const wireAlpha = clamp(model.tinWire * model.master * (0.22 + model.surfaceMap * 0.08), 0, 0.42);
+  if (pointCloudAlpha <= 0.01 && tinAlpha <= 0.01 && wireAlpha <= 0.01) return;
+
+  const cellStep = Math.max(
+    8,
+    Math.round(40 - model.cellSize * 17 - model.pointDensity * 7 - model.livePointCloud * 6 - model.subpixelScan * 3)
+  );
+  const sampleRadius = Math.max(1, Math.round(cellStep * 0.45));
+  const rows = [];
+  const safeIndex = (x, y) => (clamp(Math.round(y), 0, height - 1) * width + clamp(Math.round(x), 0, width - 1)) * 4;
+  const lumaAt = (x, y) => {
+    const index = safeIndex(x, y);
+    return (source[index] * 0.2126 + source[index + 1] * 0.7152 + source[index + 2] * 0.0722) / 255;
+  };
+
+  for (let y = Math.round(cellStep * 0.5); y < height; y += cellStep) {
+    const row = [];
+    for (let x = Math.round(cellStep * 0.5); x < width; x += cellStep) {
+      const luma = lumaAt(x, y);
+      const left = lumaAt(x - sampleRadius, y);
+      const right = lumaAt(x + sampleRadius, y);
+      const up = lumaAt(x, y - sampleRadius);
+      const down = lumaAt(x, y + sampleRadius);
+      const upLeft = lumaAt(x - sampleRadius, y - sampleRadius);
+      const downRight = lumaAt(x + sampleRadius, y + sampleRadius);
+      const localAverage = (luma * 2 + left + right + up + down) / 6;
+      const edge = clamp(Math.abs(right - left) + Math.abs(down - up), 0, 1);
+      const diagonal = Math.abs(downRight - upLeft);
+      const noise = clamp(Math.abs(luma - localAverage) * (1.9 + model.noiseMap * 1.8) + diagonal * 0.42, 0, 1);
+      const surface = clamp(Math.abs((right - left) - (down - up)) + diagonal * 0.78 + edge * 0.24, 0, 1);
+      const radial = distanceFromCenter(x / Math.max(1, width - 1), y / Math.max(1, height - 1));
+      const verticalDepth = 1 - y / Math.max(1, height - 1);
+      const depth = clamp(
+        luma * (0.32 + model.cellDepth * 0.48) +
+          edge * model.edgeWeight * 0.36 +
+          noise * model.noiseMap * 0.34 +
+          surface * model.surfaceMap * 0.38 +
+          verticalDepth * model.field * 0.16 -
+          radial * model.range * 0.12 +
+          model.sensitivity * 0.08,
+        0,
+        1
+      );
+      const warpPhase = (x * 0.017 + y * 0.013 + depth * 3.1) * (1 + model.motionTrace * 0.5);
+      const warp = model.gridWarp * model.parallax * cellStep * (0.16 + depth * 0.34 + surface * 0.22);
+      const lift = model.pointLift * cellStep * (0.12 + depth * 0.46 + noise * 0.18);
+      const px = clamp(x + Math.sin(warpPhase) * warp, 0, width);
+      const py = clamp(y + Math.cos(warpPhase * 0.9) * warp - lift, 0, height);
+      row.push({
+        x: px,
+        y: py,
+        depth,
+        edge,
+        noise,
+        surface,
+        color: spatialRecognitionDepthColor(depth, model)
+      });
+    }
+    if (row.length) rows.push(row);
+  }
+  if (rows.length < 2 || rows[0].length < 2) return;
+
+  if (tinAlpha > 0.01) {
+    context.save();
+    context.globalCompositeOperation = "screen";
+    for (let rowIndex = 0; rowIndex < rows.length - 1; rowIndex += 1) {
+      const row = rows[rowIndex];
+      const nextRow = rows[rowIndex + 1];
+      const count = Math.min(row.length, nextRow.length) - 1;
+      for (let column = 0; column < count; column += 1) {
+        const p00 = row[column];
+        const p10 = row[column + 1];
+        const p01 = nextRow[column];
+        const p11 = nextRow[column + 1];
+        if ((p00.depth + p10.depth + p01.depth + p11.depth) / 4 < 0.03) continue;
+        if (Math.abs(p00.depth - p11.depth) > Math.abs(p10.depth - p01.depth)) {
+          paintSpatialTinTriangle(context, [p00, p10, p01], tinAlpha, model);
+          paintSpatialTinTriangle(context, [p10, p11, p01], tinAlpha, model);
+        } else {
+          paintSpatialTinTriangle(context, [p00, p10, p11], tinAlpha, model);
+          paintSpatialTinTriangle(context, [p00, p11, p01], tinAlpha, model);
+        }
+      }
+    }
+    context.restore();
+  }
+
+  if (wireAlpha > 0.01) {
+    context.save();
+    context.globalCompositeOperation = "screen";
+    context.lineWidth = Math.max(0.45, cellStep / (16 - model.surfaceMap * 5));
+    context.strokeStyle = `rgba(190, 249, 255, ${wireAlpha})`;
+    for (let rowIndex = 0; rowIndex < rows.length - 1; rowIndex += 1) {
+      const row = rows[rowIndex];
+      const nextRow = rows[rowIndex + 1];
+      const count = Math.min(row.length, nextRow.length) - 1;
+      for (let column = 0; column < count; column += 1) {
+        const p00 = row[column];
+        const p10 = row[column + 1];
+        const p01 = nextRow[column];
+        const p11 = nextRow[column + 1];
+        context.beginPath();
+        context.moveTo(p00.x, p00.y);
+        context.lineTo(p10.x, p10.y);
+        context.lineTo(p11.x, p11.y);
+        context.lineTo(p01.x, p01.y);
+        context.closePath();
+        context.stroke();
+      }
+    }
+    context.restore();
+  }
+
+  if (pointCloudAlpha > 0.01) {
+    context.save();
+    context.globalCompositeOperation = "screen";
+    for (const row of rows) {
+      for (const point of row) {
+        const signal = clamp(
+          point.depth * 0.42 + point.edge * 0.28 + point.noise * model.noiseMap * 0.34 + point.surface * model.surfaceMap * 0.26,
+          0,
+          1
+        );
+        if (signal < 0.08) continue;
+        const [r, g, b] = point.color;
+        const size = clamp(0.8 + signal * 2.8 + model.pointLift * 1.1 + model.subpixelScan * 0.6, 0.8, 5.5);
+        context.fillStyle = `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${clamp(pointCloudAlpha * (0.3 + signal * 0.85), 0, 0.72)})`;
+        context.fillRect(point.x - size / 2, point.y - size / 2, size, size);
+      }
+    }
+    context.restore();
+  }
+}
+
+function paintSpatialTinTriangle(context, points, alpha, model) {
+  const depth = points.reduce((sum, point) => sum + point.depth, 0) / points.length;
+  const edge = points.reduce((sum, point) => sum + point.edge, 0) / points.length;
+  const noise = points.reduce((sum, point) => sum + point.noise, 0) / points.length;
+  const surface = points.reduce((sum, point) => sum + point.surface, 0) / points.length;
+  const color = spatialRecognitionDepthColor(
+    clamp(depth + noise * model.noiseMap * 0.12 + surface * model.surfaceMap * 0.08, 0, 1),
+    model
+  );
+  const facetAlpha = clamp(alpha * (0.18 + depth * 0.42 + edge * 0.22 + noise * model.noiseMap * 0.24 + surface * model.surfaceMap * 0.2), 0, 0.48);
+  if (facetAlpha <= 0.006) return;
+  const blendColor = color.map((channel) => mixChannel(channel, 255, model.facetSmoothing * 0.08));
+  context.beginPath();
+  context.moveTo(points[0].x, points[0].y);
+  context.lineTo(points[1].x, points[1].y);
+  context.lineTo(points[2].x, points[2].y);
+  context.closePath();
+  context.fillStyle = `rgba(${Math.round(blendColor[0])}, ${Math.round(blendColor[1])}, ${Math.round(blendColor[2])}, ${facetAlpha})`;
+  context.fill();
 }
 
 function spatialRecognitionDepthColor(value, model) {
