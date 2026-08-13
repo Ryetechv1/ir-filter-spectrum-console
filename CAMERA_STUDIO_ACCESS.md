@@ -31,6 +31,13 @@ The Camera Studio is opened from the main console with the `Studio` button. It r
 - The adjustment surface is grouped into dropdown sections. It includes 12 core photo sliders, 10 inversion sliders, smart darker-edge controls, 20 smart signal engines, the expanded Smart Isolate Grouped Pixels defect/distortion engine with 20 controls, Thermal Studio A-O hotspot recoloring, and 100 advanced effect sliders for exposure-style controls, color channels, bloom/halation, scanlines, IR/UVA/thermal washes, and other photobooth effects.
 - The smart signal engines are local image-processing tools only. They do not identify people, match identities, store biometrics, or use face/wolf recognition.
 
+## AI-Orchestrated Defect / Distortion Isolation
+
+- The Smart Isolate Grouped Pixels engine now includes an imported DWT adaptive quantization profile.
+- The local Python package lives in `integrations/dwt_isolate_pipeline/` and imports `noise_loss.py`, `models.py`, and `export_visualizer.py`.
+- The package validates OpenCV dataset hooks with `test_steg_pipeline.py` and exports `dwt_isolate_profile.json` for the static web app.
+- Enabling Smart Isolate Grouped Pixels preserves the current preset/filter and layers the DWT-weighted grouping pass on top of the existing camera output.
+
 ## YouTube Channel Window
 
 - The `YouTube channel` button opens a local GUI window for the Supernatural World channel.

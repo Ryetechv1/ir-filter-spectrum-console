@@ -200,6 +200,22 @@ const RGBW_MIXER_GAIN = 1.72;
 const PRESET_INTENSITY_MULTIPLIER = 5;
 const SMART_SIGNAL_PIXEL_BUDGET = 74_000;
 const SMART_DARK_EDGE_LABEL = "Smart darker edge amplifier";
+const DWT_ISOLATE_PROFILE = {
+  profileId: "dwt-adaptive-quantization-v1",
+  profileAsset: studioAssetUrl("assets/dwt-isolate/dwt_isolate_profile.json"),
+  wavelet: "haar",
+  lowFrequencyWeight: 0.38,
+  luminanceNoiseWeight: 0.8,
+  chrominanceNoiseWeight: 1.5,
+  digitalNoiseWeight: 1.2,
+  quantizationFloor: 0.035,
+  quantizationCeiling: 0.28,
+  defectThresholdBias: 0.045,
+  densityGain: 1.32,
+  edgeGain: 1.18,
+  chromaLockGain: 1.1,
+  artifactSuppressionGain: 1.24
+};
 let thermalWorkCanvas;
 let pixelateWorkCanvas;
 let mediaLayerWorkCanvas;
@@ -3296,7 +3312,8 @@ function CameraStudio() {
             <p>
               Local scene analysis targets repeated defects, compression blocks, subtle distortions, same-color pixel clusters,
               density patches, and shade/range groups. No remote AI call or biometric identity analysis is used; the engine
-              deterministically weighs nearby pixels and pushes similar artifacts to behave together.
+              deterministically weighs nearby pixels and pushes similar artifacts to behave together. DWT adaptive quantization
+              profile <code>{DWT_ISOLATE_PROFILE.profileId}</code> is layered on top of the current preset without replacing it.
             </p>
           </div>
         )}
@@ -5116,6 +5133,7 @@ function smartSignalProcessorStrength(settings = {}, processor) {
 }
 
 function buildIsolateGroupedPixelModel(settings = {}, processor) {
+  const dwtProfile = DWT_ISOLATE_PROFILE;
   const strength = smartSignalProcessorStrength(settings, processor);
   const colorTarget = smartSignalSetting(settings, processor, "ColorTarget") / 100;
   const pixelSize = smartSignalSetting(settings, processor, "PixelSize") / 100;
@@ -5159,8 +5177,13 @@ function buildIsolateGroupedPixelModel(settings = {}, processor) {
     smoothing,
     blend,
     blockSize: clamp(Math.round(1 + pixelSize * 7 + radius * 5), 2, 14),
-    densitySignal: clamp(pixelDensity * (0.5 + strength * 0.32), 0, 1.4),
-    defectThreshold: clamp(0.08 + (1 - sensitivity) * 0.2 - defectSignal * 0.045, 0.035, 0.28)
+    densitySignal: clamp(pixelDensity * (0.5 + strength * 0.32) * dwtProfile.densityGain, 0, 1.72),
+    defectThreshold: clamp(
+      0.08 + (1 - sensitivity) * 0.2 - defectSignal * dwtProfile.defectThresholdBias,
+      dwtProfile.quantizationFloor,
+      dwtProfile.quantizationCeiling
+    ),
+    dwtProfile
   };
 }
 
@@ -5361,6 +5384,7 @@ function applySmartSignalProcessorEffectsToContext(context, width, height, setti
 }
 
 function applyIsolateGroupedPixelEngine(r, g, b, luma, localAverage, edge, midMask, shadowMask, highlightMask, x, y, width, height, model) {
+  const dwtProfile = model.dwtProfile || DWT_ISOLATE_PROFILE;
   const gray = r * 0.2126 + g * 0.7152 + b * 0.0722;
   const normalizedR = r / 255;
   const normalizedG = g / 255;
@@ -5379,19 +5403,28 @@ function applyIsolateGroupedPixelEngine(r, g, b, luma, localAverage, edge, midMa
   const isolateGroupedPixelsDensitySignal = clamp(
     model.densitySignal * (0.32 + blockHash * 0.52 + diagonalHash * 0.22) +
       colorSpread * model.pixelDensity * 0.28 +
-      edge * model.pixelWeight * 0.18,
+      edge * model.pixelWeight * 0.18 * dwtProfile.edgeGain,
     0,
     1.45
   );
+  const dwtSubbandSignal = clamp(
+    edge * dwtProfile.digitalNoiseWeight * 0.18 +
+      Math.abs(luma - localAverage) * dwtProfile.luminanceNoiseWeight * 0.16 +
+      colorSpread * dwtProfile.chrominanceNoiseWeight * 0.12 +
+      midMask * dwtProfile.lowFrequencyWeight * 0.08,
+    0,
+    1.2
+  );
   const isolateGroupedPixelsDefectSignal = clamp(
     Math.abs(luma - localAverage) * (2.8 + model.defectSignal * 3.8) +
-      edge * (0.86 + model.distortionResponse * 1.75 + model.edgeRepair * 0.28) +
+      edge * (0.86 + model.distortionResponse * 1.75 + model.edgeRepair * 0.28) * dwtProfile.edgeGain +
       colorSpread * (0.44 + model.colorTarget * 0.74) +
       shadowMask * model.shadow * 0.42 +
       highlightMask * model.highlight * 0.44 +
       midMask * model.midtone * 0.28 +
       isolateGroupedPixelsDensitySignal * 0.26 -
-      model.defectThreshold,
+      model.defectThreshold +
+      dwtSubbandSignal * 0.34,
     0,
     1.35
   );
@@ -5403,7 +5436,8 @@ function applyIsolateGroupedPixelEngine(r, g, b, luma, localAverage, edge, midMa
   );
   if (activation <= 0.004) return [r, g, b];
 
-  const levels = Math.max(2, Math.round(14 - model.uniformity * 8 - model.isolation * 4));
+  const dwtQuantPressure = clamp(dwtSubbandSignal * (0.42 + model.pixelDensity * 0.22), 0, 0.82);
+  const levels = Math.max(2, Math.round(14 - model.uniformity * 8 - model.isolation * 4 - dwtQuantPressure * 3));
   const step = 255 / Math.max(1, levels - 1);
   const groupGray = Math.round(gray / step) * step;
   const quantR = Math.round(r / step) * step;
@@ -5415,7 +5449,7 @@ function applyIsolateGroupedPixelEngine(r, g, b, luma, localAverage, edge, midMa
   let targetGroupedG = mixChannel(groupGray, quantG, chromaPreserve);
   let targetGroupedB = mixChannel(groupGray, quantB, chromaPreserve);
 
-  const densityLift = 1 + isolateGroupedPixelsDensitySignal * model.pixelDensity * 0.22;
+  const densityLift = 1 + isolateGroupedPixelsDensitySignal * model.pixelDensity * 0.22 * dwtProfile.densityGain;
   targetGroupedR = gray + (targetGroupedR - gray) * densityLift;
   targetGroupedG = gray + (targetGroupedG - gray) * densityLift;
   targetGroupedB = gray + (targetGroupedB - gray) * densityLift;
@@ -5435,7 +5469,11 @@ function applyIsolateGroupedPixelEngine(r, g, b, luma, localAverage, edge, midMa
   g = mixChannel(g, repaired + (g - gray) * (1 + model.pixelWeight * 0.16), repairAlpha * 0.38);
   b = mixChannel(b, repaired + (b - gray) * (1 + model.pixelWeight * 0.12), repairAlpha * 0.34);
 
-  const artifactAlpha = clamp(activation * model.artifactSuppression * (0.16 + model.smoothing * 0.36), 0, 0.48);
+  const artifactAlpha = clamp(
+    activation * model.artifactSuppression * dwtProfile.artifactSuppressionGain * (0.16 + model.smoothing * 0.36),
+    0,
+    0.58
+  );
   const spectralValue = clamp(luma + edge * 0.38 + isolateGroupedPixelsDefectSignal * 0.24 + colorMatch * 0.12, 0, 1);
   const [sr, sg, sb] = thermalPaletteColor(spectralValue, model.colorTarget > 0.62 ? "red-lime" : "edge-spectrum");
   r = mixChannel(r, sr, artifactAlpha);

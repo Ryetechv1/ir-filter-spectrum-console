@@ -1,0 +1,22 @@
+# docker-compose.yml
+version: '3.8'
+services:
+  steg-pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-noise-steg-app
+    runtime: nvidia
+    volumes:
+      - ./data:/app/data
+      - ./checkpoints:/app/checkpoints
+      - ./logs:/app/logs
+      - ./exports:/app/exports
+    command: python -m pytest -v test_steg_pipeline.py
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
