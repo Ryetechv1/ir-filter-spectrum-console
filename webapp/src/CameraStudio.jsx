@@ -200,7 +200,7 @@ const THERMAL_SIGNAL_GAIN = 1.42;
 const RGBW_MIXER_GAIN = 1.72;
 const PRESET_INTENSITY_MULTIPLIER = 5;
 const SMART_SIGNAL_PIXEL_BUDGET = 74_000;
-const SPATIAL_RECOGNITION_PIXEL_BUDGET = 72_000;
+const SPATIAL_RECOGNITION_PIXEL_BUDGET = 96_000;
 const SMART_DARK_EDGE_LABEL = "Smart darker edge amplifier";
 const SPATIAL_RECOGNITION_LABEL = "Spatial recognition field mapper";
 const TORCH_LOG_LIMIT = 14;
@@ -6246,7 +6246,7 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
 
   const meshAlpha = clamp(model.meshOpacity * model.master * 0.32, 0, 0.42);
   if (meshAlpha > 0.01) {
-    const gridStep = Math.max(7, Math.round(38 - model.pointDensity * 20 - model.contourDensity * 7));
+    const gridStep = Math.max(6, Math.round(31 - model.pointDensity * 16 - model.contourDensity * 8 - model.subpixelScan * 5));
     context.save();
     context.globalCompositeOperation = "screen";
     context.lineWidth = Math.max(0.5, Math.min(width, height) / (900 - model.vectorTension * 260));
@@ -6271,7 +6271,7 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
 
   const pointAlpha = clamp(model.pointDensity * model.master * (0.28 + model.subpixelScan * 0.12), 0, 0.46);
   if (pointAlpha > 0.01) {
-    const pointStep = Math.max(5, Math.round(29 - model.pointDensity * 18 - model.subpixelScan * 7));
+    const pointStep = Math.max(4, Math.round(24 - model.pointDensity * 14 - model.subpixelScan * 8 - model.livePointCloud * 3));
     context.save();
     context.globalCompositeOperation = "screen";
     context.fillStyle = `rgba(238, 255, 255, ${pointAlpha})`;
@@ -6293,8 +6293,8 @@ function paintLiveSpatialPointCloudAndTin(context, width, height, source, model)
   if (pointCloudAlpha <= 0.01 && tinAlpha <= 0.01 && wireAlpha <= 0.01) return;
 
   const cellStep = Math.max(
-    8,
-    Math.round(40 - model.cellSize * 17 - model.pointDensity * 7 - model.livePointCloud * 6 - model.subpixelScan * 3)
+    7,
+    Math.round(32 - model.cellSize * 13 - model.pointDensity * 6 - model.livePointCloud * 5 - model.subpixelScan * 5 - model.surfaceMap * 3)
   );
   const sampleRadius = Math.max(1, Math.round(cellStep * 0.45));
   const rows = [];
