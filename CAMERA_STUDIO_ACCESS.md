@@ -23,6 +23,7 @@ The Camera Studio is opened from the main console with the `Studio` button. It r
 - `Stop Camera` stops all active video tracks.
 - `Flip Camera` toggles between front and rear camera requests after a stream is active.
 - `Rear Flashlight` requests the rear camera when needed and toggles the device torch with `MediaStreamTrack.applyConstraints({ advanced: [{ torch }] })` when the phone/browser exposes that capability.
+- `Flashlight Studio` adds three managed rear-torch modes: `Hold Torch` for persistent on/off use, `Lock Rear Torch` for rear-stream lock/reapply behavior, and `Start Strobe` with an 80ms-2000ms interval slider. The panel includes a local debug log for unsupported streams, failed constraints, and strobe state changes.
 - `Snapshot` downloads a local PNG with the current CSS/video effect stack painted into the image and adds it to the local capture shelf.
 - `Start MP4` records a processed 1080P or 2K canvas stream as `.mp4` where the browser supports MP4 MediaRecorder.
 - `Stop Recording` ends the current MP4 recording before the 3-minute cap.
@@ -38,6 +39,7 @@ The Camera Studio is opened from the main console with the `Studio` button. It r
 - The local Python package lives in `integrations/dwt_isolate_pipeline/` and imports `noise_loss.py`, `models.py`, and `export_visualizer.py`.
 - The package validates OpenCV dataset hooks with `test_steg_pipeline.py` and exports `dwt_isolate_profile.json` for the static web app.
 - Enabling Smart Isolate Grouped Pixels preserves the current preset/filter and layers the DWT-weighted grouping pass on top of the existing camera output.
+- `DWT Isolation Studio` is a dedicated popup GUI for the imported profile. It shows the active preset, DWT status, profile parameters, profile JSON links, and the Smart Isolate sliders without replacing the current filter/preset.
 
 ## YouTube Channel Window
 

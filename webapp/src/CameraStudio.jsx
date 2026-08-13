@@ -201,6 +201,11 @@ const RGBW_MIXER_GAIN = 1.72;
 const PRESET_INTENSITY_MULTIPLIER = 5;
 const SMART_SIGNAL_PIXEL_BUDGET = 74_000;
 const SMART_DARK_EDGE_LABEL = "Smart darker edge amplifier";
+const TORCH_LOG_LIMIT = 14;
+const TORCH_STROBE_MIN_MS = 80;
+const TORCH_STROBE_MAX_MS = 2000;
+const TORCH_STROBE_STEP_MS = 20;
+const TORCH_STROBE_DEFAULT_MS = 420;
 const DWT_ISOLATE_PROFILE = {
   profileId: "dwt-adaptive-quantization-v1",
   profileAsset: studioAssetUrl("assets/dwt-isolate/dwt_isolate_profile.json"),
@@ -2163,6 +2168,12 @@ function CameraStudio() {
   const cameraHudVisibleRef = useRef(false);
   const recordingTimerRef = useRef(null);
   const recordingStartedAtRef = useRef(0);
+  const torchHoldModeRef = useRef(false);
+  const torchLockModeRef = useRef(false);
+  const torchStrobeTimerRef = useRef(0);
+  const torchStrobeEnabledRef = useRef(false);
+  const torchStrobeOnRef = useRef(false);
+  const torchStrobeIntervalMsRef = useRef(TORCH_STROBE_DEFAULT_MS);
   const captureShelfRef = useRef([]);
   const mediaLayersRef = useRef([]);
   const renderStateRef = useRef({
@@ -2187,9 +2198,15 @@ function CameraStudio() {
   const [captureShelf, setCaptureShelf] = useState([]);
   const [torchActive, setTorchActive] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
+  const [torchHoldMode, setTorchHoldMode] = useState(false);
+  const [torchLockMode, setTorchLockMode] = useState(false);
+  const [torchStrobeEnabled, setTorchStrobeEnabled] = useState(false);
+  const [torchStrobeIntervalMs, setTorchStrobeIntervalMs] = useState(TORCH_STROBE_DEFAULT_MS);
+  const [torchLog, setTorchLog] = useState([]);
   const [youtubeWindowOpen, setYoutubeWindowOpen] = useState(false);
   const [databaseWindowOpen, setDatabaseWindowOpen] = useState(false);
   const [primeResultsWindowOpen, setPrimeResultsWindowOpen] = useState(false);
+  const [dwtWindowOpen, setDwtWindowOpen] = useState(false);
   const [selectedYoutubeVideoId, setSelectedYoutubeVideoId] = useState(YOUTUBE_RECENT_UPLOADS[0]?.id || "");
   const [selectedPrimeResultId, setSelectedPrimeResultId] = useState(FEATURED_PRIME_RESULT_ID);
   const [selectedCategory, setSelectedCategory] = useState("All Presets");
@@ -2427,6 +2444,16 @@ function CameraStudio() {
     }
   }, [cameraActive, cameraHudVisible, cameraFacing]);
 
+  const addTorchLog = useCallback((message, level = "info") => {
+    const entry = {
+      id: `torch-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      time: new Date().toLocaleTimeString(),
+      level,
+      message
+    };
+    setTorchLog((current) => [entry, ...current].slice(0, TORCH_LOG_LIMIT));
+  }, []);
+
   const updateTorchCapability = useCallback((stream) => {
     const videoTrack = stream?.getVideoTracks?.()[0];
     let supported = false;
@@ -2441,6 +2468,43 @@ function CameraStudio() {
     return supported;
   }, []);
 
+  const applyTorchConstraint = useCallback(
+    async (enabled, reason = "manual") => {
+      const videoTrack = streamRef.current?.getVideoTracks?.()[0];
+      if (!videoTrack?.applyConstraints) {
+        setTorchSupported(false);
+        setTorchActive(false);
+        addTorchLog(`Torch ${enabled ? "on" : "off"} skipped: no active video track for ${reason}.`, "warn");
+        return false;
+      }
+      let supported = false;
+      try {
+        const capabilities = videoTrack.getCapabilities?.() || {};
+        supported = Boolean(capabilities.torch);
+      } catch (error) {
+        addTorchLog(`Torch capability check failed for ${reason}: ${error.message || error}.`, "error");
+      }
+      if (!supported) {
+        setTorchSupported(false);
+        setTorchActive(false);
+        addTorchLog(`Torch unsupported on this stream for ${reason}.`, "warn");
+        return false;
+      }
+      try {
+        await videoTrack.applyConstraints({ advanced: [{ torch: enabled }] });
+        setTorchSupported(true);
+        setTorchActive(enabled);
+        addTorchLog(`Torch ${enabled ? "enabled" : "disabled"} (${reason}).`, enabled ? "success" : "info");
+        return true;
+      } catch (error) {
+        setTorchActive(false);
+        addTorchLog(`Torch ${enabled ? "enable" : "disable"} failed for ${reason}: ${error.message || error}.`, "error");
+        return false;
+      }
+    },
+    [addTorchLog]
+  );
+
   const attachCameraStream = useCallback(async (stream, nextFacing = cameraFacing) => {
     streamRef.current = stream;
     if (videoRef.current) {
@@ -2454,12 +2518,17 @@ function CameraStudio() {
     setCameraFacing(nextFacing);
     setCameraActive(true);
     const torchReady = updateTorchCapability(stream);
+    if (nextFacing === "environment" && torchReady && (torchHoldModeRef.current || torchLockModeRef.current)) {
+      window.setTimeout(() => {
+        applyTorchConstraint(true, torchLockModeRef.current ? "lock mode reapply" : "hold mode reapply");
+      }, 80);
+    }
     if (nextFacing === "environment" && torchReady) {
       setCameraStatus("Rear camera active. Flashlight control is available and stays local to this device.");
     } else {
       setCameraStatus("Camera active. The video is local to this device and is not uploaded.");
     }
-  }, [cameraFacing, updateTorchCapability]);
+  }, [applyTorchConstraint, cameraFacing, updateTorchCapability]);
 
   const addCaptureToShelf = useCallback((capture) => {
     setCaptureShelf((current) => {
@@ -2484,9 +2553,20 @@ function CameraStudio() {
   }, []);
 
   const stopCamera = useCallback(() => {
+    if (torchStrobeTimerRef.current) {
+      window.clearTimeout(torchStrobeTimerRef.current);
+      torchStrobeTimerRef.current = 0;
+    }
+    torchStrobeEnabledRef.current = false;
+    torchStrobeOnRef.current = false;
+    torchHoldModeRef.current = false;
+    torchLockModeRef.current = false;
+    setTorchStrobeEnabled(false);
+    setTorchHoldMode(false);
+    setTorchLockMode(false);
     if (streamRef.current) {
       const videoTrack = streamRef.current.getVideoTracks?.()[0];
-      if (torchActive && videoTrack?.applyConstraints) {
+      if (videoTrack?.applyConstraints) {
         videoTrack.applyConstraints({ advanced: [{ torch: false }] }).catch(() => undefined);
       }
       streamRef.current.getTracks().forEach((track) => track.stop());
@@ -2500,7 +2580,7 @@ function CameraStudio() {
     setCameraActive(false);
     setTorchActive(false);
     setTorchSupported(false);
-  }, [torchActive]);
+  }, []);
 
   const startCamera = useCallback(async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -2535,38 +2615,6 @@ function CameraStudio() {
       setCameraStatus(`Camera flip failed: ${error.message || error}`);
     }
   }, [attachCameraStream, cameraFacing, stopCamera]);
-
-  const toggleTorch = useCallback(async () => {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setCameraStatus("Flashlight access is not supported in this browser.");
-      return;
-    }
-    try {
-      let stream = streamRef.current;
-      if (!stream || cameraFacing !== "environment") {
-        stopCamera();
-        setCameraStatus("Requesting rear camera for flashlight access...");
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } } });
-        await attachCameraStream(stream, "environment");
-      }
-      const videoTrack = stream.getVideoTracks?.()[0];
-      const capabilities = videoTrack?.getCapabilities?.() || {};
-      if (!capabilities.torch) {
-        setTorchSupported(false);
-        setTorchActive(false);
-        setCameraStatus("This device/browser does not expose rear-camera flashlight control for this stream.");
-        return;
-      }
-      const nextTorch = !torchActive;
-      await videoTrack.applyConstraints({ advanced: [{ torch: nextTorch }] });
-      setTorchSupported(true);
-      setTorchActive(nextTorch);
-      setCameraStatus(nextTorch ? "Rear camera flashlight is on. Stream remains local to this device." : "Rear camera flashlight is off.");
-    } catch (error) {
-      setTorchActive(false);
-      setCameraStatus(`Flashlight toggle failed: ${error.message || error}`);
-    }
-  }, [attachCameraStream, cameraFacing, stopCamera, torchActive]);
 
   function currentCameraRenderSource() {
     return cameraFeedPausedRef.current && pausedFrameCanvasRef.current ? pausedFrameCanvasRef.current : videoRef.current;
@@ -2642,6 +2690,153 @@ function CameraStudio() {
     setRecordingElapsed(0);
     recorderRef.current = null;
   }, []);
+
+  const clearTorchStrobeTimer = useCallback(async (turnTorchOff = true, reason = "strobe stopped") => {
+    if (torchStrobeTimerRef.current) {
+      window.clearTimeout(torchStrobeTimerRef.current);
+      torchStrobeTimerRef.current = 0;
+    }
+    torchStrobeEnabledRef.current = false;
+    torchStrobeOnRef.current = false;
+    setTorchStrobeEnabled(false);
+    if (turnTorchOff) await applyTorchConstraint(false, reason);
+  }, [applyTorchConstraint]);
+
+  const ensureRearTorchStream = useCallback(async (reason = "torch") => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraStatus("Flashlight access is not supported in this browser.");
+      addTorchLog("Torch request failed: mediaDevices.getUserMedia is unavailable.", "error");
+      return null;
+    }
+    if (streamRef.current && cameraFacing === "environment") return streamRef.current;
+    await clearTorchStrobeTimer(true, "rear stream switch");
+    stopRecording("Recording stopped because the rear flashlight stream was requested.");
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) videoRef.current.srcObject = null;
+    if (hudVideoRef.current) hudVideoRef.current.srcObject = null;
+    pausedFrameCanvasRef.current = null;
+    cameraFeedPausedRef.current = false;
+    setCameraFeedPaused(false);
+    setTorchActive(false);
+    setTorchSupported(false);
+    setCameraStatus(`Requesting rear camera for ${reason}...`);
+    addTorchLog(`Requesting rear camera for ${reason}.`, "info");
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } } });
+    await attachCameraStream(stream, "environment");
+    return stream;
+  }, [addTorchLog, attachCameraStream, cameraFacing, clearTorchStrobeTimer, stopRecording]);
+
+  const startTorchStrobeLoop = useCallback(async () => {
+    const stream = await ensureRearTorchStream("strobe mode");
+    if (!stream) return;
+    const firstOn = await applyTorchConstraint(true, "strobe start");
+    if (!firstOn) {
+      setCameraStatus("Strobe could not start because this rear-camera stream does not expose torch control.");
+      return;
+    }
+    torchStrobeEnabledRef.current = true;
+    torchStrobeOnRef.current = true;
+    setTorchStrobeEnabled(true);
+    setTorchHoldMode(false);
+    setTorchLockMode(false);
+    torchHoldModeRef.current = false;
+    torchLockModeRef.current = false;
+    setCameraStatus(`Torch strobe running every ${torchStrobeIntervalMsRef.current}ms. Use Stop Strobe to end it.`);
+    addTorchLog(`Torch strobe loop started at ${torchStrobeIntervalMsRef.current}ms.`, "success");
+
+    const pulse = async () => {
+      if (!torchStrobeEnabledRef.current) return;
+      torchStrobeOnRef.current = !torchStrobeOnRef.current;
+      await applyTorchConstraint(torchStrobeOnRef.current, "strobe pulse");
+      if (torchStrobeEnabledRef.current) {
+        torchStrobeTimerRef.current = window.setTimeout(pulse, torchStrobeIntervalMsRef.current);
+      }
+    };
+    torchStrobeTimerRef.current = window.setTimeout(pulse, torchStrobeIntervalMsRef.current);
+  }, [addTorchLog, applyTorchConstraint, ensureRearTorchStream]);
+
+  const toggleTorchHold = useCallback(async () => {
+    if (torchHoldModeRef.current) {
+      torchHoldModeRef.current = false;
+      setTorchHoldMode(false);
+      await clearTorchStrobeTimer(true, "hold mode off");
+      setCameraStatus("Hold Torch is off.");
+      return;
+    }
+    await clearTorchStrobeTimer(true, "switching to hold mode");
+    const stream = await ensureRearTorchStream("Hold Torch");
+    if (!stream) return;
+    const ok = await applyTorchConstraint(true, "Hold Torch");
+    if (!ok) {
+      setCameraStatus("Hold Torch could not stay on because this device/browser does not expose persistent torch control.");
+      return;
+    }
+    torchHoldModeRef.current = true;
+    torchLockModeRef.current = false;
+    setTorchHoldMode(true);
+    setTorchLockMode(false);
+    setCameraStatus("Hold Torch is on. It will stay on until you turn it off, stop the camera, or close the page.");
+  }, [applyTorchConstraint, clearTorchStrobeTimer, ensureRearTorchStream]);
+
+  const toggleTorchLock = useCallback(async () => {
+    if (torchLockModeRef.current) {
+      torchLockModeRef.current = false;
+      setTorchLockMode(false);
+      await clearTorchStrobeTimer(true, "lock mode off");
+      setCameraStatus("Lock Rear Torch is off.");
+      return;
+    }
+    await clearTorchStrobeTimer(true, "switching to lock mode");
+    const stream = await ensureRearTorchStream("Lock Rear Torch");
+    if (!stream) return;
+    const ok = await applyTorchConstraint(true, "Lock Rear Torch");
+    if (!ok) {
+      setCameraStatus("Lock Rear Torch could not stay on because this device/browser does not expose persistent torch control.");
+      return;
+    }
+    torchHoldModeRef.current = false;
+    torchLockModeRef.current = true;
+    setTorchHoldMode(false);
+    setTorchLockMode(true);
+    setCameraStatus("Lock Rear Torch is on. The studio will reapply torch after rear-stream updates when possible.");
+  }, [applyTorchConstraint, clearTorchStrobeTimer, ensureRearTorchStream]);
+
+  const toggleTorchStrobe = useCallback(async () => {
+    if (torchStrobeEnabledRef.current) {
+      await clearTorchStrobeTimer(true, "strobe stopped");
+      setCameraStatus("Torch strobe stopped.");
+      return;
+    }
+    await startTorchStrobeLoop();
+  }, [clearTorchStrobeTimer, startTorchStrobeLoop]);
+
+  const toggleTorch = useCallback(async () => {
+    try {
+      if (torchStrobeEnabledRef.current) await clearTorchStrobeTimer(true, "manual flashlight override");
+      const stream = await ensureRearTorchStream("manual flashlight");
+      if (!stream) return;
+      const nextTorch = !torchActive;
+      const ok = await applyTorchConstraint(nextTorch, "manual flashlight");
+      if (!ok) {
+        setCameraStatus("This device/browser does not expose rear-camera flashlight control for this stream.");
+        return;
+      }
+      if (!nextTorch) {
+        torchHoldModeRef.current = false;
+        torchLockModeRef.current = false;
+        setTorchHoldMode(false);
+        setTorchLockMode(false);
+      }
+      setCameraStatus(nextTorch ? "Rear camera flashlight is on. Stream remains local to this device." : "Rear camera flashlight is off.");
+    } catch (error) {
+      setTorchActive(false);
+      addTorchLog(`Flashlight toggle failed: ${error.message || error}.`, "error");
+      setCameraStatus(`Flashlight toggle failed: ${error.message || error}`);
+    }
+  }, [addTorchLog, applyTorchConstraint, clearTorchStrobeTimer, ensureRearTorchStream, torchActive]);
 
   const startRecording = useCallback(() => {
     if (!cameraActive || !videoRef.current) {
@@ -2802,6 +2997,13 @@ function CameraStudio() {
       else next.delete(groupId);
       return next;
     });
+  }
+
+  function setSmartSignalProcessorEnabled(processorId, enabled) {
+    setSmartSignalEnabled((current) => ({
+      ...normalizeSmartSignalToggles(current),
+      [processorId]: Boolean(enabled)
+    }));
   }
 
   function handleStopCamera() {
@@ -3073,6 +3275,12 @@ function CameraStudio() {
     cameraFrameRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
+  function updateTorchStrobeInterval(nextValue) {
+    const next = clamp(Number(nextValue), TORCH_STROBE_MIN_MS, TORCH_STROBE_MAX_MS);
+    torchStrobeIntervalMsRef.current = next;
+    setTorchStrobeIntervalMs(next);
+  }
+
   function renderAdjustmentSlider(control, className = "") {
     if (!control) return null;
     const [key, label, min, max, unit] = control;
@@ -3292,6 +3500,118 @@ function CameraStudio() {
     );
   }
 
+  function renderFlashlightStudioPanel() {
+    const torchModeLabel = torchStrobeEnabled
+      ? `Strobe ${torchStrobeIntervalMs}ms`
+      : torchHoldMode
+        ? "Hold Torch"
+        : torchLockMode
+          ? "Lock Rear Torch"
+          : torchActive
+            ? "Manual Torch"
+            : "Standby";
+    const logRows = torchLog.length
+      ? torchLog
+      : [
+          {
+            id: "torch-log-empty",
+            time: "Ready",
+            level: "info",
+            message: "No flashlight debug events yet. Start Hold, Lock, or Strobe to test this device."
+          }
+        ];
+    return (
+      <section className="flashlight-studio-panel" aria-labelledby="flashlightStudioTitle">
+        <div className="recording-panel-heading">
+          <div>
+            <h2 id="flashlightStudioTitle">Flashlight Studio</h2>
+            <span>Rear-device torch controls stay local. Availability depends on browser, camera, and phone hardware.</span>
+          </div>
+          <strong>{torchModeLabel}</strong>
+        </div>
+
+        <div className="flashlight-status-grid" aria-label="Flashlight status">
+          <span>{cameraFacing === "environment" ? "Rear camera" : "Front camera"}</span>
+          <span>{torchSupported ? "Torch supported" : "Torch support unknown"}</span>
+          <span>{torchActive ? "Light active" : "Light off"}</span>
+        </div>
+
+        <div className="flashlight-mode-grid">
+          <button
+            type="button"
+            className={torchHoldMode ? "flashlight-mode-button active" : "flashlight-mode-button"}
+            onClick={toggleTorchHold}
+            disabled={!authorized}
+            aria-pressed={torchHoldMode}
+          >
+            <Zap size={16} />
+            <span>
+              <strong>Hold Torch</strong>
+              <small>Persistent on/off mode for the current rear stream.</small>
+            </span>
+          </button>
+          <button
+            type="button"
+            className={torchLockMode ? "flashlight-mode-button active" : "flashlight-mode-button"}
+            onClick={toggleTorchLock}
+            disabled={!authorized}
+            aria-pressed={torchLockMode}
+          >
+            <LockKeyhole size={16} />
+            <span>
+              <strong>Lock Rear Torch</strong>
+              <small>Requests rear camera and reapplies torch after stream changes.</small>
+            </span>
+          </button>
+          <button
+            type="button"
+            className={torchStrobeEnabled ? "flashlight-mode-button active strobe" : "flashlight-mode-button strobe"}
+            onClick={toggleTorchStrobe}
+            disabled={!authorized}
+            aria-pressed={torchStrobeEnabled}
+          >
+            <Sparkles size={16} />
+            <span>
+              <strong>{torchStrobeEnabled ? "Stop Strobe" : "Start Strobe"}</strong>
+              <small>Pulses torch on/off using the interval below.</small>
+            </span>
+          </button>
+        </div>
+
+        <label className="flashlight-strobe-slider">
+          <span>
+            Strobe interval
+            <output>{torchStrobeIntervalMs}ms</output>
+          </span>
+          <input
+            type="range"
+            min={TORCH_STROBE_MIN_MS}
+            max={TORCH_STROBE_MAX_MS}
+            step={TORCH_STROBE_STEP_MS}
+            value={torchStrobeIntervalMs}
+            onChange={(event) => updateTorchStrobeInterval(event.target.value)}
+            style={{
+              "--value": `${((torchStrobeIntervalMs - TORCH_STROBE_MIN_MS) / (TORCH_STROBE_MAX_MS - TORCH_STROBE_MIN_MS)) * 100}%`
+            }}
+          />
+        </label>
+
+        <p className="flashlight-warning">
+          Strobe can be uncomfortable or unsafe for photosensitive viewers. Start slow, stop immediately if it causes discomfort, and use only with consent nearby.
+        </p>
+
+        <div className="torch-debug-log" aria-label="Flashlight debug log">
+          {logRows.map((entry) => (
+            <div className={`torch-log-row ${entry.level}`} key={entry.id}>
+              <span>{entry.time}</span>
+              <p>{entry.message}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+    );
+  }
+
   function renderAdjustmentGroup(group) {
     const count =
       group.type === "rgbw"
@@ -3345,12 +3665,7 @@ function CameraStudio() {
           type="button"
           className={enabled ? "adjustment-scope-toggle active" : "adjustment-scope-toggle"}
           aria-pressed={enabled}
-          onClick={() =>
-            setSmartSignalEnabled((current) => ({
-              ...normalizeSmartSignalToggles(current),
-              [processor.id]: !current?.[processor.id]
-            }))
-          }
+          onClick={() => setSmartSignalProcessorEnabled(processor.id, !enabled)}
         >
           <ShieldCheck size={15} />
           <span>
@@ -3375,11 +3690,106 @@ function CameraStudio() {
               deterministically weighs nearby pixels and pushes similar artifacts to behave together. DWT adaptive quantization
               profile <code>{DWT_ISOLATE_PROFILE.profileId}</code> is layered on top of the current preset without replacing it.
             </p>
+            <button type="button" className="dwt-inline-button" onClick={() => setDwtWindowOpen(true)}>
+              <Sparkles size={14} />
+              Open DWT Isolation Studio
+            </button>
           </div>
         )}
         <div className="adjustment-list smart-dark-edge-list">
           {processor.controls.map((control) => renderAdjustmentSlider(control, "smart-dark-edge-adjustment smart-signal-adjustment"))}
         </div>
+      </div>
+    );
+  }
+
+  function renderDwtIsolationWindow() {
+    if (!dwtWindowOpen) return null;
+    const isolateProcessor = SMART_SIGNAL_PROCESSORS.find((processor) => processor.id === "isolateGroupedPixels");
+    const isolateEnabled = Boolean(smartSignalEnabled.isolateGroupedPixels);
+    const profileRows = [
+      ["Profile", DWT_ISOLATE_PROFILE.profileId],
+      ["Wavelet", DWT_ISOLATE_PROFILE.wavelet],
+      ["Low frequency weight", DWT_ISOLATE_PROFILE.lowFrequencyWeight],
+      ["Luminance noise", DWT_ISOLATE_PROFILE.luminanceNoiseWeight],
+      ["Chrominance noise", DWT_ISOLATE_PROFILE.chrominanceNoiseWeight],
+      ["Digital noise", DWT_ISOLATE_PROFILE.digitalNoiseWeight],
+      ["Quantization floor", DWT_ISOLATE_PROFILE.quantizationFloor],
+      ["Quantization ceiling", DWT_ISOLATE_PROFILE.quantizationCeiling],
+      ["Defect threshold bias", DWT_ISOLATE_PROFILE.defectThresholdBias],
+      ["Density gain", DWT_ISOLATE_PROFILE.densityGain],
+      ["Edge gain", DWT_ISOLATE_PROFILE.edgeGain],
+      ["Chroma lock gain", DWT_ISOLATE_PROFILE.chromaLockGain],
+      ["Artifact suppression", DWT_ISOLATE_PROFILE.artifactSuppressionGain]
+    ];
+
+    return (
+      <div className="dwt-window-backdrop" role="dialog" aria-modal="true" aria-labelledby="dwtWindowTitle">
+        <section className="dwt-window">
+          <div className="youtube-window-heading">
+            <div>
+              <Sparkles size={22} />
+              <h2 id="dwtWindowTitle">DWT Isolation Studio</h2>
+            </div>
+            <button type="button" onClick={() => setDwtWindowOpen(false)} aria-label="Close DWT Isolation Studio">
+              <X size={20} />
+            </button>
+          </div>
+
+          <p className="dwt-window-note">
+            Imported DWT adaptive quantization controls stay layered on top of the current live preset. Enabling this window's
+            Smart Isolate switch preserves <strong>{liveSelectedEffect.name}</strong> and only adds defect/distortion grouping math.
+          </p>
+
+          <div className="dwt-status-grid" aria-label="DWT pipeline status">
+            <div>
+              <span>Current preset</span>
+              <strong>{liveSelectedEffect.name}</strong>
+            </div>
+            <div>
+              <span>Smart Isolate</span>
+              <strong>{isolateEnabled ? "Enabled" : "Disabled"}</strong>
+            </div>
+            <div>
+              <span>Pipeline source</span>
+              <strong>Local OpenCV / DWT profile</strong>
+            </div>
+          </div>
+
+          <div className="dwt-action-row">
+            <button
+              type="button"
+              className={isolateEnabled ? "active" : ""}
+              onClick={() => setSmartSignalProcessorEnabled("isolateGroupedPixels", !isolateEnabled)}
+            >
+              <ShieldCheck size={16} />
+              {isolateEnabled ? "Disable DWT Isolate" : "Enable DWT Isolate"}
+            </button>
+            <a href={DWT_ISOLATE_PROFILE.profileAsset} target="_blank" rel="noreferrer">
+              <ExternalLink size={16} />
+              Open Profile JSON
+            </a>
+            <a href={DWT_ISOLATE_PROFILE.profileAsset} download="dwt_isolate_profile.json">
+              <Download size={16} />
+              Download Profile
+            </a>
+          </div>
+
+          <div className="dwt-profile-grid" aria-label="DWT profile parameters">
+            {profileRows.map(([label, value]) => (
+              <div key={label}>
+                <span>{label}</span>
+                <strong>{value}</strong>
+              </div>
+            ))}
+          </div>
+
+          {isolateProcessor && (
+            <div className="dwt-control-grid" aria-label="DWT isolate controls">
+              {isolateProcessor.controls.map((control) => renderAdjustmentSlider(control, "smart-dark-edge-adjustment smart-signal-adjustment"))}
+            </div>
+          )}
+        </section>
       </div>
     );
   }
@@ -3731,6 +4141,8 @@ function CameraStudio() {
             </button>
           </div>
 
+          {renderFlashlightStudioPanel()}
+
           {renderEquationEnginePanel()}
 
           <section className="recording-panel" aria-labelledby="recordingPanelTitle">
@@ -4066,6 +4478,8 @@ function CameraStudio() {
           </section>
         </div>
       )}
+
+      {renderDwtIsolationWindow()}
 
       {primeResultsWindowOpen && selectedPrimeResult && (
         <div className="prime-results-window-backdrop" role="dialog" aria-modal="true" aria-labelledby="primeResultsWindowTitle">
