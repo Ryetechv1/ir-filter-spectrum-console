@@ -250,6 +250,29 @@ const TRUSTED_ACCESS = [
   }
 ];
 
+function normalizeCameraFacingMode(value, fallback = "user") {
+  const mode = String(value || "").toLowerCase();
+  if (mode.includes("environment") || mode.includes("rear") || mode.includes("back")) return "environment";
+  if (mode.includes("user") || mode.includes("front") || mode.includes("selfie")) return "user";
+  return fallback === "environment" ? "environment" : "user";
+}
+
+function inferCameraStreamFacing(stream, requestedFacing = "user") {
+  const fallback = normalizeCameraFacingMode(requestedFacing);
+  try {
+    const track = stream?.getVideoTracks?.()[0];
+    const settings = track?.getSettings?.() || {};
+    const resolved = normalizeCameraFacingMode(settings.facingMode, fallback);
+    return resolved;
+  } catch {
+    return fallback;
+  }
+}
+
+function cameraFacingConstraint(facing) {
+  return { facingMode: { ideal: normalizeCameraFacingMode(facing) } };
+}
+
 const RGBW_MIXERS = [
   { key: "main", label: "Main", defaults: { R: 64, G: 196, B: 255, W: 40 } },
   { key: "secondary", label: "Secondary", defaults: { R: 255, G: 78, B: 180, W: 24 } },
@@ -2612,6 +2635,7 @@ function CameraStudio() {
   );
 
   const attachCameraStream = useCallback(async (stream, nextFacing = cameraFacing) => {
+    const resolvedFacing = inferCameraStreamFacing(stream, nextFacing);
     streamRef.current = stream;
     if (videoRef.current) {
       videoRef.current.srcObject = stream;
@@ -2621,15 +2645,15 @@ function CameraStudio() {
       hudVideoRef.current.srcObject = stream;
       await Promise.resolve(hudVideoRef.current.play()).catch(() => undefined);
     }
-    setCameraFacing(nextFacing);
+    setCameraFacing(resolvedFacing);
     setCameraActive(true);
     const torchReady = updateTorchCapability(stream);
-    if (nextFacing === "environment" && torchReady && (torchHoldModeRef.current || torchLockModeRef.current)) {
+    if (resolvedFacing === "environment" && torchReady && (torchHoldModeRef.current || torchLockModeRef.current)) {
       window.setTimeout(() => {
         applyTorchConstraint(true, torchLockModeRef.current ? "lock mode reapply" : "hold mode reapply");
       }, 80);
     }
-    if (nextFacing === "environment" && torchReady) {
+    if (resolvedFacing === "environment" && torchReady) {
       setCameraStatus("Rear camera active. Flashlight control is available and stays local to this device.");
     } else {
       setCameraStatus("Camera active. The video is local to this device and is not uploaded.");
@@ -2698,7 +2722,7 @@ function CameraStudio() {
     stopCamera();
     setCameraStatus("Requesting camera permission...");
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: cameraFacingConstraint("user") });
       await attachCameraStream(stream, "user");
     } catch (error) {
       setCameraActive(false);
@@ -2715,9 +2739,10 @@ function CameraStudio() {
     stopCamera();
     setCameraStatus(`Requesting ${nextFacing === "user" ? "front" : "rear"} camera...`);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: nextFacing } });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: cameraFacingConstraint(nextFacing) });
       await attachCameraStream(stream, nextFacing);
-      setCameraStatus(`${nextFacing === "user" ? "Front" : "Rear"} camera active. Local-only stream.`);
+      const resolvedFacing = inferCameraStreamFacing(stream, nextFacing);
+      setCameraStatus(`${resolvedFacing === "user" ? "Front" : "Rear"} camera active. Local-only stream.`);
     } catch (error) {
       setCameraActive(false);
       setCameraStatus(`Camera flip failed: ${error.message || error}`);
@@ -2834,7 +2859,7 @@ function CameraStudio() {
     setTorchSupported(false);
     setCameraStatus(`Requesting rear camera for ${reason}...`);
     addTorchLog(`Requesting rear camera for ${reason}.`, "info");
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } } });
+    const stream = await navigator.mediaDevices.getUserMedia({ video: cameraFacingConstraint("environment") });
     await attachCameraStream(stream, "environment");
     return stream;
   }, [addTorchLog, attachCameraStream, cameraFacing, clearTorchStrobeTimer, stopRecording]);
@@ -4439,7 +4464,7 @@ function CameraStudio() {
           <ul>
             <li>{CAMERA_EFFECTS.length} local visual presets compiled at 500% intensity for IR-style, UVA-style, full-spectrum thermal, XLS, inversion, tritone, quadtone, channel spectrograph, black-field, channel sweep, cinematic, monochrome, duotone, retro, and color-lab looks.</li>
             <li>Four RGBW gradient mixers for Main, Secondary, Third, and Highlights color layers that drive overlays, filter math, and the selected app accent aesthetic.</li>
-            <li>Grouped adjustment dropdowns with 11 core photo controls, 10 color inversion tools, 20 inversion presets, 10 smart darker-edge controls, 20 smart signal engines, 42 local Spatial Recognition Studio controls with live Point Cloud/TIN surface mapping, an expanded AI-orchestrated Smart Isolate Grouped Pixels DWT/noise defect-distortion module with 31 controls, Thermal Studio A-O hotspot recoloring, 100 advanced sliders, equation-generated filter names/descriptions, and live/overlay adjustment toggles.</li>
+            <li>Grouped adjustment dropdowns with 11 core photo controls, 10 color inversion tools, 20 inversion presets, 10 smart darker-edge controls, 20 smart signal engines, 42 local Spatial Recognition Studio controls with front/rear live Point Cloud/TIN surface mapping, an expanded AI-orchestrated Smart Isolate Grouped Pixels DWT/noise defect-distortion module with 31 controls, Thermal Studio A-O hotspot recoloring, 100 advanced sliders, equation-generated filter names/descriptions, and live/overlay adjustment toggles.</li>
             <li>Flashlight Studio includes Hold Torch, Lock Rear Torch, Strobe, Dimmer Pulse, interval timing, browser brightness-duty controls, and a native iOS AVFoundation torch-dimmer handoff for true smooth 0.1-1.0 iPhone torch levels.</li>
             <li>Processed PNG snapshots and 1080P or 2K MP4 recordings with local camera effects applied, including browser download plus desktop folder-save support when permission is granted.</li>
             <li>Separate 1-3 layer image/video compositor with opacity, splice masks, blend modes, transforms, full adjustment-stack support, and clean PNG export.</li>
