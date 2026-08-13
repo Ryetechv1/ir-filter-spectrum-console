@@ -204,8 +204,8 @@ const SPATIAL_RECOGNITION_PIXEL_BUDGET = 72_000;
 const SPATIAL_LOW_LIGHT_SENSITIVITY_GAIN = 10;
 const SPATIAL_LOW_LIGHT_VISIBILITY_GAIN = 2.85;
 const SPATIAL_LOW_LIGHT_POINT_GAIN = 2.4;
-const SPATIAL_FIELD_VISIBILITY_SCALE = 0.16;
-const SPATIAL_MESH_VISIBILITY_SCALE = 0.14;
+const SPATIAL_FIELD_VISIBILITY_SCALE = 1;
+const SPATIAL_MESH_VISIBILITY_SCALE = 1;
 const SMART_DARK_EDGE_LABEL = "Smart darker edge amplifier";
 const SPATIAL_RECOGNITION_LABEL = "Spatial recognition field mapper";
 const TORCH_LOG_LIMIT = 14;
@@ -1083,7 +1083,7 @@ const ADJUSTMENT_GROUPS = [
   {
     id: "spatial-recognition",
     title: "Spatial Recognition Studio",
-    description: "Local camera-side pseudo-depth, fine low-visibility point-cloud, TIN facets, contour, cell, and field-map recognition derived from visible frame gradients.",
+    description: "Local camera-side pseudo-depth, responsive point-cloud, TIN facets, contour, cell, and field-map recognition derived from visible frame gradients.",
     type: "spatial-recognition",
     controls: SPATIAL_RECOGNITION_ADJUSTMENTS
   },
@@ -4240,7 +4240,7 @@ function CameraStudio() {
           </div>
           <p className="dwt-window-note">
             Spatial Recognition estimates depth-like field structure from visible luminance, local edge gradients, color separation,
-            noise, and contour density. Its live Point Cloud and TIN modes map camera cells into fine, barely visible surface,
+            noise, and contour density. Its live Point Cloud and TIN modes map camera cells into responsive surface,
             noise, and depth geometry while staying layered on top of the current preset.
           </p>
 
@@ -4310,8 +4310,8 @@ function CameraStudio() {
           <strong>Local Spatial Field Mapping</strong>
           <p>
             Adapted from the imported SpatialViewport/pointCloudWorker prototype without adding Three.js dependencies. The camera canvas
-            decimates frame pixels into finer live cells, subtle point-cloud samples, and low-opacity TIN triangle facets so desktop,
-            mobile, HUD, exports, and media layers all share the same surface/noise/depth result without covering the scene.
+            decimates frame pixels into responsive live cells, larger point-cloud samples, and stronger TIN triangle facets so desktop,
+            mobile, HUD, exports, and media layers all share the same surface/noise/depth result.
             Spatial Power now weights frame detail instead of creating a central radial light point, and Parallax Drift moves as one
             even translated layer across the whole preview.
           </p>
@@ -4558,7 +4558,7 @@ function CameraStudio() {
           <ul>
             <li>{CAMERA_EFFECTS.length} local visual presets compiled at 500% intensity for IR-style, UVA-style, full-spectrum thermal, XLS, inversion, tritone, quadtone, channel spectrograph, black-field, channel sweep, cinematic, monochrome, duotone, retro, and color-lab looks.</li>
             <li>Four RGBW gradient mixers for Main, Secondary, Third, and Highlights color layers that drive overlays, filter math, and the selected app accent aesthetic.</li>
-            <li>Grouped adjustment dropdowns with 11 core photo controls, 10 color inversion tools, 20 inversion presets, 10 smart darker-edge controls, 20 smart signal engines, 42 local Spatial Recognition Studio controls with 1000% low-light sensitivity and fine, barely visible front/rear live Point Cloud/TIN surface mapping, an expanded AI-orchestrated Smart Isolate Grouped Pixels DWT/noise defect-distortion module with 31 controls, Thermal Studio A-O hotspot recoloring, 100 advanced sliders, equation-generated filter names/descriptions, and live/overlay adjustment toggles.</li>
+            <li>Grouped adjustment dropdowns with 11 core photo controls, 10 color inversion tools, 20 inversion presets, 10 smart darker-edge controls, 20 smart signal engines, 42 local Spatial Recognition Studio controls with 1000% low-light sensitivity and restored responsive front/rear live Point Cloud/TIN surface mapping, an expanded AI-orchestrated Smart Isolate Grouped Pixels DWT/noise defect-distortion module with 31 controls, Thermal Studio A-O hotspot recoloring, 100 advanced sliders, equation-generated filter names/descriptions, and live/overlay adjustment toggles.</li>
             <li>Flashlight Studio includes Hold Torch, Lock Rear Torch, Strobe, Dimmer Pulse, interval timing, direct torch-level probing, browser brightness-duty fallback controls, and a native iOS AVFoundation torch-dimmer handoff for true smooth 0.1-1.0 iPhone torch levels.</li>
             <li>Processed PNG snapshots and 1080P or 2K MP4 recordings with local camera effects applied, including browser download plus desktop folder-save support when permission is granted.</li>
             <li>Separate 1-3 layer image/video compositor with opacity, splice masks, blend modes, transforms, full adjustment-stack support, and clean PNG export.</li>
@@ -6325,7 +6325,7 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
         nearField * 0.18 -
         farField * 0.14 +
         specularSignal * 0.12 -
-        shadowSignal * model.occlusion * 0.18 -
+        shadowSignal * model.occlusion * 0.18 +
         model.sensitivity * 0.12,
       0,
       1
@@ -6346,7 +6346,7 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
         (0.26 + model.depth * 0.34 + model.sensitivity * 0.26 + model.thermalLock * 0.16 + lowLightSignal * 0.42) *
         SPATIAL_FIELD_VISIBILITY_SCALE,
       0,
-      0.14
+      0.92
     );
     let r = data[index];
     let g = data[index + 1];
@@ -6368,7 +6368,7 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
     }
 
     if (model.occlusion > 0.01) {
-      const darken = clamp((shadowSignal + farField * 0.22) * model.occlusion * model.master * 68 * SPATIAL_FIELD_VISIBILITY_SCALE, 0, 18);
+      const darken = clamp((shadowSignal + farField * 0.22) * model.occlusion * model.master * 68 * SPATIAL_FIELD_VISIBILITY_SCALE, 0, 96);
       r -= darken;
       g -= darken * 0.9;
       b -= darken * 0.82;
@@ -6378,7 +6378,7 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
       const split = clamp(
         (edge + contourMask + specularSignal * 0.45) * model.colorSplit * model.master * (42 + model.colorDepth * 36) * SPATIAL_FIELD_VISIBILITY_SCALE,
         0,
-        16
+        72
       );
       r += split;
       g += split * Math.sin((x / Math.max(1, width)) * Math.PI + model.motionTrace) * (0.28 + model.vectorTension * 0.2);
@@ -6386,7 +6386,7 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
     }
 
     if (model.smoothing > 0.01) {
-      const smoothAlpha = clamp(model.smoothing * (0.06 + (1 - edge) * 0.12 + model.depthBlur * 0.08) * model.master * SPATIAL_FIELD_VISIBILITY_SCALE, 0, 0.08);
+      const smoothAlpha = clamp(model.smoothing * (0.06 + (1 - edge) * 0.12 + model.depthBlur * 0.08) * model.master * SPATIAL_FIELD_VISIBILITY_SCALE, 0, 0.28);
       const localGray = localAverage * 255;
       r = mixChannel(r, localGray, smoothAlpha);
       g = mixChannel(g, localGray, smoothAlpha * 0.9);
@@ -6406,7 +6406,7 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
     }
 
     if (lowLightSignal > 0.01) {
-      const lowLightAlpha = clamp(lowLightSignal * model.master * 0.045 * SPATIAL_FIELD_VISIBILITY_SCALE, 0, 0.08);
+      const lowLightAlpha = clamp(lowLightSignal * model.master * 0.045 * SPATIAL_FIELD_VISIBILITY_SCALE, 0, 0.46);
       r = mixChannel(r, dr, lowLightAlpha);
       g = mixChannel(g, dg, lowLightAlpha * 0.94);
       b = mixChannel(b, db, lowLightAlpha * 0.88);
@@ -6419,22 +6419,22 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
   context.putImageData(frame, 0, 0);
   paintLiveSpatialPointCloudAndTin(context, width, height, source, model);
 
-  const meshAlpha = clamp(model.meshOpacity * model.master * 0.32 * SPATIAL_MESH_VISIBILITY_SCALE, 0, 0.075);
+  const meshAlpha = clamp(model.meshOpacity * model.master * 0.32 * SPATIAL_MESH_VISIBILITY_SCALE, 0, 0.42);
   if (meshAlpha > 0.01) {
-    const gridStep = Math.max(4, Math.round(26 - model.pointDensity * 4 - model.contourDensity * 2 - model.lowLightSensitivity * 0.8));
+    const gridStep = Math.max(7, Math.round(38 - model.pointDensity * 20 - model.contourDensity * 7));
     const drift = spatialUniformParallaxOffset(width, height, model, 1);
     context.save();
     context.globalCompositeOperation = "screen";
     context.translate(drift.x, drift.y);
-    context.lineWidth = Math.max(0.28, Math.min(0.72, Math.min(width, height) / (1400 - model.vectorTension * 210)));
-    context.strokeStyle = `rgba(125, 238, 255, ${clamp(meshAlpha + model.surfaceNormal * 0.004, 0, 0.085)})`;
+    context.lineWidth = Math.max(0.5, Math.min(width, height) / (900 - model.vectorTension * 260));
+    context.strokeStyle = `rgba(125, 238, 255, ${clamp(meshAlpha + model.surfaceNormal * 0.04, 0, 0.5)})`;
     for (let x = -gridStep; x <= width + gridStep; x += gridStep) {
       context.beginPath();
       context.moveTo(x, -gridStep);
       context.lineTo(x, height + gridStep);
       context.stroke();
     }
-    context.strokeStyle = `rgba(255, 111, 164, ${clamp(meshAlpha * (0.62 + model.colorDepth * 0.05), 0, 0.07)})`;
+    context.strokeStyle = `rgba(255, 111, 164, ${clamp(meshAlpha * (0.74 + model.colorDepth * 0.22), 0, 0.5)})`;
     for (let y = -gridStep; y <= height + gridStep; y += gridStep) {
       context.beginPath();
       context.moveTo(-gridStep, y);
@@ -6444,16 +6444,16 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
     context.restore();
   }
 
-  const pointAlpha = clamp(model.pointDensity * model.master * (0.28 + model.subpixelScan * 0.12) * SPATIAL_MESH_VISIBILITY_SCALE, 0, 0.075);
+  const pointAlpha = clamp(model.pointDensity * model.master * (0.28 + model.subpixelScan * 0.12) * SPATIAL_MESH_VISIBILITY_SCALE, 0, 0.46);
   if (pointAlpha > 0.01) {
-    const pointStep = Math.max(4, Math.round(18 - model.pointDensity * 3 - model.subpixelScan * 1.4));
+    const pointStep = Math.max(5, Math.round(29 - model.pointDensity * 18 - model.subpixelScan * 7));
     const drift = spatialUniformParallaxOffset(width, height, model, 0.85);
     context.save();
     context.globalCompositeOperation = "screen";
     context.fillStyle = `rgba(238, 255, 255, ${pointAlpha})`;
     for (let y = pointStep; y < height; y += pointStep) {
       for (let x = pointStep; x < width; x += pointStep) {
-        const size = clamp(0.45 + model.subpixelScan * 0.16 + model.objectCohesion * 0.08, 0.45, 1.35);
+        const size = clamp(1.2 + model.subpixelScan * 1.1 + model.objectCohesion * 0.5, 1.2, 8.2);
         context.fillRect(x + drift.x, y + drift.y, size, size);
       }
     }
@@ -6465,25 +6465,25 @@ function paintLiveSpatialPointCloudAndTin(context, width, height, source, model)
   const pointCloudAlpha = clamp(
     model.livePointCloud * model.master * (0.34 + model.subpixelScan * 0.16 + model.lowLightSensitivity * 0.022) * SPATIAL_MESH_VISIBILITY_SCALE,
     0,
-    0.11
+    0.82
   );
   const tinAlpha = clamp(
     model.tinOpacity * model.master * (0.28 + model.surfaceMap * 0.12 + model.cellDepth * 0.08 + model.lowLightSensitivity * 0.018) * SPATIAL_MESH_VISIBILITY_SCALE,
     0,
-    0.085
+    0.7
   );
   const wireAlpha = clamp(
     model.tinWire * model.master * (0.22 + model.surfaceMap * 0.08 + model.lowLightSensitivity * 0.014) * SPATIAL_MESH_VISIBILITY_SCALE,
     0,
-    0.095
+    0.62
   );
   if (pointCloudAlpha <= 0.01 && tinAlpha <= 0.01 && wireAlpha <= 0.01) return;
 
   const cellStep = Math.max(
-    3,
-    Math.round(28 - model.cellSize * 9 - model.pointDensity * 3 - model.livePointCloud * 2 - model.subpixelScan * 1.4 - model.lowLightSensitivity * 0.9)
+    5,
+    Math.round(40 - model.cellSize * 17 - model.pointDensity * 7 - model.livePointCloud * 6 - model.subpixelScan * 3 - model.lowLightSensitivity * 1.8)
   );
-  const sampleRadius = Math.max(1, Math.round(cellStep * 0.34));
+  const sampleRadius = Math.max(1, Math.round(cellStep * 0.45));
   const uniformDrift = spatialUniformParallaxOffset(width, height, model, 0.7 + model.gridWarp * 0.05);
   const rows = [];
   const safeIndex = (x, y) => (clamp(Math.round(y), 0, height - 1) * width + clamp(Math.round(x), 0, width - 1)) * 4;
@@ -6576,7 +6576,7 @@ function paintLiveSpatialPointCloudAndTin(context, width, height, source, model)
   if (wireAlpha > 0.01) {
     context.save();
     context.globalCompositeOperation = "screen";
-    context.lineWidth = clamp(cellStep / (24 - model.surfaceMap * 3), 0.22, 0.62);
+    context.lineWidth = Math.max(0.45, cellStep / (16 - model.surfaceMap * 5));
     context.strokeStyle = `rgba(190, 249, 255, ${wireAlpha})`;
     for (let rowIndex = 0; rowIndex < rows.length - 1; rowIndex += 1) {
       const row = rows[rowIndex];
@@ -6615,8 +6615,8 @@ function paintLiveSpatialPointCloudAndTin(context, width, height, source, model)
         );
         if (signal < clamp(0.08 - model.lowLightSensitivity * 0.009, 0.012, 0.08)) continue;
         const [r, g, b] = point.color;
-        const size = clamp(0.45 + signal * 0.65 + model.pointLift * 0.08 + model.subpixelScan * 0.08 + point.lowLight * 0.18, 0.45, 1.8);
-        context.fillStyle = `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${clamp(pointCloudAlpha * (0.18 + signal * 0.28 + point.lowLight * 0.12), 0, 0.12)})`;
+        const size = clamp(0.8 + signal * 2.8 + model.pointLift * 1.1 + model.subpixelScan * 0.6 + point.lowLight * 1.2, 0.8, 7.4);
+        context.fillStyle = `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${clamp(pointCloudAlpha * (0.3 + signal * 0.85 + point.lowLight * 0.32), 0, 0.88)})`;
         context.fillRect(point.x - size / 2, point.y - size / 2, size, size);
       }
     }
@@ -6637,7 +6637,7 @@ function paintSpatialTinTriangle(context, points, alpha, model) {
   const facetAlpha = clamp(
     alpha * (0.18 + depth * 0.42 + edge * 0.22 + noise * model.noiseMap * 0.24 + surface * model.surfaceMap * 0.2 + lowLight * 0.38),
     0,
-    0.055
+    0.68
   );
   if (facetAlpha <= 0.006) return;
   const blendColor = color.map((channel) => mixChannel(channel, 255, model.facetSmoothing * 0.08));
