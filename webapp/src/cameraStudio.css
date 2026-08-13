@@ -2054,6 +2054,7 @@
 
 .feature-guide-window {
   width: min(1240px, calc(100vw - 32px));
+  box-sizing: border-box;
   overflow-x: hidden;
 }
 
@@ -2225,14 +2226,76 @@
 .feature-guide-item {
   display: grid;
   align-content: start;
-  gap: 7px;
+  gap: 0;
   min-width: 0;
-  padding: 11px;
   border: 1px solid rgba(133, 160, 184, 0.16);
   border-radius: 8px;
   background:
     radial-gradient(circle at 0 0, rgba(var(--studio-accent-rgb), 0.12), transparent 34%),
     rgba(2, 5, 8, 0.44);
+  overflow: clip;
+}
+
+.feature-guide-item summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  padding: 11px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.feature-guide-item summary::-webkit-details-marker {
+  display: none;
+}
+
+.feature-guide-item summary::after {
+  content: "Open details";
+  justify-self: start;
+  padding: 4px 7px;
+  border: 1px solid rgba(var(--studio-accent-rgb), 0.2);
+  border-radius: 999px;
+  color: var(--studio-accent-strong);
+  background: rgba(2, 5, 8, 0.4);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.feature-guide-item[open] summary {
+  border-bottom: 1px solid rgba(var(--studio-accent-rgb), 0.14);
+}
+
+.feature-guide-item[open] summary::after {
+  content: "Collapse";
+  color: var(--studio-accent-contrast);
+  background: linear-gradient(180deg, var(--studio-accent-strong), var(--studio-accent-deep));
+}
+
+.feature-guide-item-body {
+  display: grid;
+  gap: 8px;
+  padding: 11px;
+}
+
+.feature-guide-inline-action {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 38px;
+  padding: 0 11px;
+  border: 1px solid rgba(var(--studio-accent-rgb), 0.34);
+  border-radius: 8px;
+  color: var(--studio-accent-contrast);
+  background: linear-gradient(180deg, var(--studio-accent-strong), var(--studio-accent-deep));
+  font-size: 12px;
+  font-weight: 880;
+  overflow-wrap: anywhere;
+  text-align: center;
 }
 
 .feature-guide-item p,

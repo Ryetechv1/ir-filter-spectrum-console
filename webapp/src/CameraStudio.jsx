@@ -4633,21 +4633,45 @@ function CameraStudio() {
                     <em>{section.items.length} entries</em>
                   </summary>
                   <div className="feature-guide-item-grid">
-                    {section.items.map((item) => (
-                      <article className="feature-guide-item" key={`${section.id}-${item.meta || ""}-${item.title}`}>
-                        <span>{item.meta || section.title}</span>
-                        <strong>{item.title}</strong>
-                        {item.description && <p>{item.description}</p>}
-                        {item.details?.length > 0 && (
-                          <ul>
-                            {item.details.slice(0, 18).map((detail) => (
-                              <li key={detail}>{detail}</li>
-                            ))}
-                            {item.details.length > 18 && <li>{item.details.length - 18} more entries documented in this group.</li>}
-                          </ul>
-                        )}
-                      </article>
-                    ))}
+                    {section.items.map((item) => {
+                      const isSincereOverview = section.id === "overview" && item.title === "Free sincere experimental studio mission";
+                      return (
+                        <details
+                          className="feature-guide-item"
+                          key={`${section.id}-${item.meta || ""}-${item.title}`}
+                          open={Boolean(query) || isSincereOverview}
+                        >
+                          <summary>
+                            <span>{item.meta || section.title}</span>
+                            <strong>{item.title}</strong>
+                          </summary>
+                          <div className="feature-guide-item-body">
+                            {item.description && <p>{item.description}</p>}
+                            {isSincereOverview && (
+                              <button
+                                type="button"
+                                className="feature-guide-inline-action"
+                                onClick={() => {
+                                  setFeatureGuideWindowOpen(false);
+                                  setPrimeResultsWindowOpen(true);
+                                }}
+                              >
+                                <Sparkles size={15} />
+                                Open PRIME Spectral Examples Image Gallery Listing
+                              </button>
+                            )}
+                            {item.details?.length > 0 && (
+                              <ul>
+                                {item.details.slice(0, 18).map((detail) => (
+                                  <li key={detail}>{detail}</li>
+                                ))}
+                                {item.details.length > 18 && <li>{item.details.length - 18} more entries documented in this group.</li>}
+                              </ul>
+                            )}
+                          </div>
+                        </details>
+                      );
+                    })}
                   </div>
                 </details>
               ))
