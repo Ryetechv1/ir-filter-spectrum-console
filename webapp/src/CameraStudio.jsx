@@ -200,7 +200,7 @@ const THERMAL_SIGNAL_GAIN = 1.42;
 const RGBW_MIXER_GAIN = 1.72;
 const PRESET_INTENSITY_MULTIPLIER = 5;
 const SMART_SIGNAL_PIXEL_BUDGET = 74_000;
-const SPATIAL_RECOGNITION_PIXEL_BUDGET = 56_000;
+const SPATIAL_RECOGNITION_PIXEL_BUDGET = 72_000;
 const SMART_DARK_EDGE_LABEL = "Smart darker edge amplifier";
 const SPATIAL_RECOGNITION_LABEL = "Spatial recognition field mapper";
 const TORCH_LOG_LIMIT = 14;
@@ -208,6 +208,11 @@ const TORCH_STROBE_MIN_MS = 80;
 const TORCH_STROBE_MAX_MS = 2000;
 const TORCH_STROBE_STEP_MS = 20;
 const TORCH_STROBE_DEFAULT_MS = 420;
+const TORCH_BRIGHTNESS_MIN = 5;
+const TORCH_BRIGHTNESS_MAX = 100;
+const TORCH_BRIGHTNESS_STEP = 5;
+const TORCH_BRIGHTNESS_DEFAULT = 100;
+const SNAPSHOT_SAVE_FOLDER_NAME = "SPECTRAL_X1_IMAGE_SAVES";
 const DWT_ISOLATE_PROFILE = {
   profileId: "dwt-adaptive-quantization-v1",
   profileAsset: studioAssetUrl("assets/dwt-isolate/dwt_isolate_profile.json"),
@@ -712,7 +717,27 @@ const SPATIAL_RECOGNITION_ADJUSTMENTS = [
   ["spatialContourOpacity", "Contour Opacity", 0, 100, "%", 48],
   ["spatialParallax", "Parallax Drift", 0, 100, "%", 36],
   ["spatialColorSplit", "Color Split", 0, 100, "%", 56],
-  ["spatialSmoothing", "Depth Smoothing", 0, 100, "%", 38]
+  ["spatialSmoothing", "Depth Smoothing", 0, 100, "%", 38],
+  ["spatialMicroContrast", "Micro Contrast", 0, 100, "%", 58],
+  ["spatialGradientLift", "Gradient Lift", 0, 100, "%", 52],
+  ["spatialNearFieldBias", "Near Field Bias", 0, 100, "%", 48],
+  ["spatialFarFieldBias", "Far Field Bias", 0, 100, "%", 44],
+  ["spatialOcclusion", "Occlusion Weight", 0, 100, "%", 50],
+  ["spatialDepthSharpen", "Depth Sharpen", 0, 100, "%", 54],
+  ["spatialDepthBlur", "Depth Blur", 0, 100, "%", 24],
+  ["spatialContourDensity", "Contour Density", 0, 100, "%", 62],
+  ["spatialContourThreshold", "Contour Threshold", 0, 100, "%", 38],
+  ["spatialVectorTension", "Vector Tension", 0, 100, "%", 46],
+  ["spatialSurfaceNormal", "Surface Normal", 0, 100, "%", 56],
+  ["spatialSpecularSense", "Specular Sense", 0, 100, "%", 50],
+  ["spatialShadowSense", "Shadow Sense", 0, 100, "%", 55],
+  ["spatialHighlightSense", "Highlight Sense", 0, 100, "%", 52],
+  ["spatialColorDepth", "Color Depth", 0, 100, "%", 64],
+  ["spatialNoiseReject", "Noise Reject", 0, 100, "%", 36],
+  ["spatialObjectCohesion", "Object Cohesion", 0, 100, "%", 58],
+  ["spatialMotionTrace", "Motion Trace", 0, 100, "%", 28],
+  ["spatialSubpixelScan", "Subpixel Scan", 0, 100, "%", 46],
+  ["spatialThermalLock", "Thermal Lock", 0, 100, "%", 60]
 ];
 
 const SMART_SIGNAL_PROCESSOR_SLIDERS = [
@@ -2229,7 +2254,10 @@ function CameraStudio() {
   const torchStrobeEnabledRef = useRef(false);
   const torchStrobeOnRef = useRef(false);
   const torchStrobeIntervalMsRef = useRef(TORCH_STROBE_DEFAULT_MS);
+  const torchDimmerEnabledRef = useRef(false);
+  const torchBrightnessPercentRef = useRef(TORCH_BRIGHTNESS_DEFAULT);
   const captureShelfRef = useRef([]);
+  const snapshotSaveDirectoryRef = useRef(null);
   const mediaLayersRef = useRef([]);
   const renderStateRef = useRef({
     filterCss: "",
@@ -2258,6 +2286,8 @@ function CameraStudio() {
   const [torchLockMode, setTorchLockMode] = useState(false);
   const [torchStrobeEnabled, setTorchStrobeEnabled] = useState(false);
   const [torchStrobeIntervalMs, setTorchStrobeIntervalMs] = useState(TORCH_STROBE_DEFAULT_MS);
+  const [torchDimmerEnabled, setTorchDimmerEnabled] = useState(false);
+  const [torchBrightnessPercent, setTorchBrightnessPercent] = useState(TORCH_BRIGHTNESS_DEFAULT);
   const [torchLog, setTorchLog] = useState([]);
   const [youtubeWindowOpen, setYoutubeWindowOpen] = useState(false);
   const [databaseWindowOpen, setDatabaseWindowOpen] = useState(false);
@@ -2625,9 +2655,11 @@ function CameraStudio() {
     }
     torchStrobeEnabledRef.current = false;
     torchStrobeOnRef.current = false;
+    torchDimmerEnabledRef.current = false;
     torchHoldModeRef.current = false;
     torchLockModeRef.current = false;
     setTorchStrobeEnabled(false);
+    setTorchDimmerEnabled(false);
     setTorchHoldMode(false);
     setTorchLockMode(false);
     if (streamRef.current) {
@@ -2764,7 +2796,9 @@ function CameraStudio() {
     }
     torchStrobeEnabledRef.current = false;
     torchStrobeOnRef.current = false;
+    torchDimmerEnabledRef.current = false;
     setTorchStrobeEnabled(false);
+    setTorchDimmerEnabled(false);
     if (turnTorchOff) await applyTorchConstraint(false, reason);
   }, [applyTorchConstraint]);
 
@@ -2795,6 +2829,30 @@ function CameraStudio() {
     return stream;
   }, [addTorchLog, attachCameraStream, cameraFacing, clearTorchStrobeTimer, stopRecording]);
 
+  const scheduleTorchDutyCycleLoop = useCallback(
+    (activeRef, label) => {
+      const pulseOn = async () => {
+        if (!activeRef.current) return;
+        const cycleMs = clamp(torchStrobeIntervalMsRef.current, TORCH_STROBE_MIN_MS, TORCH_STROBE_MAX_MS);
+        const duty = clamp(torchBrightnessPercentRef.current / 100, TORCH_BRIGHTNESS_MIN / 100, 0.96);
+        const onMs = Math.max(24, Math.round(cycleMs * duty));
+        const offMs = Math.max(24, cycleMs - onMs);
+        torchStrobeOnRef.current = true;
+        await applyTorchConstraint(true, `${label} pulse on`);
+        if (!activeRef.current) return;
+        torchStrobeTimerRef.current = window.setTimeout(async () => {
+          if (!activeRef.current) return;
+          torchStrobeOnRef.current = false;
+          await applyTorchConstraint(false, `${label} pulse off`);
+          if (!activeRef.current) return;
+          torchStrobeTimerRef.current = window.setTimeout(pulseOn, offMs);
+        }, onMs);
+      };
+      pulseOn();
+    },
+    [applyTorchConstraint]
+  );
+
   const startTorchStrobeLoop = useCallback(async () => {
     const stream = await ensureRearTorchStream("strobe mode");
     if (!stream) return;
@@ -2806,23 +2864,48 @@ function CameraStudio() {
     torchStrobeEnabledRef.current = true;
     torchStrobeOnRef.current = true;
     setTorchStrobeEnabled(true);
+    setTorchDimmerEnabled(false);
+    setTorchHoldMode(false);
+    setTorchLockMode(false);
+    torchDimmerEnabledRef.current = false;
+    torchHoldModeRef.current = false;
+    torchLockModeRef.current = false;
+    setCameraStatus(
+      `Torch strobe running every ${torchStrobeIntervalMsRef.current}ms at ${torchBrightnessPercentRef.current}% duty brightness. Use Stop Strobe to end it.`
+    );
+    addTorchLog(
+      `Torch strobe duty loop started at ${torchStrobeIntervalMsRef.current}ms / ${torchBrightnessPercentRef.current}% brightness duty.`,
+      "success"
+    );
+    scheduleTorchDutyCycleLoop(torchStrobeEnabledRef, "strobe");
+  }, [addTorchLog, applyTorchConstraint, ensureRearTorchStream, scheduleTorchDutyCycleLoop]);
+
+  const startTorchDimmerLoop = useCallback(async () => {
+    const stream = await ensureRearTorchStream("dimmer pulse mode");
+    if (!stream) return;
+    const firstOn = await applyTorchConstraint(true, "dimmer pulse start");
+    if (!firstOn) {
+      setCameraStatus("Dimmer pulse could not start because this rear-camera stream does not expose torch control.");
+      return;
+    }
+    torchDimmerEnabledRef.current = true;
+    torchStrobeEnabledRef.current = false;
+    torchStrobeOnRef.current = true;
+    setTorchDimmerEnabled(true);
+    setTorchStrobeEnabled(false);
     setTorchHoldMode(false);
     setTorchLockMode(false);
     torchHoldModeRef.current = false;
     torchLockModeRef.current = false;
-    setCameraStatus(`Torch strobe running every ${torchStrobeIntervalMsRef.current}ms. Use Stop Strobe to end it.`);
-    addTorchLog(`Torch strobe loop started at ${torchStrobeIntervalMsRef.current}ms.`, "success");
-
-    const pulse = async () => {
-      if (!torchStrobeEnabledRef.current) return;
-      torchStrobeOnRef.current = !torchStrobeOnRef.current;
-      await applyTorchConstraint(torchStrobeOnRef.current, "strobe pulse");
-      if (torchStrobeEnabledRef.current) {
-        torchStrobeTimerRef.current = window.setTimeout(pulse, torchStrobeIntervalMsRef.current);
-      }
-    };
-    torchStrobeTimerRef.current = window.setTimeout(pulse, torchStrobeIntervalMsRef.current);
-  }, [addTorchLog, applyTorchConstraint, ensureRearTorchStream]);
+    setCameraStatus(
+      `Torch dimmer pulse is running at ${torchBrightnessPercentRef.current}% duty brightness using the ${torchStrobeIntervalMsRef.current}ms interval.`
+    );
+    addTorchLog(
+      `Torch dimmer pulse started from the strobe engine at ${torchBrightnessPercentRef.current}% brightness duty.`,
+      "success"
+    );
+    scheduleTorchDutyCycleLoop(torchDimmerEnabledRef, "dimmer");
+  }, [addTorchLog, applyTorchConstraint, ensureRearTorchStream, scheduleTorchDutyCycleLoop]);
 
   const toggleTorchHold = useCallback(async () => {
     if (torchHoldModeRef.current) {
@@ -2879,9 +2962,20 @@ function CameraStudio() {
     await startTorchStrobeLoop();
   }, [clearTorchStrobeTimer, startTorchStrobeLoop]);
 
+  const toggleTorchDimmer = useCallback(async () => {
+    if (torchDimmerEnabledRef.current) {
+      await clearTorchStrobeTimer(true, "dimmer pulse stopped");
+      setCameraStatus("Torch dimmer pulse stopped.");
+      return;
+    }
+    await clearTorchStrobeTimer(true, "switching to dimmer pulse");
+    await startTorchDimmerLoop();
+  }, [clearTorchStrobeTimer, startTorchDimmerLoop]);
+
   const toggleTorch = useCallback(async () => {
     try {
       if (torchStrobeEnabledRef.current) await clearTorchStrobeTimer(true, "manual flashlight override");
+      if (torchDimmerEnabledRef.current) await clearTorchStrobeTimer(true, "manual flashlight override");
       const stream = await ensureRearTorchStream("manual flashlight");
       if (!stream) return;
       const nextTorch = !torchActive;
@@ -3210,6 +3304,62 @@ function CameraStudio() {
     setMediaComposerStatus("Video layer restarted.");
   }
 
+  function triggerBrowserDownload(url, filename) {
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
+  function isLikelyDesktopSaveTarget() {
+    const userAgent = navigator.userAgent || "";
+    return !/Android|iPhone|iPad|iPod|Mobile|Mobi/i.test(userAgent);
+  }
+
+  async function trySaveBlobToSpectralFolder(blob, filename) {
+    if (!isLikelyDesktopSaveTarget() || typeof window.showDirectoryPicker !== "function") {
+      return { saved: false, reason: "folder-api-unavailable" };
+    }
+    try {
+      let spectralDirectory = snapshotSaveDirectoryRef.current;
+      if (!spectralDirectory) {
+        const rootDirectory = await window.showDirectoryPicker({
+          id: "spectral-x1-image-saves",
+          mode: "readwrite",
+          startIn: "downloads"
+        });
+        spectralDirectory = await rootDirectory.getDirectoryHandle(SNAPSHOT_SAVE_FOLDER_NAME, { create: true });
+        snapshotSaveDirectoryRef.current = spectralDirectory;
+      }
+      const fileHandle = await spectralDirectory.getFileHandle(filename, { create: true });
+      const writable = await fileHandle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return { saved: true, reason: "folder-save" };
+    } catch (error) {
+      return {
+        saved: false,
+        reason: error?.name === "AbortError" ? "folder-picker-cancelled" : error?.message || String(error)
+      };
+    }
+  }
+
+  async function saveExportBlob(blob, url, filename, statusTarget = "camera") {
+    const folderResult = await trySaveBlobToSpectralFolder(blob, filename);
+    if (folderResult.saved) {
+      return `Saved to the selected Downloads folder inside ${SNAPSHOT_SAVE_FOLDER_NAME}.`;
+    }
+    triggerBrowserDownload(url, filename);
+    if (statusTarget === "camera" && folderResult.reason !== "folder-api-unavailable") {
+      addTorchLog(`Desktop folder save fell back to browser download: ${folderResult.reason}.`, "warn");
+    }
+    return isLikelyDesktopSaveTarget()
+      ? `Downloaded through the browser. For a fixed ${SNAPSHOT_SAVE_FOLDER_NAME} folder, allow the folder picker when prompted.`
+      : "Snapshot download started on this device. Mobile browsers decide whether it lands in Photos, Files, or Downloads.";
+  }
+
   async function exportMediaCompositeSnapshot() {
     if (!mediaLayers.length) {
       setMediaComposerStatus("Upload at least one image or video before exporting a composite.");
@@ -3251,11 +3401,9 @@ function CameraStudio() {
         size: blob.size,
         createdAt: new Date().toISOString()
       });
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `spectral-media-composite-${new Date().toISOString().replace(/[:.]/g, "-")}.png`;
-      link.click();
-      setMediaComposerStatus("Composite PNG exported as clean media only, with app chrome and watermark overlays hidden.");
+      const filename = `spectral-media-composite-${new Date().toISOString().replace(/[:.]/g, "-")}.png`;
+      const saveMessage = await saveExportBlob(blob, url, filename, "media");
+      setMediaComposerStatus(`Composite PNG exported as clean media only. ${saveMessage}`);
     } catch (error) {
       setMediaComposerStatus(`Composite export failed: ${error.message || error}`);
     }
@@ -3332,11 +3480,9 @@ function CameraStudio() {
         size: blob.size,
         createdAt: new Date().toISOString()
       });
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `spectral-imaging-studio-${new Date().toISOString().replace(/[:.]/g, "-")}.png`;
-      link.click();
-      setCameraStatus("Snapshot downloaded as clean media only, with app chrome and watermark overlays hidden.");
+      const filename = `spectral-imaging-studio-${new Date().toISOString().replace(/[:.]/g, "-")}.png`;
+      const saveMessage = await saveExportBlob(blob, url, filename, "camera");
+      setCameraStatus(`Snapshot exported as clean media only, with app chrome and watermark overlays hidden. ${saveMessage}`);
     } catch (error) {
       setCameraStatus(`Snapshot export failed: ${error.message || error}`);
     }
@@ -3350,6 +3496,19 @@ function CameraStudio() {
     const next = clamp(Number(nextValue), TORCH_STROBE_MIN_MS, TORCH_STROBE_MAX_MS);
     torchStrobeIntervalMsRef.current = next;
     setTorchStrobeIntervalMs(next);
+    if (torchStrobeEnabledRef.current || torchDimmerEnabledRef.current) {
+      addTorchLog(`Pulse interval updated to ${next}ms. The active loop will use it on the next cycle.`, "info");
+    }
+  }
+
+  function updateTorchBrightness(nextValue) {
+    const next = clamp(Number(nextValue), TORCH_BRIGHTNESS_MIN, TORCH_BRIGHTNESS_MAX);
+    torchBrightnessPercentRef.current = next;
+    setTorchBrightnessPercent(next);
+    if (torchStrobeEnabledRef.current || torchDimmerEnabledRef.current) {
+      addTorchLog(`Torch brightness duty updated to ${next}%.`, "info");
+      setCameraStatus(`Torch pulse brightness duty updated to ${next}%.`);
+    }
   }
 
   function renderAdjustmentSlider(control, className = "") {
@@ -3574,6 +3733,8 @@ function CameraStudio() {
   function renderFlashlightStudioPanel() {
     const torchModeLabel = torchStrobeEnabled
       ? `Strobe ${torchStrobeIntervalMs}ms`
+      : torchDimmerEnabled
+        ? `Dimmer ${torchBrightnessPercent}%`
       : torchHoldMode
         ? "Hold Torch"
         : torchLockMode
@@ -3588,7 +3749,7 @@ function CameraStudio() {
             id: "torch-log-empty",
             time: "Ready",
             level: "info",
-            message: "No flashlight debug events yet. Start Hold, Lock, or Strobe to test this device."
+            message: "No flashlight debug events yet. Start Hold, Lock, Strobe, or Dimmer Pulse to test this device."
           }
         ];
     return (
@@ -3605,6 +3766,7 @@ function CameraStudio() {
           <span>{cameraFacing === "environment" ? "Rear camera" : "Front camera"}</span>
           <span>{torchSupported ? "Torch supported" : "Torch support unknown"}</span>
           <span>{torchActive ? "Light active" : "Light off"}</span>
+          <span>{torchBrightnessPercent}% brightness duty</span>
         </div>
 
         <div className="flashlight-mode-grid">
@@ -3647,6 +3809,19 @@ function CameraStudio() {
               <small>Pulses torch on/off using the interval below.</small>
             </span>
           </button>
+          <button
+            type="button"
+            className={torchDimmerEnabled ? "flashlight-mode-button active dimmer" : "flashlight-mode-button dimmer"}
+            onClick={toggleTorchDimmer}
+            disabled={!authorized}
+            aria-pressed={torchDimmerEnabled}
+          >
+            <SlidersHorizontal size={16} />
+            <span>
+              <strong>{torchDimmerEnabled ? "Stop Dimmer" : "Dimmer Pulse"}</strong>
+              <small>Uses the strobe engine as a brightness duty-cycle control.</small>
+            </span>
+          </button>
         </div>
 
         <label className="flashlight-strobe-slider">
@@ -3667,8 +3842,26 @@ function CameraStudio() {
           />
         </label>
 
+        <label className="flashlight-strobe-slider">
+          <span>
+            Flashlight brightness / dimming
+            <output>{torchBrightnessPercent}%</output>
+          </span>
+          <input
+            type="range"
+            min={TORCH_BRIGHTNESS_MIN}
+            max={TORCH_BRIGHTNESS_MAX}
+            step={TORCH_BRIGHTNESS_STEP}
+            value={torchBrightnessPercent}
+            onChange={(event) => updateTorchBrightness(event.target.value)}
+            style={{
+              "--value": `${((torchBrightnessPercent - TORCH_BRIGHTNESS_MIN) / (TORCH_BRIGHTNESS_MAX - TORCH_BRIGHTNESS_MIN)) * 100}%`
+            }}
+          />
+        </label>
+
         <p className="flashlight-warning">
-          Strobe can be uncomfortable or unsafe for photosensitive viewers. Start slow, stop immediately if it causes discomfort, and use only with consent nearby.
+          Strobe and dimmer pulse modes can be uncomfortable or unsafe for photosensitive viewers. True LED brightness depends on device/browser torch support; this studio uses duty-cycle dimming when direct brightness control is unavailable.
         </p>
 
         <div className="torch-debug-log" aria-label="Flashlight debug log">
@@ -4181,7 +4374,8 @@ function CameraStudio() {
             This studio asks for camera access only after you unlock the page and press Start Camera. Your camera stream stays on your own
             device, inside your browser. The site does not upload, transmit, store, or remotely view your camera feed, photos, or recordings.
             Captures and recordings are created locally as browser object URLs and remain visible only in this browser session unless you
-            download or share them yourself.
+            download or share them yourself. Desktop browsers that expose the File System Access API can save snapshots into a user-approved
+            `SPECTRAL_X1_IMAGE_SAVES` folder; mobile browsers decide whether downloaded images land in Photos, Files, or Downloads.
           </p>
           <p>
             Smart signal controls are experimental local image-processing tools only. They do not identify people, match identities, store
@@ -4231,8 +4425,9 @@ function CameraStudio() {
           <ul>
             <li>{CAMERA_EFFECTS.length} local visual presets compiled at 500% intensity for IR-style, UVA-style, full-spectrum thermal, XLS, inversion, tritone, quadtone, channel spectrograph, black-field, channel sweep, cinematic, monochrome, duotone, retro, and color-lab looks.</li>
             <li>Four RGBW gradient mixers for Main, Secondary, Third, and Highlights color layers that drive overlays, filter math, and the selected app accent aesthetic.</li>
-            <li>Grouped adjustment dropdowns with 11 core photo controls, 10 color inversion tools, 20 inversion presets, 10 smart darker-edge controls, 20 smart signal engines, local Spatial Recognition Studio controls, an expanded AI-orchestrated Smart Isolate Grouped Pixels DWT/noise defect-distortion module with 31 controls, Thermal Studio A-O hotspot recoloring, 100 advanced sliders, equation-generated filter names/descriptions, and live/overlay adjustment toggles.</li>
-            <li>Processed PNG snapshots and 1080P or 2K MP4 recordings with local camera effects applied.</li>
+            <li>Grouped adjustment dropdowns with 11 core photo controls, 10 color inversion tools, 20 inversion presets, 10 smart darker-edge controls, 20 smart signal engines, 32 local Spatial Recognition Studio controls, an expanded AI-orchestrated Smart Isolate Grouped Pixels DWT/noise defect-distortion module with 31 controls, Thermal Studio A-O hotspot recoloring, 100 advanced sliders, equation-generated filter names/descriptions, and live/overlay adjustment toggles.</li>
+            <li>Flashlight Studio includes Hold Torch, Lock Rear Torch, Strobe, Dimmer Pulse, interval timing, and brightness-duty controls where the rear-camera torch API is exposed by the device.</li>
+            <li>Processed PNG snapshots and 1080P or 2K MP4 recordings with local camera effects applied, including browser download plus desktop folder-save support when permission is granted.</li>
             <li>Separate 1-3 layer image/video compositor with opacity, splice masks, blend modes, transforms, full adjustment-stack support, and clean PNG export.</li>
             <li>Clean exports hide app-added preview chrome, labels, and watermark overlays so only the processed image or video remains.</li>
             <li>A local shelf stores the latest 3 photos/videos with preview, download, and remove controls.</li>
@@ -5837,20 +6032,47 @@ function buildSpatialRecognitionModel(settings = {}, effect = {}, enabled = fals
   const master = enabled ? clamp(setting(settings, "spatialMaster") / 100, 0, 1) : 0;
   const thermalBias = isThermalRenderMode(settings, effect) ? 0.16 : 0;
   const edgeBias = effectSetting(settings, "edgeEnhance", 0, PIXEL_EFFECT_GAIN) / 220;
+  const thermalLock = clamp(setting(settings, "spatialThermalLock") / 100 + thermalBias * 0.8, 0, 1.35);
+  const sensitivityBoost =
+    (setting(settings, "spatialMicroContrast") +
+      setting(settings, "spatialSubpixelScan") +
+      setting(settings, "spatialSpecularSense") +
+      setting(settings, "spatialShadowSense")) /
+    1600;
   return {
     active: master > 0.01,
     master,
-    sensitivity: clamp(setting(settings, "spatialSensitivity") / 100 + thermalBias * 0.2, 0, 1.25),
-    depth: clamp(setting(settings, "spatialDepth") / 100 + thermalBias, 0, 1.35),
-    field: clamp(setting(settings, "spatialField") / 100, 0, 1.15),
-    range: clamp(setting(settings, "spatialRange") / 100, 0, 1.2),
-    pointDensity: clamp(setting(settings, "spatialPointDensity") / 100, 0, 1),
-    edgeWeight: clamp(setting(settings, "spatialEdgeWeight") / 100 + edgeBias, 0, 1.35),
+    sensitivity: clamp(setting(settings, "spatialSensitivity") / 100 + thermalBias * 0.24 + sensitivityBoost, 0, 1.55),
+    depth: clamp(setting(settings, "spatialDepth") / 100 + thermalBias + thermalLock * 0.12, 0, 1.65),
+    field: clamp(setting(settings, "spatialField") / 100 + setting(settings, "spatialVectorTension") / 420, 0, 1.35),
+    range: clamp(setting(settings, "spatialRange") / 100 + setting(settings, "spatialObjectCohesion") / 460, 0, 1.45),
+    pointDensity: clamp(setting(settings, "spatialPointDensity") / 100 + setting(settings, "spatialSubpixelScan") / 420, 0, 1.25),
+    edgeWeight: clamp(setting(settings, "spatialEdgeWeight") / 100 + edgeBias + setting(settings, "spatialDepthSharpen") / 420, 0, 1.7),
     meshOpacity: clamp(setting(settings, "spatialMeshOpacity") / 100, 0, 1),
-    contourOpacity: clamp(setting(settings, "spatialContourOpacity") / 100, 0, 1),
-    parallax: clamp(setting(settings, "spatialParallax") / 100, 0, 1),
-    colorSplit: clamp(setting(settings, "spatialColorSplit") / 100, 0, 1.15),
-    smoothing: clamp(setting(settings, "spatialSmoothing") / 100, 0, 1),
+    contourOpacity: clamp(setting(settings, "spatialContourOpacity") / 100 + setting(settings, "spatialContourDensity") / 360, 0, 1.35),
+    parallax: clamp(setting(settings, "spatialParallax") / 100 + setting(settings, "spatialMotionTrace") / 520, 0, 1.22),
+    colorSplit: clamp(setting(settings, "spatialColorSplit") / 100 + setting(settings, "spatialColorDepth") / 310, 0, 1.55),
+    smoothing: clamp(setting(settings, "spatialSmoothing") / 100 + setting(settings, "spatialDepthBlur") / 480, 0, 1.15),
+    microContrast: clamp(setting(settings, "spatialMicroContrast") / 100, 0, 1.25),
+    gradientLift: clamp(setting(settings, "spatialGradientLift") / 100, 0, 1.2),
+    nearFieldBias: clamp(setting(settings, "spatialNearFieldBias") / 100, 0, 1.25),
+    farFieldBias: clamp(setting(settings, "spatialFarFieldBias") / 100, 0, 1.25),
+    occlusion: clamp(setting(settings, "spatialOcclusion") / 100, 0, 1.3),
+    depthSharpen: clamp(setting(settings, "spatialDepthSharpen") / 100, 0, 1.35),
+    depthBlur: clamp(setting(settings, "spatialDepthBlur") / 100, 0, 1),
+    contourDensity: clamp(setting(settings, "spatialContourDensity") / 100, 0, 1.4),
+    contourThreshold: clamp(setting(settings, "spatialContourThreshold") / 100, 0, 1),
+    vectorTension: clamp(setting(settings, "spatialVectorTension") / 100, 0, 1.25),
+    surfaceNormal: clamp(setting(settings, "spatialSurfaceNormal") / 100, 0, 1.35),
+    specularSense: clamp(setting(settings, "spatialSpecularSense") / 100, 0, 1.35),
+    shadowSense: clamp(setting(settings, "spatialShadowSense") / 100, 0, 1.35),
+    highlightSense: clamp(setting(settings, "spatialHighlightSense") / 100, 0, 1.35),
+    colorDepth: clamp(setting(settings, "spatialColorDepth") / 100, 0, 1.45),
+    noiseReject: clamp(setting(settings, "spatialNoiseReject") / 100, 0, 1),
+    objectCohesion: clamp(setting(settings, "spatialObjectCohesion") / 100, 0, 1.4),
+    motionTrace: clamp(setting(settings, "spatialMotionTrace") / 100, 0, 1.2),
+    subpixelScan: clamp(setting(settings, "spatialSubpixelScan") / 100, 0, 1.35),
+    thermalLock,
     palette: settings?.thermalPalette || "full-range-rgb"
   };
 }
@@ -5906,45 +6128,91 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
     const right = x < width - 1 ? lumaAt(index + 4) : luma;
     const up = y > 0 ? lumaAt(index - width * 4) : luma;
     const down = y < height - 1 ? lumaAt(index + width * 4) : luma;
+    const upLeft = x > 0 && y > 0 ? lumaAt(index - width * 4 - 4) : luma;
+    const downRight = x < width - 1 && y < height - 1 ? lumaAt(index + width * 4 + 4) : luma;
     const localAverage = (luma * 2 + left + right + up + down) / 6;
-    const edge = clamp(Math.abs(right - left) + Math.abs(down - up) + Math.abs(luma - localAverage) * 1.8, 0, 1);
+    const localDeviation = Math.abs(luma - localAverage);
+    const diagonalGradient = Math.abs(downRight - upLeft);
+    const normalSignal = clamp(Math.abs((right - left) - (down - up)) + diagonalGradient * 0.75, 0, 1);
+    const rawEdge = Math.abs(right - left) + Math.abs(down - up) + localDeviation * (1.8 + model.microContrast * 1.4);
+    const noiseGate = 1 - clamp(Math.max(0, localDeviation * 2.8 - rawEdge * 0.18) * model.noiseReject, 0, 0.72);
+    const edge = clamp((rawEdge + normalSignal * model.surfaceNormal * 0.55) * noiseGate, 0, 1);
     const radial = distanceFromCenter(x / Math.max(1, width - 1), y / Math.max(1, height - 1));
     const verticalDepth = 1 - y / Math.max(1, height - 1);
-    const contourPhase = Math.abs(Math.sin((luma * 7.5 + edge * 4.2 + model.range * 2.1) * Math.PI));
+    const nearField = Math.pow(1 - radial, 1.35) * model.nearFieldBias;
+    const farField = Math.pow(radial, 1.12) * model.farFieldBias;
+    const specularSignal = clamp(Math.max(0, luma - 0.58) * model.specularSense * 2.65, 0, 1);
+    const shadowSignal = clamp(Math.max(0, 0.42 - luma) * model.shadowSense * 2.55, 0, 1);
+    const highlightSignal = clamp(Math.max(0, luma - 0.48) * model.highlightSense * 2.05, 0, 1);
+    const contourPhase = Math.abs(
+      Math.sin((luma * (7.5 + model.contourDensity * 8.8) + edge * 4.2 + model.range * 2.1 + normalSignal * model.vectorTension) * Math.PI)
+    );
     const pseudoDepth = clamp(
       luma * (0.42 + model.range * 0.36) +
-        edge * model.edgeWeight * 0.42 +
-        Math.abs(luma - localAverage) * model.depth * 1.05 +
-        verticalDepth * model.field * 0.16 -
+        edge * model.edgeWeight * (0.42 + model.depthSharpen * 0.34) +
+        localDeviation * model.depth * 1.22 +
+        normalSignal * model.surfaceNormal * 0.32 +
+        verticalDepth * model.field * (0.16 + model.gradientLift * 0.22) +
+        nearField * 0.18 -
+        farField * 0.14 +
+        specularSignal * 0.12 -
+        shadowSignal * model.occlusion * 0.18 -
         radial * model.field * 0.14 +
-        model.sensitivity * 0.08,
+        model.sensitivity * 0.12,
       0,
       1
     );
     const [dr, dg, db] = spatialRecognitionDepthColor(pseudoDepth, model);
-    const contourMask = clamp((1 - contourPhase) * model.contourOpacity * (0.38 + edge * 0.8), 0, 1);
-    const depthMask = clamp((edge * 0.36 + Math.abs(luma - localAverage) * 1.35 + contourMask * 0.5) * model.master, 0, 0.88);
-    const alpha = clamp(depthMask * (0.22 + model.depth * 0.28 + model.sensitivity * 0.18), 0, 0.62);
+    const thresholdGate = clamp((edge + localDeviation * 1.8 + normalSignal * 0.8) - model.contourThreshold * 0.32, 0, 1);
+    const contourMask = clamp((1 - contourPhase) * model.contourOpacity * thresholdGate * (0.38 + edge * 0.95), 0, 1);
+    const cohesion = clamp(1 + model.objectCohesion * (0.34 - localDeviation * 0.22), 0.78, 1.38);
+    const depthMask = clamp(
+      (edge * 0.42 + localDeviation * 1.58 + contourMask * 0.68 + specularSignal * 0.18 + shadowSignal * 0.16) * model.master * cohesion,
+      0,
+      0.95
+    );
+    const alpha = clamp(depthMask * (0.26 + model.depth * 0.34 + model.sensitivity * 0.26 + model.thermalLock * 0.16), 0, 0.78);
     let r = data[index];
     let g = data[index + 1];
     let b = data[index + 2];
-    r = mixChannel(r, dr, alpha);
-    g = mixChannel(g, dg, alpha * 0.96);
-    b = mixChannel(b, db, alpha * 0.92);
+    r = mixChannel(r, dr, alpha * (0.96 + model.colorDepth * 0.22));
+    g = mixChannel(g, dg, alpha * (0.92 + model.colorDepth * 0.18));
+    b = mixChannel(b, db, alpha * (0.88 + model.colorDepth * 0.14));
+
+    if (model.microContrast > 0.01) {
+      const contrastLift = clamp(edge * model.microContrast * model.master * 1.15 + normalSignal * model.surfaceNormal * 0.32, 0, 1.6);
+      r = (r - 128) * (1 + contrastLift) + 128;
+      g = (g - 128) * (1 + contrastLift * 0.9) + 128;
+      b = (b - 128) * (1 + contrastLift * 0.82) + 128;
+    }
+
+    if (model.occlusion > 0.01) {
+      const darken = clamp((shadowSignal + farField * 0.22) * model.occlusion * model.master * 68, 0, 96);
+      r -= darken;
+      g -= darken * 0.9;
+      b -= darken * 0.82;
+    }
 
     if (model.colorSplit > 0.01) {
-      const split = clamp((edge + contourMask) * model.colorSplit * model.master * 34, 0, 42);
+      const split = clamp((edge + contourMask + specularSignal * 0.45) * model.colorSplit * model.master * (42 + model.colorDepth * 36), 0, 72);
       r += split;
-      g += split * Math.sin((x / Math.max(1, width)) * Math.PI) * 0.28;
-      b -= split * 0.5;
+      g += split * Math.sin((x / Math.max(1, width)) * Math.PI + model.motionTrace) * (0.28 + model.vectorTension * 0.2);
+      b -= split * (0.44 + model.thermalLock * 0.18);
     }
 
     if (model.smoothing > 0.01) {
-      const smoothAlpha = clamp(model.smoothing * (0.06 + (1 - edge) * 0.12) * model.master, 0, 0.22);
+      const smoothAlpha = clamp(model.smoothing * (0.06 + (1 - edge) * 0.12 + model.depthBlur * 0.08) * model.master, 0, 0.28);
       const localGray = localAverage * 255;
       r = mixChannel(r, localGray, smoothAlpha);
       g = mixChannel(g, localGray, smoothAlpha * 0.9);
       b = mixChannel(b, localGray, smoothAlpha * 0.8);
+    }
+
+    if (model.gradientLift > 0.01) {
+      const lift = (verticalDepth - radial * 0.36 + nearField * 0.2 - farField * 0.16 + highlightSignal * 0.22) * model.gradientLift * model.master * 34;
+      r += lift * 0.62;
+      g += lift * 0.82;
+      b += lift;
     }
 
     data[index] = clamp(r, 0, 255);
@@ -5955,21 +6223,21 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
 
   const meshAlpha = clamp(model.meshOpacity * model.master * 0.32, 0, 0.42);
   if (meshAlpha > 0.01) {
-    const gridStep = Math.max(10, Math.round(36 - model.pointDensity * 20));
+    const gridStep = Math.max(7, Math.round(38 - model.pointDensity * 20 - model.contourDensity * 7));
     context.save();
     context.globalCompositeOperation = "screen";
-    context.lineWidth = Math.max(0.5, Math.min(width, height) / 850);
-    context.strokeStyle = `rgba(125, 238, 255, ${meshAlpha})`;
+    context.lineWidth = Math.max(0.5, Math.min(width, height) / (900 - model.vectorTension * 260));
+    context.strokeStyle = `rgba(125, 238, 255, ${clamp(meshAlpha + model.surfaceNormal * 0.04, 0, 0.5)})`;
     for (let x = 0; x <= width; x += gridStep) {
-      const offset = Math.sin((x / Math.max(1, width)) * Math.PI * 2) * model.parallax * gridStep * 0.45;
+      const offset = Math.sin((x / Math.max(1, width)) * Math.PI * (2 + model.vectorTension * 2)) * model.parallax * gridStep * (0.45 + model.motionTrace * 0.24);
       context.beginPath();
       context.moveTo(x, 0);
       context.lineTo(x + offset, height);
       context.stroke();
     }
-    context.strokeStyle = `rgba(255, 111, 164, ${meshAlpha * 0.74})`;
+    context.strokeStyle = `rgba(255, 111, 164, ${meshAlpha * (0.74 + model.colorDepth * 0.22)})`;
     for (let y = 0; y <= height; y += gridStep) {
-      const offset = Math.cos((y / Math.max(1, height)) * Math.PI * 2) * model.parallax * gridStep * 0.42;
+      const offset = Math.cos((y / Math.max(1, height)) * Math.PI * (2 + model.vectorTension * 1.6)) * model.parallax * gridStep * (0.42 + model.motionTrace * 0.2);
       context.beginPath();
       context.moveTo(0, y);
       context.lineTo(width, y + offset);
@@ -5978,16 +6246,17 @@ function applySpatialRecognitionEffectsToContext(context, width, height, setting
     context.restore();
   }
 
-  const pointAlpha = clamp(model.pointDensity * model.master * 0.28, 0, 0.36);
+  const pointAlpha = clamp(model.pointDensity * model.master * (0.28 + model.subpixelScan * 0.12), 0, 0.46);
   if (pointAlpha > 0.01) {
-    const pointStep = Math.max(8, Math.round(28 - model.pointDensity * 18));
+    const pointStep = Math.max(5, Math.round(29 - model.pointDensity * 18 - model.subpixelScan * 7));
     context.save();
     context.globalCompositeOperation = "screen";
     context.fillStyle = `rgba(238, 255, 255, ${pointAlpha})`;
     for (let y = pointStep; y < height; y += pointStep) {
       for (let x = pointStep; x < width; x += pointStep) {
-        const drift = Math.sin((x * 0.017 + y * 0.021) * (1 + model.parallax)) * model.parallax * 2.2;
-        context.fillRect(x + drift, y - drift, 1.4, 1.4);
+        const drift = Math.sin((x * 0.017 + y * 0.021) * (1 + model.parallax + model.motionTrace * 0.5)) * model.parallax * (2.2 + model.motionTrace * 1.8);
+        const size = 1.2 + model.subpixelScan * 1.1 + model.objectCohesion * 0.5;
+        context.fillRect(x + drift, y - drift, size, size);
       }
     }
     context.restore();

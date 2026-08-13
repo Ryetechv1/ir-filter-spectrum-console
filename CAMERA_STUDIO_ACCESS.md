@@ -23,14 +23,14 @@ The Camera Studio is opened from the main console with the `Studio` button. It r
 - `Stop Camera` stops all active video tracks.
 - `Flip Camera` toggles between front and rear camera requests after a stream is active.
 - `Rear Flashlight` requests the rear camera when needed and toggles the device torch with `MediaStreamTrack.applyConstraints({ advanced: [{ torch }] })` when the phone/browser exposes that capability.
-- `Flashlight Studio` adds three managed rear-torch modes: `Hold Torch` for persistent on/off use, `Lock Rear Torch` for rear-stream lock/reapply behavior, and `Start Strobe` with an 80ms-2000ms interval slider. The panel includes a local debug log for unsupported streams, failed constraints, and strobe state changes.
-- `Snapshot` downloads a local PNG with the current CSS/video effect stack painted into the image and adds it to the local capture shelf.
+- `Flashlight Studio` adds four managed rear-torch modes: `Hold Torch` for persistent on/off use, `Lock Rear Torch` for rear-stream lock/reapply behavior, `Start Strobe` with an 80ms-2000ms interval slider, and `Dimmer Pulse` with a 5%-100% duty-cycle brightness slider. The panel includes a local debug log for unsupported streams, failed constraints, strobe state changes, and dimmer-duty changes.
+- `Snapshot` exports a local PNG with the current CSS/video effect stack painted into the image and adds it to the local capture shelf. On desktop browsers with File System Access support, Snapshot first asks for a folder and creates/uses `SPECTRAL_X1_IMAGE_SAVES`; otherwise it falls back to a normal browser download. Static web pages cannot silently write into `C:\Users\<name>\Downloads` or directly insert images into a phone gallery without browser/OS permission.
 - `Start MP4` records a processed 1080P or 2K canvas stream as `.mp4` where the browser supports MP4 MediaRecorder.
 - `Stop Recording` ends the current MP4 recording before the 3-minute cap.
 - All visual effect presets are compiled through a 500% intensity amplifier. The amplifier boosts numeric preset settings away from their neutral value and increases preset overlay alpha while clamping to each control's safe range.
 - Four RGBW mixer groups drive live gradient color layers and the main filter math: Main, Secondary, Third, and Highlights.
 - Ten inversion controls add Classic RGB Invert, Luma Negative, Channel Swap Invert, Spectral Invert, Thermal Black-Hot Invert, Red Channel Invert, Green Channel Invert, Blue Channel Invert, Shadow Range Invert, and Highlight Range Invert.
-- The adjustment surface is grouped into dropdown sections. It includes 12 core photo sliders, 10 inversion sliders, smart darker-edge controls, local Spatial Recognition Studio controls, 20 smart signal engines, the expanded Smart Isolate Grouped Pixels DWT/noise defect-distortion engine with 31 controls, Thermal Studio A-O hotspot recoloring, and 100 advanced effect sliders for exposure-style controls, color channels, bloom/halation, scanlines, IR/UVA/thermal washes, and other photobooth effects.
+- The adjustment surface is grouped into dropdown sections. It includes 12 core photo sliders, 10 inversion sliders, smart darker-edge controls, 32 local Spatial Recognition Studio controls, 20 smart signal engines, the expanded Smart Isolate Grouped Pixels DWT/noise defect-distortion engine with 31 controls, Thermal Studio A-O hotspot recoloring, and 100 advanced effect sliders for exposure-style controls, color channels, bloom/halation, scanlines, IR/UVA/thermal washes, and other photobooth effects.
 - The smart signal engines are local image-processing tools only. They do not identify people, match identities, store biometrics, or use face/wolf recognition.
 
 ## Spatial Recognition Studio
@@ -38,6 +38,7 @@ The Camera Studio is opened from the main console with the `Studio` button. It r
 - Spatial Recognition Studio adapts the imported point-cloud prototype into the browser camera pipeline without adding heavy Three.js or LAS loader dependencies to the live static app.
 - The preserved prototype handoff lives in `integrations/spatial_recognition_prototype/` for future Codex import work.
 - The studio estimates pseudo-depth, contour bands, point-cloud dots, field curvature, and mesh overlays from visible luminance/edge gradients in the current camera/compositor canvas.
+- The 32-control spatial stack now includes micro contrast, near/far field bias, occlusion, contour density/threshold, surface-normal response, specular/shadow/highlight sensitivity, color depth, noise rejection, object cohesion, motion trace, subpixel scan, and thermal-lock weighting.
 - The spatial pass is local and visual-only. It does not identify people, perform biometric matching, store a face model, or upload camera frames.
 
 ## AI-Orchestrated Defect / Distortion Isolation

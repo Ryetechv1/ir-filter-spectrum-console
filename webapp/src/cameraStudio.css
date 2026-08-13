@@ -972,7 +972,7 @@
 }
 
 .flashlight-status-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .flashlight-status-grid span {
@@ -986,7 +986,7 @@
 }
 
 .flashlight-mode-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .flashlight-mode-button {
@@ -1032,6 +1032,11 @@
 .flashlight-mode-button.strobe.active {
   border-color: rgba(255, 192, 92, 0.72);
   box-shadow: 0 0 22px rgba(255, 192, 92, 0.18);
+}
+
+.flashlight-mode-button.dimmer.active {
+  border-color: rgba(123, 244, 255, 0.74);
+  box-shadow: 0 0 24px rgba(123, 244, 255, 0.18);
 }
 
 .flashlight-strobe-slider {
