@@ -202,8 +202,38 @@ const RGBW_MIXER_GAIN = 1.72;
 const PRESET_INTENSITY_MULTIPLIER = 5;
 const SMART_SIGNAL_PIXEL_BUDGET = 74_000;
 const SPATIAL_RECOGNITION_PIXEL_BUDGET = 96_000;
+const DATACOHERECTICS_SPATIAL_MAPPING_URL =
+  "https://www.google.com/search?q=datacoherectics+and+spatial+mapping+and+voxels";
 const SMART_DARK_EDGE_LABEL = "Smart darker edge amplifier";
 const SPATIAL_RECOGNITION_LABEL = "Spatial recognition field mapper";
+const SPATIAL_MESH_FORMS = [
+  {
+    id: "triangular",
+    label: "Triangular",
+    description: "TIN-style triangular facets with diagonal depth links across the synchronized live-cell field."
+  },
+  {
+    id: "hexagonal",
+    label: "Hexagonal",
+    description: "Honeycomb voxel cells arranged from the same camera samples for broad surface and range mapping."
+  },
+  {
+    id: "irregular",
+    label: "Irregular",
+    description: "Uneven adaptive polygons that pull toward live noise, edge, and subtle depth disturbances."
+  },
+  {
+    id: "variable",
+    label: "Variable",
+    description: "A mixed voxel field that alternates triangular, hexagonal, and irregular forms by local signal strength."
+  },
+  {
+    id: "equation-driven",
+    label: "Equation Driven",
+    description: "Formula-weighted mesh where X means adherence and Y means metronymics for rhythmic voxel behavior."
+  }
+];
+const SPATIAL_MESH_FORM_LOOKUP = new Map(SPATIAL_MESH_FORMS.map((form) => [form.id, form]));
 const TORCH_LOG_LIMIT = 14;
 const TORCH_STROBE_MIN_MS = 80;
 const TORCH_STROBE_MAX_MS = 2000;
@@ -750,7 +780,9 @@ const SPATIAL_RECOGNITION_ADJUSTMENTS = [
   ["spatialNoiseMap", "Noise Mapping", 0, 100, "%", 58],
   ["spatialGridWarp", "Grid Warp", 0, 100, "%", 44],
   ["spatialPointLift", "Point Height Lift", 0, 100, "%", 54],
-  ["spatialFacetSmoothing", "TIN Facet Smoothing", 0, 100, "%", 42]
+  ["spatialFacetSmoothing", "TIN Facet Smoothing", 0, 100, "%", 42],
+  ["spatialEquationAdherence", "X Adherence", 0, 100, "%", 64],
+  ["spatialEquationMetronymics", "Y Metronymics", 0, 100, "%", 46]
 ];
 
 const SMART_SIGNAL_PROCESSOR_SLIDERS = [
@@ -970,6 +1002,7 @@ const DEFAULT_SETTINGS = {
   ...Object.fromEntries(INVERSION_ADJUSTMENTS.map(([key, , , , , initial = 0]) => [key, initial])),
   ...Object.fromEntries(SMART_DARK_EDGE_ADJUSTMENTS.map(([key, , , , , initial = 0]) => [key, initial])),
   ...Object.fromEntries(SPATIAL_RECOGNITION_ADJUSTMENTS.map(([key, , , , , initial = 0]) => [key, initial])),
+  spatialMeshForm: "triangular",
   ...Object.fromEntries(SMART_SIGNAL_ADJUSTMENTS.map(([key, , , , , initial = 0]) => [key, initial])),
   ...Object.fromEntries(THERMAL_STUDIO_NUMERIC_ADJUSTMENTS.map(([key, , , , , initial = 0]) => [key, initial])),
   ...THERMAL_STUDIO_COLOR_DEFAULTS,
@@ -985,6 +1018,7 @@ const STACKED_SETTING_KEYS = new Set([
   ...INVERSION_ADJUSTMENTS.map(([key]) => key),
   ...SMART_DARK_EDGE_ADJUSTMENTS.map(([key]) => key),
   ...SPATIAL_RECOGNITION_ADJUSTMENTS.map(([key]) => key),
+  "spatialMeshForm",
   ...SMART_SIGNAL_ADJUSTMENTS.map(([key]) => key),
   ...THERMAL_STUDIO_NUMERIC_ADJUSTMENTS.map(([key]) => key),
   ...THERMAL_STUDIO_BANDS.map((band) => `thermalHotspot${band.letter}Color`),
@@ -1032,7 +1066,8 @@ const ADJUSTMENT_GROUPS = [
   {
     id: "spatial-recognition",
     title: "Spatial Recognition Studio",
-    description: "Local camera-side pseudo-depth, live point-cloud, TIN facets, contour, cell, and field-map recognition derived from visible frame gradients.",
+    description:
+      "Local camera-side pseudo-depth, live point-cloud, TIN facets, contour, cell, voxel-form mesh, and field-map recognition derived from visible frame gradients.",
     type: "spatial-recognition",
     controls: SPATIAL_RECOGNITION_ADJUSTMENTS
   },
@@ -2091,6 +2126,9 @@ function featureGuideSettingDescriptor(key, index = 0) {
   const label = featureGuideSettingLabel(key);
   const range = settingRange(key);
   const keyLower = String(key || "").toLowerCase();
+  if (key === "spatialMeshForm") {
+    return `${label} is setting key ${index + 1} in the studio state model. It stores the active Spatial Recognition mesh/voxel form, choosing triangular, hexagonal, irregular, variable, or equation-driven drawing against the same synchronized live-cell field used by preview, HUD, snapshots, recordings, and media layers.`;
+  }
   let role = "stores a numeric processing value used by the live render pipeline";
   if (STACKED_SETTING_KEYS.has(key)) role = "is part of the stacked advanced engine layer that can combine with the active preset instead of replacing it";
   if (keyLower.includes("thermal") || keyLower.includes("heat") || keyLower.includes("hotspot")) role = "stores thermal, thermogram, isotherm, heat-edge, or hotspot behavior";
@@ -2109,6 +2147,7 @@ function featureGuideSmartEngineDescriptor(processor) {
 function featureGuideControlCount(group) {
   if (group.type === "rgbw") return RGBW_MIXERS.length * RGBW_CHANNELS.length;
   if (group.type === "thermal-studio") return THERMAL_STUDIO_NUMERIC_ADJUSTMENTS.length + THERMAL_STUDIO_BANDS.length;
+  if (group.type === "spatial-recognition") return (group.controls?.length || 0) + 1;
   return group.controls?.length || 0;
 }
 
@@ -2149,6 +2188,23 @@ function featureGuideGroupItems(group) {
       control
     }));
   }
+  if (group.type === "spatial-recognition") {
+    return [
+      {
+        title: "Mesh / voxel form selector",
+        meta: group.title,
+        description:
+          "Selects triangular, hexagonal, irregular, variable, or equation-driven mesh geometry while keeping every point, TIN facet, cell, HUD preview, snapshot, and recording tied to the same live camera field.",
+        details: SPATIAL_MESH_FORMS.map((form) => `${form.label}: ${form.description}`)
+      },
+      ...(group.controls || []).map((control) => ({
+        title: featureGuideControlLabel(control),
+        meta: group.title,
+        description: group.description,
+        control
+      }))
+    ];
+  }
   return (group.controls || []).map((control) => ({
     title: featureGuideControlLabel(control),
     meta: group.title,
@@ -2170,7 +2226,8 @@ function buildFeatureGuideStats() {
         MEDIA_SPLICE_MODES.length +
         THERMAL_STUDIO_BANDS.length +
         SMART_SIGNAL_PROCESSORS.length +
-        SPATIAL_RECOGNITION_ADJUSTMENTS.length
+        SPATIAL_RECOGNITION_ADJUSTMENTS.length +
+        SPATIAL_MESH_FORMS.length
     );
   return [
     { label: "Effect presets", value: CAMERA_EFFECTS.length.toLocaleString() },
@@ -2424,9 +2481,9 @@ function buildFeatureGuideSections() {
         },
         {
           title: "Spatial Recognition Studio",
-          meta: `${SPATIAL_RECOGNITION_ADJUSTMENTS.length} controls`,
+          meta: `${SPATIAL_RECOGNITION_ADJUSTMENTS.length + 1} controls`,
           description:
-            "Opens pseudo-depth, live point-cloud, TIN, mesh, contour, cell, and field-map recognition details derived from visible frame gradients."
+            "Opens pseudo-depth, live point-cloud, TIN, triangular/hexagonal/irregular/variable/equation-driven mesh, contour, cell, and field-map recognition details derived from visible frame gradients."
         }
       ]
     },
@@ -2734,6 +2791,7 @@ function applyEquationSettings(baseSettings = DEFAULT_SETTINGS, equationModel) {
 }
 
 function settingRange(key) {
+  if (key === "spatialMeshForm") return { min: "triangular", max: "equation-driven" };
   const control = ADJUSTMENT_LOOKUP.get(key);
   if (control) return { min: Number(control[2]), max: Number(control[3]) };
   if (RGBW_MIXERS.some((group) => RGBW_CHANNELS.some((channel) => `${group.key}${channel.key}` === key))) {
@@ -2892,6 +2950,8 @@ function CameraStudio() {
     () => (equationStyleEffectId === EQUATION_STYLE_AUTO ? selectedEffect : CAMERA_EFFECT_LOOKUP.get(equationStyleEffectId) || selectedEffect),
     [equationStyleEffectId, selectedEffect]
   );
+  const selectedSpatialMeshForm =
+    SPATIAL_MESH_FORM_LOOKUP.get(manualSettings.spatialMeshForm) || SPATIAL_MESH_FORMS[0];
 
   const visibleEffects = useMemo(() => {
     const query = deferredSearch.trim().toLowerCase();
@@ -4123,6 +4183,25 @@ function CameraStudio() {
     );
   }
 
+  function renderSpatialMeshFormSelector(compact = false) {
+    return (
+      <label className={`spatial-mesh-form-selector${compact ? " compact" : ""}`}>
+        <span>
+          <Layers size={15} />
+          Mesh / voxel form
+        </span>
+        <select value={selectedSpatialMeshForm.id} onChange={(event) => updateSetting("spatialMeshForm", event.target.value)}>
+          {SPATIAL_MESH_FORMS.map((form) => (
+            <option key={form.id} value={form.id}>
+              {form.label}
+            </option>
+          ))}
+        </select>
+        <p>{selectedSpatialMeshForm.description}</p>
+      </label>
+    );
+  }
+
   function renderRgbwMixerGroup() {
     return (
       <div className="rgbw-mixer-board" aria-label="RGBW color mixers">
@@ -4807,7 +4886,9 @@ function CameraStudio() {
     if (!spatialWindowOpen) return null;
     const profileRows = [
       ["Mode", "Pseudo-depth + live point cloud + TIN facets"],
+      ["Mesh form", selectedSpatialMeshForm.label],
       ["Data source", "Current camera/compositor canvas"],
+      ["Equation mapping", "X adherence / Y metronymics"],
       ["Prototype source", "SpatialViewport / pointCloudWorker adapted locally"],
       ["Privacy", "No identity matching, no biometric storage, no upload"],
       ["AI-Q hook", "Optional future backend; local canvas active now"]
@@ -4872,6 +4953,10 @@ function CameraStudio() {
               <Layers size={16} />
               {spatialVisualInterfaceEnabled ? "Hide Mesh Interface" : "Show Mesh Interface"}
             </button>
+            <a href={DATACOHERECTICS_SPATIAL_MAPPING_URL} target="_blank" rel="noreferrer">
+              <ExternalLink size={16} />
+              Datacoherectics Voxel Search
+            </a>
           </div>
 
           <div className="dwt-profile-grid" aria-label="Spatial recognition profile">
@@ -4882,6 +4967,8 @@ function CameraStudio() {
               </div>
             ))}
           </div>
+
+          {renderSpatialMeshFormSelector()}
 
           <div className="dwt-control-grid spatial-control-grid" aria-label="Spatial recognition controls">
             {SPATIAL_RECOGNITION_ADJUSTMENTS.map((control) => renderAdjustmentSlider(control, "smart-dark-edge-adjustment spatial-recognition-adjustment"))}
@@ -4932,17 +5019,26 @@ function CameraStudio() {
             "smart-dark-edge-adjustment spatial-recognition-adjustment spatial-interface-opacity"
           )}
         </div>
+        {renderSpatialMeshFormSelector(true)}
         <div className="smart-isolate-engine-brief spatial-recognition-brief" aria-label="Spatial recognition description">
           <strong>Local Spatial Field Mapping</strong>
           <p>
             Adapted from the imported SpatialViewport/pointCloudWorker prototype without adding Three.js dependencies. The camera canvas
             decimates frame pixels into one synchronized live-cell field used by point-cloud samples, TIN triangle facets, mesh lines,
-            and cell nodes so desktop, mobile, HUD, exports, and media layers all share the same surface/noise/depth result.
+            and cell nodes so desktop, mobile, HUD, exports, and media layers all share the same surface/noise/depth result. Mesh forms
+            include triangular, hexagonal, irregular, variable, and equation-driven voxel layouts where X controls adherence and Y controls
+            metronymics.
           </p>
-          <button type="button" className="dwt-inline-button" onClick={() => setSpatialWindowOpen(true)}>
-            <Layers size={14} />
-            Open Spatial Recognition Studio
-          </button>
+          <div className="spatial-mesh-form-actions">
+            <button type="button" className="dwt-inline-button" onClick={() => setSpatialWindowOpen(true)}>
+              <Layers size={14} />
+              Open Spatial Recognition Studio
+            </button>
+            <a className="dwt-inline-button" href={DATACOHERECTICS_SPATIAL_MAPPING_URL} target="_blank" rel="noreferrer">
+              <ExternalLink size={14} />
+              Datacoherectics Voxel Search
+            </a>
+          </div>
         </div>
         <div className="adjustment-list smart-dark-edge-list spatial-recognition-list">
           {group.controls.map((control) => renderAdjustmentSlider(control, "smart-dark-edge-adjustment spatial-recognition-adjustment"))}
@@ -5190,7 +5286,7 @@ function CameraStudio() {
           <ul>
             <li>{CAMERA_EFFECTS.length} local visual presets compiled at 500% intensity for IR-style, UVA-style, full-spectrum thermal, XLS, inversion, tritone, quadtone, channel spectrograph, black-field, channel sweep, cinematic, monochrome, duotone, retro, and color-lab looks.</li>
             <li>Four RGBW gradient mixers for Main, Secondary, Third, and Highlights color layers that drive overlays, filter math, and the selected app accent aesthetic.</li>
-            <li>Grouped adjustment dropdowns with 11 core photo controls, 10 color inversion tools, 20 inversion presets, 10 smart darker-edge controls, 20 smart signal engines, 44 local Spatial Recognition Studio controls with synchronized live cell, mesh, Point Cloud, and TIN surface mapping, subtle reveal sampling, a visual mesh interface toggle and opacity scaler, an expanded AI-orchestrated Smart Isolate Grouped Pixels DWT/noise defect-distortion module with 31 controls, Thermal Studio A-O hotspot recoloring, 100 advanced sliders, equation-generated filter names/descriptions, and live/overlay adjustment toggles.</li>
+            <li>Grouped adjustment dropdowns with 11 core photo controls, 10 color inversion tools, 20 inversion presets, 10 smart darker-edge controls, 20 smart signal engines, 47 local Spatial Recognition Studio controls with synchronized live cell, triangular/hexagonal/irregular/variable/equation-driven mesh forms, Point Cloud, and TIN surface mapping, subtle reveal sampling, a visual mesh interface toggle and opacity scaler, an expanded AI-orchestrated Smart Isolate Grouped Pixels DWT/noise defect-distortion module with 31 controls, Thermal Studio A-O hotspot recoloring, 100 advanced sliders, equation-generated filter names/descriptions, and live/overlay adjustment toggles.</li>
             <li>Flashlight Studio includes Hold Torch, Lock Rear Torch, Strobe, Dimmer Pulse, interval timing, and brightness-duty controls where the rear-camera torch API is exposed by the device.</li>
             <li>Processed PNG snapshots and 1080P or 2K MP4 recordings with local camera effects applied, including browser download plus desktop folder-save support when permission is granted.</li>
             <li>Separate 1-3 layer image/video compositor with opacity, splice masks, blend modes, transforms, full adjustment-stack support, and clean PNG export.</li>
@@ -6806,6 +6902,7 @@ function buildSpatialRecognitionModel(settings = {}, effect = {}, enabled = fals
   const thermalBias = isThermalRenderMode(settings, effect) ? 0.16 : 0;
   const edgeBias = effectSetting(settings, "edgeEnhance", 0, PIXEL_EFFECT_GAIN) / 220;
   const thermalLock = clamp(setting(settings, "spatialThermalLock") / 100 + thermalBias * 0.8, 0, 1.35);
+  const meshForm = SPATIAL_MESH_FORM_LOOKUP.has(settings?.spatialMeshForm) ? settings.spatialMeshForm : DEFAULT_SETTINGS.spatialMeshForm;
   const visualInterfaceOpacity =
     options.spatialVisualInterfaceEnabled === false ? 0 : clamp(setting(settings, "spatialInterfaceOpacity") / 100, 0, 1);
   const sensitivityBoost =
@@ -6819,6 +6916,7 @@ function buildSpatialRecognitionModel(settings = {}, effect = {}, enabled = fals
   return {
     active: master > 0.01,
     master,
+    meshForm,
     visualInterfaceOpacity,
     sensitivity: clamp(setting(settings, "spatialSensitivity") / 100 + thermalBias * 0.24 + sensitivityBoost, 0, 1.55),
     depth: clamp(setting(settings, "spatialDepth") / 100 + thermalBias + thermalLock * 0.12, 0, 1.65),
@@ -6865,6 +6963,8 @@ function buildSpatialRecognitionModel(settings = {}, effect = {}, enabled = fals
     gridWarp: clamp(setting(settings, "spatialGridWarp") / 100, 0, 1.25),
     pointLift: clamp(setting(settings, "spatialPointLift") / 100, 0, 1.35),
     facetSmoothing: clamp(setting(settings, "spatialFacetSmoothing") / 100, 0, 1),
+    equationAdherence: clamp(setting(settings, "spatialEquationAdherence") / 100, 0, 1.35),
+    equationMetronymics: clamp(setting(settings, "spatialEquationMetronymics") / 100, 0, 1.35),
     thermalLock,
     palette: settings?.thermalPalette || "full-range-rgb"
   };
@@ -7108,8 +7208,10 @@ function buildLiveSpatialCellField(width, height, source, model) {
   };
 
   for (let y = Math.round(cellStep * 0.5); y < height; y += cellStep) {
+    const rowIndex = rows.length;
     const row = [];
     for (let x = Math.round(cellStep * 0.5); x < width; x += cellStep) {
+      const columnIndex = row.length;
       const luma = lumaAt(x, y);
       const left = lumaAt(x - sampleRadius, y);
       const right = lumaAt(x + sampleRadius, y);
@@ -7153,11 +7255,33 @@ function buildLiveSpatialCellField(width, height, source, model) {
       const warpPhase = (x * 0.017 + y * 0.013 + depth * 3.1) * (1 + model.motionTrace * 0.5);
       const warp = model.gridWarp * model.parallax * cellStep * (0.16 + depth * 0.34 + surface * 0.22);
       const lift = model.pointLift * cellStep * (0.12 + depth * 0.46 + noise * 0.18);
-      const px = clamp(x + Math.sin(warpPhase) * warp, 0, width);
-      const py = clamp(y + Math.cos(warpPhase * 0.9) * warp - lift, 0, height);
+      const equationRhythm = Math.sin((columnIndex + rowIndex * 1.37) * (0.72 + model.equationMetronymics * 1.8) + depth * 4.1);
+      const variableGate = clamp(depth * 0.42 + edge * 0.28 + subtle * 0.2 + noise * 0.18, 0, 1);
+      const hexOffset =
+        model.meshForm === "hexagonal" || (model.meshForm === "variable" && variableGate > 0.52)
+          ? (rowIndex % 2 ? 0.42 : -0.12) * cellStep
+          : 0;
+      const irregularAmount =
+        model.meshForm === "irregular"
+          ? 1
+          : model.meshForm === "variable"
+            ? variableGate
+            : model.meshForm === "equation-driven"
+              ? 1 - model.equationAdherence * 0.72
+              : 0;
+      const equationAmount = model.meshForm === "equation-driven" ? model.equationMetronymics : 0;
+      const formJitter = cellStep * (0.08 + model.gridWarp * 0.18 + model.subtleReveal * 0.08);
+      const jitterX = Math.sin(warpPhase * 1.83 + rowIndex * 0.9) * formJitter * irregularAmount;
+      const jitterY = Math.cos(warpPhase * 1.57 + columnIndex * 0.7) * formJitter * irregularAmount;
+      const equationX = equationRhythm * cellStep * equationAmount * (0.08 + model.equationAdherence * 0.12);
+      const equationY = Math.cos(equationRhythm + warpPhase * 0.6) * cellStep * equationAmount * 0.08;
+      const px = clamp(x + hexOffset + Math.sin(warpPhase) * warp + jitterX + equationX, 0, width);
+      const py = clamp(y + Math.cos(warpPhase * 0.9) * warp - lift + jitterY + equationY, 0, height);
       row.push({
         x: px,
         y: py,
+        rowIndex,
+        columnIndex,
         depth,
         edge,
         noise,
@@ -7267,9 +7391,11 @@ function paintSyncedSpatialCellMesh(context, cellField, model, meshAlpha) {
   const { rows, cellStep } = cellField;
   context.save();
   context.globalCompositeOperation = "screen";
-  context.lineWidth = Math.max(0.48, cellStep / (20 - model.vectorTension * 6));
-  const rowAlpha = clamp(meshAlpha + model.surfaceNormal * 0.04, 0, 0.5);
-  const columnAlpha = clamp(meshAlpha * (0.74 + model.colorDepth * 0.22), 0, 0.48);
+  context.lineWidth = Math.max(0.42, cellStep / (22 - model.vectorTension * 5));
+  const form = model.meshForm || "triangular";
+  const baselineAlpha = form === "triangular" ? 0.62 : form === "hexagonal" ? 0.26 : 0.34;
+  const rowAlpha = clamp((meshAlpha + model.surfaceNormal * 0.04) * baselineAlpha, 0, 0.42);
+  const columnAlpha = clamp(meshAlpha * (0.74 + model.colorDepth * 0.22) * baselineAlpha, 0, 0.38);
   for (const row of rows) {
     if (row.length < 2) continue;
     context.beginPath();
@@ -7304,7 +7430,143 @@ function paintSyncedSpatialCellMesh(context, cellField, model, meshAlpha) {
       context.stroke();
     }
   }
+  if (form === "hexagonal") {
+    paintSpatialHexagonalVoxelMesh(context, rows, cellStep, model, meshAlpha);
+  } else if (form === "irregular") {
+    paintSpatialIrregularVoxelMesh(context, rows, model, meshAlpha, 1);
+  } else if (form === "variable") {
+    paintSpatialVariableVoxelMesh(context, rows, cellStep, model, meshAlpha);
+  } else if (form === "equation-driven") {
+    paintSpatialEquationDrivenVoxelMesh(context, rows, cellStep, model, meshAlpha);
+  } else {
+    paintSpatialTriangularVoxelMesh(context, rows, model, meshAlpha);
+  }
   context.restore();
+}
+
+function paintSpatialTriangularVoxelMesh(context, rows, model, meshAlpha) {
+  context.save();
+  context.lineWidth = Math.max(0.42, context.lineWidth * 0.78);
+  for (let rowIndex = 0; rowIndex < rows.length - 1; rowIndex += 1) {
+    const row = rows[rowIndex];
+    const nextRow = rows[rowIndex + 1];
+    const count = Math.min(row.length, nextRow.length) - 1;
+    for (let column = 0; column < count; column += 1) {
+      const p00 = row[column];
+      const p10 = row[column + 1];
+      const p01 = nextRow[column];
+      const p11 = nextRow[column + 1];
+      const signal = clamp((p00.depth + p10.depth + p01.depth + p11.depth + p00.surface + p11.surface) / 6, 0, 1);
+      if (signal < 0.04) continue;
+      context.beginPath();
+      context.moveTo(p00.x, p00.y);
+      context.lineTo(p11.x, p11.y);
+      context.moveTo(p10.x, p10.y);
+      context.lineTo(p01.x, p01.y);
+      context.strokeStyle = spatialMeshStrokeStyle(p00, model, meshAlpha * (0.16 + signal * 0.5));
+      context.stroke();
+    }
+  }
+  context.restore();
+}
+
+function paintSpatialHexagonalVoxelMesh(context, rows, cellStep, model, meshAlpha) {
+  context.save();
+  context.lineWidth = Math.max(0.45, context.lineWidth * 0.84);
+  const radius = Math.max(3, cellStep * (0.36 + model.surfaceMap * 0.12));
+  for (const row of rows) {
+    for (const point of row) {
+      const signal = clamp(point.depth * 0.38 + point.surface * 0.24 + point.edge * 0.22 + point.noise * model.noiseMap * 0.18, 0, 1);
+      if (signal < 0.045) continue;
+      paintSpatialHexCell(context, point.x, point.y, radius * (0.72 + signal * 0.46), spatialMeshStrokeStyle(point, model, meshAlpha * (0.18 + signal * 0.44)));
+    }
+  }
+  context.restore();
+}
+
+function paintSpatialIrregularVoxelMesh(context, rows, model, meshAlpha, amount = 1) {
+  context.save();
+  context.lineWidth = Math.max(0.4, context.lineWidth * 0.72);
+  for (let rowIndex = 0; rowIndex < rows.length - 1; rowIndex += 1) {
+    const row = rows[rowIndex];
+    const nextRow = rows[rowIndex + 1];
+    const count = Math.min(row.length, nextRow.length) - 1;
+    for (let column = 0; column < count; column += 1) {
+      const p00 = row[column];
+      const p10 = row[column + 1];
+      const p01 = nextRow[column];
+      const p11 = nextRow[column + 1];
+      const signal = clamp((p00.noise + p10.edge + p01.surface + p11.depth + (p00.subtle || 0) + (p11.subtle || 0)) / 6, 0, 1);
+      if (signal < 0.035) continue;
+      const cx = (p00.x + p10.x + p01.x + p11.x) / 4;
+      const cy = (p00.y + p10.y + p01.y + p11.y) / 4;
+      const pull = clamp((0.18 + signal * 0.34 + model.gridWarp * 0.18) * amount, 0, 0.74);
+      context.beginPath();
+      context.moveTo(mixChannel(p00.x, cx, pull * p00.noise), mixChannel(p00.y, cy, pull * p00.surface));
+      context.lineTo(mixChannel(p10.x, cx, pull * p10.surface), mixChannel(p10.y, cy, pull * p10.noise));
+      context.lineTo(mixChannel(p11.x, cx, pull * p11.edge), mixChannel(p11.y, cy, pull * p11.depth));
+      context.lineTo(mixChannel(p01.x, cx, pull * p01.depth), mixChannel(p01.y, cy, pull * p01.edge));
+      context.closePath();
+      context.strokeStyle = spatialMeshStrokeStyle(p11, model, meshAlpha * (0.16 + signal * 0.52));
+      context.stroke();
+    }
+  }
+  context.restore();
+}
+
+function paintSpatialVariableVoxelMesh(context, rows, cellStep, model, meshAlpha) {
+  paintSpatialTriangularVoxelMesh(context, rows, model, meshAlpha * 0.52);
+  paintSpatialHexagonalVoxelMesh(context, rows, cellStep, model, meshAlpha * 0.44);
+  paintSpatialIrregularVoxelMesh(context, rows, model, meshAlpha * 0.5, 0.68);
+}
+
+function paintSpatialEquationDrivenVoxelMesh(context, rows, cellStep, model, meshAlpha) {
+  paintSpatialTriangularVoxelMesh(context, rows, model, meshAlpha * clamp(0.35 + model.equationAdherence * 0.45, 0.18, 0.82));
+  context.save();
+  const dash = Math.max(2, cellStep * (0.16 + model.equationMetronymics * 0.18));
+  context.setLineDash([dash, dash * clamp(0.45 + model.equationAdherence, 0.5, 1.7)]);
+  context.lineWidth = Math.max(0.42, context.lineWidth * (0.72 + model.equationAdherence * 0.35));
+  for (let rowIndex = 0; rowIndex < rows.length - 1; rowIndex += 1) {
+    const row = rows[rowIndex];
+    const nextRow = rows[rowIndex + 1];
+    const count = Math.min(row.length, nextRow.length) - 1;
+    for (let column = 0; column < count; column += 1) {
+      const p00 = row[column];
+      const p11 = nextRow[column + 1];
+      const rhythm = Math.sin((rowIndex + column) * (0.72 + model.equationMetronymics * 2.4) + p00.depth * Math.PI);
+      const signal = clamp((p00.depth + p11.depth + p00.edge + p11.surface + Math.abs(rhythm) * model.equationMetronymics) / 5, 0, 1);
+      if (signal < 0.04) continue;
+      const offset = rhythm * cellStep * model.equationMetronymics * 0.16;
+      context.beginPath();
+      context.moveTo(p00.x + offset, p00.y - offset * 0.5);
+      context.quadraticCurveTo((p00.x + p11.x) / 2, (p00.y + p11.y) / 2 + offset, p11.x - offset, p11.y + offset * 0.5);
+      context.strokeStyle = spatialMeshStrokeStyle(p11, model, meshAlpha * (0.18 + signal * 0.56));
+      context.stroke();
+    }
+  }
+  context.restore();
+}
+
+function paintSpatialHexCell(context, x, y, radius, strokeStyle) {
+  context.beginPath();
+  for (let index = 0; index < 6; index += 1) {
+    const angle = Math.PI / 6 + index * (Math.PI / 3);
+    const px = x + Math.cos(angle) * radius;
+    const py = y + Math.sin(angle) * radius;
+    if (index === 0) context.moveTo(px, py);
+    else context.lineTo(px, py);
+  }
+  context.closePath();
+  context.strokeStyle = strokeStyle;
+  context.stroke();
+}
+
+function spatialMeshStrokeStyle(point, model, alpha) {
+  const [r, g, b] = point.color || spatialRecognitionDepthColor(point.depth || 0, model);
+  const red = Math.round(mixChannel(r, 255, 0.16 + model.colorSplit * 0.08));
+  const green = Math.round(mixChannel(g, 245, 0.14 + model.surfaceMap * 0.05));
+  const blue = Math.round(mixChannel(b, 255, 0.2 + model.colorDepth * 0.06));
+  return `rgba(${red}, ${green}, ${blue}, ${clamp(alpha, 0, 0.62)})`;
 }
 
 function paintSyncedSpatialCellSamples(context, cellField, model, pointAlpha) {

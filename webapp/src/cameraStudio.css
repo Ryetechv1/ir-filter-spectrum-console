@@ -1520,6 +1520,57 @@
   font-weight: 800;
 }
 
+.spatial-mesh-form-selector {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(var(--studio-accent-rgb), 0.28);
+  border-radius: 10px;
+  background:
+    linear-gradient(135deg, rgba(var(--studio-accent-rgb), 0.16), transparent 52%),
+    rgba(2, 6, 10, 0.46);
+}
+
+.spatial-mesh-form-selector span {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--studio-accent-strong);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.spatial-mesh-form-selector select {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid rgba(var(--studio-accent-rgb), 0.3);
+  border-radius: 8px;
+  color: #eef8ff;
+  background: rgba(1, 5, 8, 0.82);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.spatial-mesh-form-selector p {
+  margin: 0;
+  color: #c9d5df;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.spatial-mesh-form-selector.compact {
+  margin-top: 10px;
+}
+
+.spatial-mesh-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .smart-dark-edge-adjustment span svg {
   color: var(--studio-accent-strong);
 }
