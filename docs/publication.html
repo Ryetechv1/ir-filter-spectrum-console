@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Official GitHub Publication | SW's Spectral Image Studio</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #020407;
+        --panel: rgba(8, 17, 22, 0.92);
+        --line: rgba(255, 78, 54, 0.58);
+        --accent: #ff4e36;
+        --accent-2: #42ddff;
+        --text: #f6fbff;
+        --muted: #b8c6ce;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--text);
+        background:
+          radial-gradient(circle at 12% 0%, rgba(255, 78, 54, 0.3), transparent 34%),
+          radial-gradient(circle at 100% 10%, rgba(66, 221, 255, 0.16), transparent 30%),
+          linear-gradient(135deg, #020407 0%, #081219 48%, #030508 100%);
+        font-family: Fiona, "Trebuchet MS", Arial, sans-serif;
+        line-height: 1.6;
+      }
+
+      main {
+        width: min(960px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 56px 0;
+      }
+
+      .publication-shell {
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        box-shadow: 0 0 44px rgba(255, 78, 54, 0.18), inset 0 0 42px rgba(255, 78, 54, 0.08);
+        background: var(--panel);
+        overflow: hidden;
+      }
+
+      header,
+      section {
+        padding: clamp(22px, 4vw, 42px);
+        border-bottom: 1px solid rgba(255, 78, 54, 0.24);
+      }
+
+      section:last-child {
+        border-bottom: 0;
+      }
+
+      .eyebrow {
+        margin: 0 0 10px;
+        color: var(--accent-2);
+        font-size: 0.8rem;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2 {
+        margin: 0;
+        letter-spacing: 0.04em;
+      }
+
+      h1 {
+        max-width: 820px;
+        font-size: clamp(2.1rem, 8vw, 5rem);
+        line-height: 0.95;
+      }
+
+      h2 {
+        color: #fff;
+        font-size: clamp(1.35rem, 3vw, 2.1rem);
+      }
+
+      p {
+        margin: 14px 0 0;
+        color: var(--muted);
+      }
+
+      a {
+        color: #9eefff;
+        font-weight: 800;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 24px;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
+        padding: 0 18px;
+        border: 1px solid rgba(66, 221, 255, 0.65);
+        border-radius: 10px;
+        color: #041015;
+        background: linear-gradient(135deg, var(--accent-2), #effcff);
+        text-decoration: none;
+      }
+
+      .button.secondary {
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.05);
+        border-color: var(--line);
+      }
+
+      .facts {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 12px;
+        margin-top: 22px;
+      }
+
+      .fact {
+        min-width: 0;
+        padding: 14px;
+        border: 1px solid rgba(255, 78, 54, 0.32);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.035);
+      }
+
+      .fact strong {
+        display: block;
+        color: var(--accent-2);
+        font-size: 0.76rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .fact span {
+        display: block;
+        margin-top: 6px;
+        overflow-wrap: anywhere;
+      }
+
+      code {
+        color: #fff;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 6px;
+        padding: 0.1em 0.35em;
+      }
+
+      blockquote {
+        margin: 18px 0 0;
+        padding: 14px 16px;
+        border-left: 4px solid var(--accent);
+        color: #fff;
+        background: rgba(255, 78, 54, 0.08);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <article class="publication-shell">
+        <header>
+          <p class="eyebrow">Official GitHub Publication</p>
+          <h1>SW's Spectral Image Studio</h1>
+          <p>
+            This page marks the GitHub Pages build of the spectral camera studio as the official public reference
+            publication for the current repository state.
+          </p>
+          <div class="actions">
+            <a class="button" href="./?studio=camera&amp;v=official-publication-2026-08-15">Open Published Studio</a>
+            <a class="button secondary" href="https://github.com/Ryetechv1/ir-filter-spectrum-console">Open GitHub Repository</a>
+          </div>
+        </header>
+
+        <section>
+          <h2>Publication Identity</h2>
+          <div class="facts">
+            <div class="fact">
+              <strong>Release tag</strong>
+              <span><code>official-publication-2026-08-15</code></span>
+            </div>
+            <div class="fact">
+              <strong>Repository</strong>
+              <span>Ryetechv1/ir-filter-spectrum-console</span>
+            </div>
+            <div class="fact">
+              <strong>Published URL</strong>
+              <span>https://ryetechv1.github.io/ir-filter-spectrum-console/</span>
+            </div>
+            <div class="fact">
+              <strong>Release date</strong>
+              <span>August 15, 2026</span>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h2>Scope</h2>
+          <p>
+            This publication includes the camera studio, local camera permission flow, effect presets, generated-value
+            filter engine, upload and overlay tools, PRIME examples gallery, DWT isolation materials, flashlight controls,
+            spatial recognition mesh/voxel controls, and public documentation currently shipped with the repository.
+          </p>
+        </section>
+
+        <section>
+          <h2>Citation</h2>
+          <blockquote>
+            Seth M. Knudson. <strong>SW's Spectral Image Studio</strong>. GitHub, 2026.
+            https://github.com/Ryetechv1/ir-filter-spectrum-console
+          </blockquote>
+          <p>
+            Machine-readable citation metadata is available in the repository's <code>CITATION.cff</code> file.
+          </p>
+        </section>
+
+        <section>
+          <h2>Rights</h2>
+          <p>
+            The project is publicly accessible for reference through GitHub Pages. Original app content, branding, gallery
+            assets, and publication wording are reserved to Seth M. Knudson / Supernatural World unless a separate written
+            license is later added.
+          </p>
+        </section>
+      </article>
+    </main>
+  </body>
+</html>
