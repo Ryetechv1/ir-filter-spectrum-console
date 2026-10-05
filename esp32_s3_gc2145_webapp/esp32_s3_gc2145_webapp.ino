@@ -7,8 +7,8 @@
 
 // Replace these for station-mode use. If left unchanged or connection fails,
 // the sketch starts its own ESP32-S3-SPECTRUM access point.
-const char *WIFI_SSID = "YOUR_WIFI_NAME";
-const char *WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
+const char *WIFI_SSID = "";
+const char *WIFI_PASSWORD = "";
 
 const char *AP_SSID = "ESP32-S3-SPECTRUM";
 const char *AP_PASSWORD = "change-this-password";
