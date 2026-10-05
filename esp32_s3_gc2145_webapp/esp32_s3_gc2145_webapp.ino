@@ -688,7 +688,7 @@ void sendCorsHeaders() {
 }
 
 bool initCamera() {
-  camera_config_t config;
+  camera_config_t config = {};
   config.ledc_channel = LEDC_CHANNEL_0;
   config.ledc_timer = LEDC_TIMER_0;
   config.pin_d0 = Y2_GPIO_NUM;
@@ -708,8 +708,8 @@ bool initCamera() {
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
-  // RGB565 works with GC2145 and OV3660; encode JPEG for the HTTP endpoints.
-  config.pixel_format = PIXFORMAT_RGB565;
+  // Prefer sensor JPEG; GC2145 falls back to RGB565 below.
+  config.pixel_format = PIXFORMAT_JPEG;
   config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
   config.frame_size = FRAMESIZE_QVGA;
   config.jpeg_quality = 12;
@@ -717,6 +717,10 @@ bool initCamera() {
   config.fb_location = psramFound() ? CAMERA_FB_IN_PSRAM : CAMERA_FB_IN_DRAM;
 
   esp_err_t err = esp_camera_init(&config);
+  if (err == ESP_ERR_NOT_SUPPORTED) {
+    config.pixel_format = PIXFORMAT_RGB565;
+    err = esp_camera_init(&config);
+  }
   if (err != ESP_OK) {
     Serial.printf("Camera init failed: 0x%x\n", err);
     return false;
@@ -973,6 +977,20 @@ void handleLed() {
   handleStatus();
 }
 
+bool jpegForFrame(camera_fb_t *fb, uint8_t **data, size_t *length) {
+  if (fb->format == PIXFORMAT_JPEG) {
+    *data = fb->buf;
+    *length = fb->len;
+    return true;
+  }
+  return frame2jpg(fb, STREAM_JPEG_QUALITY, data, length);
+}
+
+void releaseJpegFrame(camera_fb_t *fb, uint8_t *data) {
+  if (fb->format != PIXFORMAT_JPEG) free(data);
+  esp_camera_fb_return(fb);
+}
+
 void handleCapture() {
   camera_fb_t *fb = esp_camera_fb_get();
   if (!fb) {
@@ -983,9 +1001,9 @@ void handleCapture() {
 
   uint8_t *jpg = nullptr;
   size_t jpgLen = 0;
-  const bool encoded = frame2jpg(fb, STREAM_JPEG_QUALITY, &jpg, &jpgLen);
-  esp_camera_fb_return(fb);
+  const bool encoded = jpegForFrame(fb, &jpg, &jpgLen);
   if (!encoded || !jpg) {
+    esp_camera_fb_return(fb);
     sendCorsHeaders();
     server.send(503, "text/plain", "JPEG conversion failed");
     return;
@@ -998,7 +1016,7 @@ void handleCapture() {
   server.setContentLength(jpgLen);
   server.send(200, "image/jpeg", "");
   client.write(jpg, jpgLen);
-  free(jpg);
+  releaseJpegFrame(fb, jpg);
 }
 
 void handleStream() {
@@ -1024,9 +1042,9 @@ void handleStream() {
 
     uint8_t *jpg = nullptr;
     size_t jpgLen = 0;
-    const bool encoded = frame2jpg(fb, STREAM_JPEG_QUALITY, &jpg, &jpgLen);
-    esp_camera_fb_return(fb);
+    const bool encoded = jpegForFrame(fb, &jpg, &jpgLen);
     if (!encoded || !jpg) {
+      esp_camera_fb_return(fb);
       delay(50);
       server.handleClient();
       serviceLightTimeout();
@@ -1041,7 +1059,7 @@ void handleStream() {
     client.println();
     const size_t written = client.write(jpg, jpgLen);
     client.println();
-    free(jpg);
+    releaseJpegFrame(fb, jpg);
 
     if (written != jpgLen) {
       break;
