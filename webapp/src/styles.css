@@ -691,125 +691,26 @@ button:disabled {
   grid-template-rows: minmax(212px, 1fr) auto;
   gap: 10px;
   padding: 12px;
-  background:
-    radial-gradient(circle at 50% 48%, rgba(var(--theme-accent-rgb), 0.1), transparent 42%),
-    rgba(4, 8, 12, 0.86);
-}
-
-.hologram-preview.off .holo-pane,
-.hologram-preview.off .holo-reticle {
-  opacity: 0.12;
+  background: rgba(4, 8, 12, 0.86);
 }
 
 .hologram-glass {
-  position: relative;
-  min-height: 212px;
+  display: grid;
+  place-items: center;
+  min-height: 248px;
   overflow: hidden;
   border: 1px solid rgba(98, 134, 160, 0.34);
   border-radius: 7px;
-  background:
-    linear-gradient(90deg, transparent 49%, rgba(255, 255, 255, 0.04) 50%, transparent 51%),
-    linear-gradient(0deg, transparent 49%, rgba(255, 255, 255, 0.04) 50%, transparent 51%),
-    linear-gradient(145deg, rgba(16, 33, 47, 0.75), rgba(3, 6, 9, 0.96));
-  background-size: 34px 34px, 34px 34px, auto;
+  background: #030506;
 }
 
-.holo-pane {
-  position: absolute;
-  border: 1px solid rgba(222, 246, 255, 0.7);
-  border-radius: 7px;
-  opacity: var(--holo-alpha);
-  background: linear-gradient(90deg, var(--holo-c1), var(--holo-c2), var(--holo-c3));
-  box-shadow:
-    0 0 18px var(--holo-c1),
-    inset 0 0 18px rgba(255, 255, 255, 0.14);
-}
-
-.pane-top,
-.pane-bottom {
-  left: 50%;
-  width: 46%;
-  height: 26%;
-  transform: translateX(-50%);
-}
-
-.pane-top {
-  top: 8%;
-}
-
-.pane-bottom {
-  bottom: 8%;
-  transform: translateX(-50%) rotate(180deg);
-}
-
-.pane-left,
-.pane-right {
-  top: 50%;
-  width: 28%;
-  height: 46%;
-  transform: translateY(-50%);
-}
-
-.pane-left {
-  left: 8%;
-  transform: translateY(-50%) rotate(90deg);
-}
-
-.pane-right {
-  right: 8%;
-  transform: translateY(-50%) rotate(-90deg);
-}
-
-.holo-reticle {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 74px;
-  height: 74px;
-  border: 2px solid var(--holo-c3);
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  opacity: var(--holo-alpha);
-  box-shadow: 0 0 24px var(--holo-c2);
-}
-
-.holo-reticle::before,
-.holo-reticle::after {
-  content: "";
-  position: absolute;
-  background: var(--holo-c3);
-  box-shadow: 0 0 14px var(--holo-c2);
-}
-
-.holo-reticle::before {
-  left: -38px;
-  right: -38px;
-  top: 50%;
-  height: 2px;
-}
-
-.holo-reticle::after {
-  top: -38px;
-  bottom: -38px;
-  left: 50%;
-  width: 2px;
-}
-
-.mode-0 .hologram-glass {
-  background: linear-gradient(180deg, var(--holo-c1), var(--holo-c1));
-}
-
-.mode-1 .hologram-glass {
-  background: linear-gradient(180deg, var(--holo-c1), var(--holo-c2), var(--holo-c3));
-}
-
-.mode-3 .hologram-glass::after {
-  content: "";
-  position: absolute;
-  inset: 18% 0 auto;
-  height: 3px;
-  background: var(--holo-c3);
-  box-shadow: 0 0 22px var(--holo-c2);
+.hologram-glass canvas {
+  display: block;
+  width: auto;
+  height: min(36vh, 300px);
+  max-width: 100%;
+  aspect-ratio: 172 / 320;
+  border: 1px solid #2e3e48;
 }
 
 .hologram-palette-strip {
@@ -1318,7 +1219,7 @@ input[type="range"]::-moz-range-thumb {
 
 .hardware-content {
   display: grid;
-  grid-template-columns: 76px 76px minmax(110px, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
   align-items: stretch;
   margin-top: 14px;
@@ -1336,17 +1237,25 @@ figure {
 
 .hardware-content img {
   width: 100%;
-  aspect-ratio: 1 / 1.18;
-  object-fit: cover;
+  aspect-ratio: 4 / 3;
+  object-fit: contain;
   border: 1px solid #344552;
   border-radius: 7px;
-  background: #0a0e12;
+  background: #f7f7f7;
 }
 
 .hardware-content figcaption {
   color: var(--muted);
   font-size: 12px;
   text-align: center;
+}
+
+.hardware-content figcaption a {
+  color: var(--accent);
+}
+
+.hardware-content .telemetry-list {
+  grid-column: 1 / -1;
 }
 
 .telemetry-list {
@@ -1547,10 +1456,6 @@ figure {
   .hardware-panel,
   .wiring-panel {
     grid-column: auto;
-  }
-
-  .hardware-content {
-    grid-template-columns: 120px 120px minmax(180px, 1fr);
   }
 
   .wiring-diagram {

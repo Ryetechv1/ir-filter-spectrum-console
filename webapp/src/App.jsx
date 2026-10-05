@@ -34,6 +34,7 @@ import {
 import AccentThemePicker from "./AccentThemePicker.jsx";
 import CameraStudio from "./CameraStudio.jsx";
 import { DEFAULT_PROTOTYPE_ID, PROTOTYPES, getPrototype } from "./prototypes.js";
+import { drawHologramFrame, LCD_HEIGHT, LCD_WIDTH, motionIntervalMs } from "./hologramRenderer.js";
 
 const APP_NAME = "༄SW’s SPECTRAL IMAGE STUDIO𒀼";
 const DEFAULT_ADDRESS = "http://192.168.4.1";
@@ -367,14 +368,6 @@ function dutyToPercent(value) {
 function colorCss(hologram, index) {
   return `rgb(${hologram[`r${index}`]}, ${hologram[`g${index}`]}, ${hologram[`b${index}`]})`;
 }
-
-function dimmedColorCss(hologram, index) {
-  const scale = hologram.brightness / 255;
-  return `rgb(${Math.round(hologram[`r${index}`] * scale)}, ${Math.round(hologram[`g${index}`] * scale)}, ${Math.round(
-    hologram[`b${index}`] * scale
-  )})`;
-}
-
 
 function rgbwLevel(lights, groupKey) {
   const group = RGBW_GROUPS[groupKey];
@@ -1020,8 +1013,9 @@ function App() {
               <HologramSlider
                 label="Motion"
                 value={hologram.speed}
+                outputText={hologram.speed === 0 ? "Stopped" : hologram.speed}
                 disabled={!hologramEnabled}
-                onChange={(value) => updateHologram({ speed: value })}
+                onChange={(value) => updateHologram({ speed: value, power: value > 0 ? 1 : hologram.power })}
               />
               {[1, 2, 3].map((index) => (
                 <HologramColorMixer key={index} index={index} hologram={hologram} disabled={!hologramEnabled} onChange={updateHologram} />
@@ -1214,12 +1208,16 @@ function App() {
           <PanelHeader title="Hardware reference" icon={<SatelliteDish size={18} />} meta="S3 camera, C6 display, ESP32 LCD driver" />
           <div className="hardware-content">
             <figure>
-              <img src="/assets/esp32-front.jpg" alt="ESP32-CAM front with OV2640 camera" />
-              <figcaption>Legacy ESP32-CAM front</figcaption>
+              <img src={`${import.meta.env.BASE_URL}assets/esp32-s3-cam-reference.webp`} alt="ESP32-S3 camera development board reference" loading="lazy" />
+              <figcaption>ESP32-S3 CAM board <a href="https://www.newegg.com/p/3C6-00UH-03R82" target="_blank" rel="noopener noreferrer">reference</a></figcaption>
             </figure>
             <figure>
-              <img src="/assets/esp32-back.jpg" alt="ESP32-CAM back with ESP32 module" />
-              <figcaption>Legacy ESP32-CAM back</figcaption>
+              <img src={`${import.meta.env.BASE_URL}assets/ov3660-module-reference.png`} alt="OV3660 ribbon camera sensor module reference" loading="lazy" />
+              <figcaption>OV3660 sensor <a href="https://zaitronics.com.au/products/ov3660-camera-for-esp32" target="_blank" rel="noopener noreferrer">reference</a></figcaption>
+            </figure>
+            <figure>
+              <img src={`${import.meta.env.BASE_URL}assets/esp32-c6-lcd-reference.webp`} alt="Waveshare ESP32-C6-LCD-1.47 development board reference" loading="lazy" />
+              <figcaption>ESP32-C6 LCD <a href="https://docs.waveshare.com/ESP32-C6-LCD-1.47" target="_blank" rel="noopener noreferrer">reference</a></figcaption>
             </figure>
             <div className="telemetry-list">
               {telemetrySeed.map(([label, value]) => (
@@ -1458,21 +1456,36 @@ function ColorChannelSlider({ label, channel, value, disabled = false, onChange,
 }
 
 function HologramPreview({ hologram, disabled = false }) {
-  const previewStyle = {
-    "--holo-c1": dimmedColorCss(hologram, 1),
-    "--holo-c2": dimmedColorCss(hologram, 2),
-    "--holo-c3": dimmedColorCss(hologram, 3),
-    "--holo-alpha": hologram.power && !disabled ? Math.max(0.08, hologram.brightness / 255) : 0.04
-  };
+  const canvasRef = useRef(null);
+  const frameRef = useRef(0);
+
+  useEffect(() => {
+    const ctx = canvasRef.current?.getContext("2d");
+    if (!ctx) return undefined;
+    drawHologramFrame(ctx, hologram, frameRef.current, disabled);
+    const interval = motionIntervalMs(hologram.speed);
+    if (!interval || !hologram.power || disabled || hologram.mode === 0 || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return undefined;
+
+    let animationId;
+    let lastDrawAt = performance.now();
+    const tick = (now) => {
+      const elapsed = now - lastDrawAt;
+      if (elapsed >= interval) {
+        const steps = Math.floor(elapsed / interval);
+        frameRef.current += steps;
+        lastDrawAt += steps * interval;
+        drawHologramFrame(ctx, hologram, frameRef.current, disabled);
+      }
+      animationId = requestAnimationFrame(tick);
+    };
+    animationId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(animationId);
+  }, [hologram, disabled]);
 
   return (
-    <div className={`hologram-preview mode-${hologram.mode} ${hologram.power && !disabled ? "" : "off"}`} style={previewStyle}>
-      <div className="hologram-glass" aria-label="Hologram acrylic preview">
-        <span className="holo-pane pane-top" />
-        <span className="holo-pane pane-right" />
-        <span className="holo-pane pane-bottom" />
-        <span className="holo-pane pane-left" />
-        <span className="holo-reticle" />
+    <div className="hologram-preview">
+      <div className="hologram-glass">
+        <canvas ref={canvasRef} width={LCD_WIDTH} height={LCD_HEIGHT} role="img" aria-label="Simulated ESP32-C6 LCD output" />
       </div>
       <div className="hologram-palette-strip">
         <span style={{ background: colorCss(hologram, 1) }} />
@@ -1483,12 +1496,12 @@ function HologramPreview({ hologram, disabled = false }) {
   );
 }
 
-function HologramSlider({ label, value, disabled = false, onChange }) {
+function HologramSlider({ label, value, outputText = value, disabled = false, onChange }) {
   return (
     <label className="hologram-slider">
       <span>
         <strong>{label}</strong>
-        <output>{value}</output>
+        <output>{outputText}</output>
       </span>
       <input
         type="range"
@@ -1504,7 +1517,7 @@ function HologramSlider({ label, value, disabled = false, onChange }) {
 }
 
 function HologramColorMixer({ index, hologram, disabled = false, onChange }) {
-  const labels = ["Primary", "Secondary", "Highlight"];
+  const labels = ["Color 1 · Primary", "Color 2 · Secondary", "Color 3 · Accent"];
   const patchFor = (channel, value) => {
     onChange({
       [`${channel}${index}`]: value,

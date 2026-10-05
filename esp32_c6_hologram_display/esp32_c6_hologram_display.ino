@@ -350,12 +350,11 @@ void setup() {
 void loop() {
   server.handleClient();
 
+  // Speed zero freezes the current frame; solid color has no motion to redraw.
   const uint16_t intervalMs = map(holo.speed, 0, 255, 180, 18);
-  if (holo.power && millis() - lastDrawAt >= intervalMs) {
+  if (holo.power && holo.speed > 0 && holo.mode != 0 && millis() - lastDrawAt >= intervalMs) {
     lastDrawAt = millis();
     holo.frame++;
-    if (holo.mode >= 2) {
-      drawHologram();
-    }
+    drawHologram();
   }
 }

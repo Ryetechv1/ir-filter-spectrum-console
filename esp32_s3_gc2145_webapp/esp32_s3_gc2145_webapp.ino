@@ -1,4 +1,5 @@
 #include "esp_camera.h"
+#include "img_converters.h"
 #include <WiFi.h>
 #include <SHA1Builder.h>
 #include <ESPmDNS.h>
@@ -13,7 +14,7 @@ const char *AP_SSID = "ESP32-S3-SPECTRUM";
 const char *AP_PASSWORD = "change-this-password";
 
 // ESP32-S3-WROOM-1-N16R8 CAM board pinout used by Keyestudio MB0184-style
-// boards and many dual-USB ESP32-S3 CAM clones. The GC2145 module is detected
+// boards and many dual-USB ESP32-S3 CAM clones. The camera sensor is detected
 // by esp32-camera over SCCB at runtime.
 #define PWDN_GPIO_NUM -1
 #define RESET_GPIO_NUM -1
@@ -48,7 +49,8 @@ WebServer streamServer(81);
 HardwareSerial ledSerial(1);
 
 const char *STREAM_BOUNDARY = "esp32s3camstream";
-const uint32_t STREAM_FRAME_INTERVAL_MS = 36;
+const uint32_t STREAM_FRAME_INTERVAL_MS = 90;
+const uint8_t STREAM_JPEG_QUALITY = 70;
 
 bool driverPower = false;
 bool irOn = false;
@@ -67,6 +69,8 @@ uint8_t rgbwG[RGBW_GROUP_COUNT] = {0, 0, 0, 0, 0};
 uint8_t rgbwB[RGBW_GROUP_COUNT] = {0, 0, 0, 0, 0};
 uint8_t rgbwW[RGBW_GROUP_COUNT] = {0, 0, 0, 0, 0};
 uint8_t activePrototype = DEFAULT_PROTOTYPE_BUILD;
+uint16_t cameraSensorPid = 0;
+const char *cameraSensorName = "unknown";
 
 const uint8_t VISIBLE_R = 204;
 const uint8_t VISIBLE_G = 186;
@@ -207,7 +211,7 @@ const char INDEX_HTML[] PROGMEM = R"HTML(
 </head>
 <body>
   <header>
-      <h1>ESP32-S3 GC2145 Spectrum</h1>
+      <h1>ESP32-S3 Camera Spectrum</h1>
     <button id="pause" type="button">Pause</button>
   </header>
   <main>
@@ -704,20 +708,13 @@ bool initCamera() {
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
-  config.pixel_format = PIXFORMAT_JPEG;
-  config.grab_mode = CAMERA_GRAB_LATEST;
-
-  if (psramFound()) {
-    config.frame_size = FRAMESIZE_VGA;
-    config.jpeg_quality = 10;
-    config.fb_count = 2;
-    config.fb_location = CAMERA_FB_IN_PSRAM;
-  } else {
-    config.frame_size = FRAMESIZE_QVGA;
-    config.jpeg_quality = 12;
-    config.fb_count = 1;
-    config.fb_location = CAMERA_FB_IN_DRAM;
-  }
+  // RGB565 works with GC2145 and OV3660; encode JPEG for the HTTP endpoints.
+  config.pixel_format = PIXFORMAT_RGB565;
+  config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
+  config.frame_size = FRAMESIZE_QVGA;
+  config.jpeg_quality = 12;
+  config.fb_count = 1;
+  config.fb_location = psramFound() ? CAMERA_FB_IN_PSRAM : CAMERA_FB_IN_DRAM;
 
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
@@ -727,7 +724,10 @@ bool initCamera() {
 
   sensor_t *sensor = esp_camera_sensor_get();
   if (sensor) {
-    sensor->set_framesize(sensor, psramFound() ? FRAMESIZE_VGA : FRAMESIZE_QVGA);
+    cameraSensorPid = sensor->id.PID;
+    cameraSensorName = cameraSensorPid == 0x3660 ? "ov3660" : cameraSensorPid == 0x2145 ? "gc2145" : "other";
+    Serial.printf("Camera sensor: %s (PID 0x%04x)\n", cameraSensorName, cameraSensorPid);
+    sensor->set_framesize(sensor, FRAMESIZE_QVGA);
     sensor->set_saturation(sensor, -2);
     sensor->set_brightness(sensor, 0);
     sensor->set_whitebal(sensor, 1);
@@ -833,7 +833,11 @@ String lightStatusJson() {
     body += "\":";
     body += String(rgbwW[index]);
   }
-  body += ",\"rgbwPixels\":8,\"camera\":\"esp32-s3-gc2145\",\"legacyCamera\":\"esp32-cam-ov2640\",\"driver\":\"esp32-lcd-1.14-sk6812-acrylic-v1.0\"}";
+  body += ",\"rgbwPixels\":8,\"camera\":\"esp32-s3-camera\",\"cameraSensor\":\"";
+  body += cameraSensorName;
+  body += "\",\"cameraSensorPid\":";
+  body += String(cameraSensorPid);
+  body += ",\"legacyCamera\":\"esp32-cam-ov2640\",\"driver\":\"esp32-lcd-1.14-sk6812-acrylic-v1.0\"}";
   return body;
 }
 
@@ -977,14 +981,24 @@ void handleCapture() {
     return;
   }
 
+  uint8_t *jpg = nullptr;
+  size_t jpgLen = 0;
+  const bool encoded = frame2jpg(fb, STREAM_JPEG_QUALITY, &jpg, &jpgLen);
+  esp_camera_fb_return(fb);
+  if (!encoded || !jpg) {
+    sendCorsHeaders();
+    server.send(503, "text/plain", "JPEG conversion failed");
+    return;
+  }
+
   WiFiClient client = server.client();
   sendCorsHeaders();
   server.sendHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
   server.sendHeader("Pragma", "no-cache");
-  server.setContentLength(fb->len);
+  server.setContentLength(jpgLen);
   server.send(200, "image/jpeg", "");
-  client.write(fb->buf, fb->len);
-  esp_camera_fb_return(fb);
+  client.write(jpg, jpgLen);
+  free(jpg);
 }
 
 void handleStream() {
@@ -1008,17 +1022,28 @@ void handleStream() {
       continue;
     }
 
+    uint8_t *jpg = nullptr;
+    size_t jpgLen = 0;
+    const bool encoded = frame2jpg(fb, STREAM_JPEG_QUALITY, &jpg, &jpgLen);
+    esp_camera_fb_return(fb);
+    if (!encoded || !jpg) {
+      delay(50);
+      server.handleClient();
+      serviceLightTimeout();
+      continue;
+    }
+
     client.print("--");
     client.println(STREAM_BOUNDARY);
     client.println("Content-Type: image/jpeg");
     client.print("Content-Length: ");
-    client.println(fb->len);
+    client.println(jpgLen);
     client.println();
-    const size_t written = client.write(fb->buf, fb->len);
+    const size_t written = client.write(jpg, jpgLen);
     client.println();
-    esp_camera_fb_return(fb);
+    free(jpg);
 
-    if (written != fb->len) {
+    if (written != jpgLen) {
       break;
     }
 
